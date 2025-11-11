@@ -1,8 +1,9 @@
 import { defineBackend } from '@aws-amplify/backend';
-import { auth } from './auth/resource.js';
-import { data } from './data/resource.js';
+import { auth } from './auth/resource';
 
-defineBackend({
+/**
+ * Coordy バックエンド設定
+ */
+export const backend = defineBackend({
   auth,
-  data,
 });
