@@ -1,0 +1,1552 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>予約サイト - サイトマップ＆ワイヤーフレーム</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+        }
+        
+        /* サイトマップスタイル */
+        .sitemap-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: white;
+            min-height: 100vh;
+        }
+        
+        .sitemap-header {
+            text-align: center;
+            margin-bottom: 60px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        
+        .sitemap-header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            color: #1f2937;
+        }
+        
+        .sitemap-tree {
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+            margin-bottom: 60px;
+        }
+        
+        .role-section {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .role-header {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        
+        .role-user .role-header {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .role-instructor .role-header {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .role-admin .role-header {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .sitemap-list {
+            list-style: none;
+            padding-left: 20px;
+        }
+        
+        .sitemap-list li {
+            margin: 8px 0;
+            display: flex;
+            align-items: center;
+        }
+        
+        .sitemap-list li::before {
+            content: "├─";
+            margin-right: 10px;
+            color: #9ca3af;
+        }
+        
+        .sitemap-list li:last-child::before {
+            content: "└─";
+        }
+        
+        .page-link {
+            text-decoration: none;
+            color: #3b82f6;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        
+        .page-link:hover {
+            background: #eff6ff;
+        }
+        
+        .page-link code {
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 13px;
+            color: #6b7280;
+            margin-left: 8px;
+        }
+        
+        /* ワイヤーフレームスタイル */
+        .wireframe-section {
+            margin-top: 80px;
+            padding-top: 40px;
+            border-top: 3px solid #e5e7eb;
+        }
+        
+        .wireframe-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-top: 30px;
+        }
+        
+        .wireframe-page {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .wireframe-header {
+            background: #f9fafb;
+            padding: 15px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .wireframe-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .wireframe-url {
+            font-size: 12px;
+            color: #6b7280;
+            font-family: monospace;
+        }
+        
+        .wireframe-content {
+            padding: 20px;
+            min-height: 400px;
+        }
+        
+        /* 共通UIコンポーネント */
+        .header-mock {
+            background: #374151;
+            color: white;
+            padding: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: -20px -20px 20px -20px;
+        }
+        
+        .nav-mock {
+            background: #f3f4f6;
+            padding: 10px;
+            margin: -20px -20px 20px -20px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .btn {
+            background: #3b82f6;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            display: inline-block;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        
+        .btn-secondary {
+            background: #6b7280;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .calendar-mock {
+            background: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            padding: 20px;
+            text-align: center;
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6b7280;
+        }
+        
+        .table-mock {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        
+        .table-mock th,
+        .table-mock td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .table-mock th {
+            background: #f9fafb;
+            font-weight: 600;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .badge-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1f2937;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 5px;
+        }
+        
+        /* レスポンシブ */
+        @media (max-width: 768px) {
+            .wireframe-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* プリント用スタイル */
+        @media print {
+            .wireframe-section {
+                page-break-before: always;
+            }
+            
+            .wireframe-page {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="sitemap-container">
+        <!-- サイトマップセクション -->
+        <div class="sitemap-header">
+            <h1>🗂️ 予約サイト - サイトマップ＆ワイヤーフレーム</h1>
+            <p>URLベースロール判定システム（2024年版）</p>
+        </div>
+        
+        <!-- ルートリダイレクト説明 -->
+        <div class="role-section" style="margin-bottom: 40px;">
+            <div style="background: #fee2e2; color: #991b1b; padding: 10px; border-radius: 4px; margin-bottom: 15px;">
+                <strong>⚠️ ルートアクセス処理</strong>
+            </div>
+            <ul class="sitemap-list">
+                <li>
+                    <span><code>/</code> → <code>302 Redirect</code> → <code>/user/login</code></span>
+                </li>
+            </ul>
+        </div>
+        
+        <!-- サイトマップツリー -->
+        <div class="sitemap-tree">
+            <!-- Userロール -->
+            <div class="role-section role-user">
+                <div class="role-header">👤 User (利用者)</div>
+                <ul class="sitemap-list">
+                    <li><a href="#user-login" class="page-link">ログイン<code>/user/login</code></a></li>
+                    <li><a href="#user-home" class="page-link">ホーム<code>/user</code></a></li>
+                    <li><a href="#user-dashboard" class="page-link">ダッシュボード<code>/user/dashboard</code></a></li>
+                    <li><a href="#user-services" class="page-link">サービス一覧<code>/user/services</code></a></li>
+                    <li><a href="#user-service-detail" class="page-link">サービス詳細<code>/user/services/[id]</code></a></li>
+                    <li><a href="#user-availability" class="page-link">空き状況<code>/user/availability</code></a></li>
+                    <li><a href="#user-checkout" class="page-link">予約手続き<code>/user/checkout</code></a></li>
+                    <li><a href="#user-reservations" class="page-link">予約履歴<code>/user/account/reservations</code></a></li>
+                    <li><a href="#user-payments" class="page-link">支払い<code>/user/payments</code></a></li>
+                    <li><a href="#user-reviews" class="page-link">レビュー<code>/user/reviews</code></a></li>
+                    <li><a href="#user-favorites" class="page-link">お気に入り<code>/user/favorites</code></a></li>
+                    <li><a href="#user-live" class="page-link">ライブ<code>/user/live</code></a></li>
+                    <li><a href="#user-help" class="page-link">ヘルプ<code>/user/help</code></a></li>
+                </ul>
+            </div>
+            
+            <!-- Instructorロール -->
+            <div class="role-section role-instructor">
+                <div class="role-header">👨‍🏫 Instructor (インストラクター)</div>
+                <ul class="sitemap-list">
+                    <li><a href="#instructor-login" class="page-link">ログイン<code>/instructor/login</code></a></li>
+                    <li><a href="#instructor-home" class="page-link">ホーム<code>/instructor</code></a></li>
+                    <li><a href="#instructor-dashboard" class="page-link">ダッシュボード<code>/instructor/dashboard</code></a></li>
+                    <li><a href="#instructor-schedule" class="page-link">スケジュール管理<code>/instructor/schedule</code></a></li>
+                    <li><a href="#instructor-reservations" class="page-link">予約管理<code>/instructor/reservations</code></a></li>
+                    <li><a href="#instructor-profile" class="page-link">プロフィール編集<code>/instructor/profile</code></a></li>
+                </ul>
+            </div>
+            
+            <!-- Adminロール -->
+            <div class="role-section role-admin">
+                <div class="role-header">⚙️ Admin (管理者)</div>
+                <ul class="sitemap-list">
+                    <li><a href="#admin-login" class="page-link">ログイン<code>/admin/login</code></a></li>
+                    <li><a href="#admin-home" class="page-link">ホーム<code>/admin</code></a></li>
+                    <li><a href="#admin-dashboard" class="page-link">ダッシュボード<code>/admin/dashboard</code></a></li>
+                    <li><a href="#admin-services" class="page-link">サービス管理<code>/admin/services</code></a></li>
+                    <li><a href="#admin-users" class="page-link">ユーザー管理<code>/admin/users</code></a></li>
+                    <li><a href="#admin-settings" class="page-link">サイト設定<code>/admin/settings</code></a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- 認証情報 -->
+        <div class="role-section" style="background: #f0f9ff; border-color: #3b82f6;">
+            <div style="background: #dbeafe; color: #1e40af; padding: 10px; border-radius: 4px; margin-bottom: 15px;">
+                <strong>🔐 モック認証情報</strong>
+            </div>
+            <table class="table-mock">
+                <thead>
+                    <tr>
+                        <th>ロール</th>
+                        <th>ユーザー名</th>
+                        <th>パスワード</th>
+                        <th>ログイン後の遷移先</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="badge" style="background: #dbeafe; color: #1e40af;">User</span></td>
+                        <td><code>user01</code></td>
+                        <td><code>user01</code></td>
+                        <td><code>/user</code></td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge" style="background: #d1fae5; color: #065f46;">Instructor</span></td>
+                        <td><code>inst01</code></td>
+                        <td><code>inst01</code></td>
+                        <td><code>/instructor</code></td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge" style="background: #fef3c7; color: #92400e;">Admin</span></td>
+                        <td><code>admin01</code></td>
+                        <td><code>admin01</code></td>
+                        <td><code>/admin</code></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- ワイヤーフレームセクション -->
+        <div class="wireframe-section">
+            <h2 style="text-align: center; margin-bottom: 30px; font-size: 28px;">📐 ワイヤーフレーム</h2>
+            
+            <!-- User Pages -->
+            <h3 style="color: #1e40af; margin-bottom: 20px;">👤 User Pages</h3>
+            <div class="wireframe-grid">
+                <!-- User Login -->
+                <div id="user-login" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">ユーザーログイン</div>
+                        <div class="wireframe-url">/user/login</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <h2 style="text-align: center; margin-bottom: 30px;">予約サイト - ユーザーログイン</h2>
+                        <div class="card">
+                            <div class="form-group">
+                                <label class="form-label">ユーザー名</label>
+                                <input type="text" class="form-input" placeholder="user01">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">パスワード</label>
+                                <input type="password" class="form-input" placeholder="••••••">
+                            </div>
+                            <button class="btn" style="width: 100%;">ログイン</button>
+                            <p style="text-align: center; margin-top: 15px; font-size: 12px; color: #6b7280;">
+                                アカウントをお持ちでない方は<a href="#" style="color: #3b82f6;">新規登録</a>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- User Home -->
+                <div id="user-home" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">ユーザーホーム</div>
+                        <div class="wireframe-url">/user</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <div class="header-mock">
+                            <span>予約サイト</span>
+                            <span>user01</span>
+                        </div>
+                        <h1 style="margin-bottom: 20px;">ようこそ！</h1>
+                        <div class="card">
+                            <h3>サービスを検索</h3>
+                            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                                <input type="text" class="form-input" placeholder="キーワード">
+                                <button class="btn">検索</button>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3>おすすめサービス</h3>
+                            <div style="display: grid; gap: 10px; margin-top: 10px;">
+                                <div style="padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 4px;">
+                                    ヨガクラス - ¥3,000
+                                </div>
+                                <div style="padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 4px;">
+                                    ピラティス - ¥3,500
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- User Dashboard -->
+                <div id="user-dashboard" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">ダッシュボード</div>
+                        <div class="wireframe-url">/user/dashboard</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <div class="header-mock">
+                            <span>予約サイト</span>
+                            <span>user01</span>
+                        </div>
+                        <h2 style="margin-bottom: 20px;">ダッシュボード</h2>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-value">3</div>
+                                <div class="stat-label">今後の予約</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">5</div>
+                                <div class="stat-label">お気に入り</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">1,250</div>
+                                <div class="stat-label">ポイント</div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3>直近の予約</h3>
+                            <table class="table-mock" style="margin-top: 10px;">
+                                <tr>
+                                    <td>ヨガクラス</td>
+                                    <td>1/20 10:00</td>
+                                    <td><span class="badge badge-success">確定</span></td>
+                                </tr>
+                                <tr>
+                                    <td>ピラティス</td>
+                                    <td>1/22 14:00</td>
+                                    <td><span class="badge badge-warning">保留</span></td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- User Services -->
+                <div id="user-services" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">サービス一覧</div>
+                        <div class="wireframe-url">/user/services</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <div class="header-mock">
+                            <span>予約サイト</span>
+                            <span>user01</span>
+                        </div>
+                        <h2 style="margin-bottom: 20px;">サービス一覧</h2>
+                        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                            <select class="form-input" style="width: auto;">
+                                <option>すべてのカテゴリ</option>
+                                <option>フィットネス</option>
+                                <option>ウェルネス</option>
+                            </select>
+                            <input type="text" class="form-input" placeholder="検索...">
+                        </div>
+                        <div style="display: grid; gap: 15px;">
+                            <div class="card">
+                                <h4>ヨガクラス</h4>
+                                <p style="font-size: 14px; color: #6b7280;">初心者向けヨガ - 60分</p>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                                    <span style="font-weight: bold;">¥3,000</span>
+                                    <button class="btn">予約する</button>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <h4>ピラティス</h4>
+                                <p style="font-size: 14px; color: #6b7280;">体幹トレーニング - 45分</p>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                                    <span style="font-weight: bold;">¥3,500</span>
+                                    <button class="btn">予約する</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- User Availability -->
+                <div id="user-availability" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">空き状況</div>
+                        <div class="wireframe-url">/user/availability</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <div class="header-mock">
+                            <span>予約サイト</span>
+                            <span>user01</span>
+                        </div>
+                        <h2 style="margin-bottom: 20px;">空き状況確認</h2>
+                        <div class="calendar-mock">
+                            <div>
+                                📅 カレンダー表示<br>
+                                <small>日付選択可能</small>
+                            </div>
+                        </div>
+                        <div class="card" style="margin-top: 20px;">
+                            <h3>時間を選択</h3>
+                            <div style="display: grid; gap: 5px; margin-top: 10px;">
+                                <button class="btn btn-secondary">09:00</button>
+                                <button class="btn btn-secondary">10:00</button>
+                                <button class="btn">11:00 (選択中)</button>
+                                <button class="btn btn-secondary">14:00</button>
+                            </div>
+                        </div>
+                        <button class="btn" style="width: 100%; margin-top: 20px;">予約手続きへ</button>
+                    </div>
+                </div>
+                
+                <!-- User Checkout -->
+                <div id="user-checkout" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">予約手続き（3ステップ）</div>
+                        <div class="wireframe-url">/user/checkout</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <div class="header-mock">
+                            <span>予約サイト</span>
+                            <span>user01</span>
+                        </div>
+                        <h2 style="margin-bottom: 20px;">予約手続き</h2>
+                        <!-- Progress Bar -->
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
+                            <div style="text-align: center; flex: 1;">
+                                <div style="width: 30px; height: 30px; background: #3b82f6; color: white; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;">1</div>
+                                <div style="font-size: 12px; margin-top: 5px;">情報入力</div>
+                            </div>
+                            <div style="flex: 1; display: flex; align-items: center;">
+                                <div style="height: 2px; background: #e5e7eb; width: 100%;"></div>
+                            </div>
+                            <div style="text-align: center; flex: 1;">
+                                <div style="width: 30px; height: 30px; background: #e5e7eb; color: #6b7280; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;">2</div>
+                                <div style="font-size: 12px; margin-top: 5px;">確認</div>
+                            </div>
+                            <div style="flex: 1; display: flex; align-items: center;">
+                                <div style="height: 2px; background: #e5e7eb; width: 100%;"></div>
+                            </div>
+                            <div style="text-align: center; flex: 1;">
+                                <div style="width: 30px; height: 30px; background: #e5e7eb; color: #6b7280; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;">3</div>
+                                <div style="font-size: 12px; margin-top: 5px;">完了</div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3>お客様情報</h3>
+                            <div class="form-group">
+                                <label class="form-label">名前 *</label>
+                                <input type="text" class="form-input">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">メールアドレス *</label>
+                                <input type="email" class="form-input">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">備考</label>
+                                <textarea class="form-input" rows="3"></textarea>
+                            </div>
+                            <button class="btn" style="width: 100%;">次へ</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- User Reservations -->
+                <div id="user-reservations" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">予約履歴</div>
+                        <div class="wireframe-url">/user/account/reservations</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <div class="header-mock">
+                            <span>予約サイト</span>
+                            <span>user01</span>
+                        </div>
+                        <h2 style="margin-bottom: 20px;">予約履歴</h2>
+                        <table class="table-mock">
+                            <thead>
+                                <tr>
+                                    <th>予約ID</th>
+                                    <th>サービス</th>
+                                    <th>日時</th>
+                                    <th>ステータス</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>RES-001</td>
+                                    <td>ヨガクラス</td>
+                                    <td>1/20 10:00</td>
+                                    <td><span class="badge badge-success">確定</span></td>
+                                    <td><a href="#" style="color: #3b82f6;">変更</a> | <a href="#" style="color: #ef4444;">キャンセル</a></td>
+                                </tr>
+                                <tr>
+                                    <td>RES-002</td>
+                                    <td>ピラティス</td>
+                                    <td>1/22 14:00</td>
+                                    <td><span class="badge badge-warning">保留</span></td>
+                                    <td><a href="#" style="color: #3b82f6;">変更</a> | <a href="#" style="color: #ef4444;">キャンセル</a></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Instructor Pages -->
+            <h3 style="color: #065f46; margin: 40px 0 20px 0;">👨‍🏫 Instructor Pages</h3>
+            <div class="wireframe-grid">
+                <!-- Instructor Login -->
+                <div id="instructor-login" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">インストラクターログイン</div>
+                        <div class="wireframe-url">/instructor/login</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <h2 style="text-align: center; margin-bottom: 30px;">インストラクター専用ログイン</h2>
+                        <div class="card" style="background: #d1fae5;">
+                            <div class="form-group">
+                                <label class="form-label">インストラクターID</label>
+                                <input type="text" class="form-input" placeholder="inst01">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">パスワード</label>
+                                <input type="password" class="form-input" placeholder="••••••">
+                            </div>
+                            <button class="btn" style="width: 100%; background: #059669;">ログイン</button>
+                            <p style="text-align: center; margin-top: 15px; font-size: 12px; color: #6b7280;">
+                                インストラクター登録は<a href="#" style="color: #059669;">こちら</a>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Instructor Home -->
+                <div id="instructor-home" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">インストラクターホーム</div>
+                        <div class="wireframe-url">/instructor</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <div class="header-mock" style="background: #059669;">
+                            <span>予約サイト - Instructor</span>
+                            <span>inst01</span>
+                        </div>
+                        <h1 style="margin-bottom: 20px;">インストラクターポータル</h1>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-value">5</div>
+                                <div class="stat-label">今日の予約</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">23</div>
+                                <div class="stat-label">今週の予約</div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3>クイックアクション</h3>
+                            <div style="display: grid; gap: 10px; margin-top: 10px;">
+                                <button class="btn" style="background: #059669;">スケジュール管理</button>
+                                <button class="btn" style="background: #059669;">予約確認</button>
+                                <button class="btn" style="background: #059669;">プロフィール編集</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Instructor Dashboard -->
+                <div id="instructor-dashboard" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">インストラクターダッシュボード</div>
+                        <div class="wireframe-url">/instructor/dashboard</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <div class="header-mock" style="background: #059669;">
+                            <span>予約サイト - Instructor</span>
+                            <span>inst01</span>
+                        </div>
+                        <h2 style="margin-bottom: 20px;">ダッシュボード</h2>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-value">78%</div>
+                                <div class="stat-label">稼働率</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">4.8</div>
+                                <div class="stat-label">評価</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">520</div>
+                                <div class="stat-label">総セッション</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">¥45,000</div>
+                                <div class="stat-label">今月の収益</div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3>今日のスケジュール</h3>
+                            <table class="table-mock" style="margin-top: 10px;">
+                                <tr>
+                                    <td>09:00-10:00</td>
+                                    <td>ヨガクラス</td>
+                                    <td>8名参加</td>
+                                </tr>
+                                <tr>
+                                    <td>11:00-12:00</td>
+                                    <td>ピラティス</td>
+                                    <td>6名参加</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Instructor Schedule -->
+                <div id="instructor-schedule" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">スケジュール管理</div>
+                        <div class="wireframe-url">/instructor/schedule</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <div class="header-mock" style="background: #059669;">
+                            <span>予約サイト - Instructor</span>
+                            <span>inst01</span>
+                        </div>
+                        <h2 style="margin-bottom: 20px;">スケジュール管理</h2>
+                        <div class="calendar-mock">
+                            <div>
+                                📅 インストラクター用カレンダー<br>
+                                <small>空き枠の作成・編集可能</small>
+                            </div>
+                        </div>
+                        <div class="card" style="margin-top: 20px;">
+                            <h3>空き枠の作成</h3>
+                            <button class="btn" style="background: #059669; margin-top: 10px;">
+                                ＋ 新規空き枠を追加
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Instructor Reservations -->
+                <div id="instructor-reservations" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">予約管理</div>
+                        <div class="wireframe-url">/instructor/reservations</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <div class="header-mock" style="background: #059669;">
+                            <span>予約サイト - Instructor</span>
+                            <span>inst01</span>
+                        </div>
+                        <h2 style="margin-bottom: 20px;">予約管理</h2>
+                        <table class="table-mock">
+                            <thead>
+                                <tr>
+                                    <th>日時</th>
+                                    <th>サービス</th>
+                                    <th>参加者</th>
+                                    <th>ステータス</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>1/20 10:00</td>
+                                    <td>ヨガクラス</td>
+                                    <td>田中太郎</td>
+                                    <td><span class="badge badge-success">確定</span></td>
+                                    <td><a href="#" style="color: #059669;">詳細</a></td>
+                                </tr>
+                                <tr>
+                                    <td>1/20 14:00</td>
+                                    <td>ピラティス</td>
+                                    <td>佐藤花子</td>
+                                    <td><span class="badge badge-warning">保留</span></td>
+                                    <td><a href="#" style="color: #059669;">確認</a></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Instructor Profile -->
+                <div id="instructor-profile" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">プロフィール編集</div>
+                        <div class="wireframe-url">/instructor/profile</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <div class="header-mock" style="background: #059669;">
+                            <span>予約サイト - Instructor</span>
+                            <span>inst01</span>
+                        </div>
+                        <h2 style="margin-bottom: 20px;">プロフィール編集</h2>
+                        <div class="card">
+                            <div class="form-group">
+                                <label class="form-label">表示名</label>
+                                <input type="text" class="form-input" value="山田花子">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">自己紹介</label>
+                                <textarea class="form-input" rows="4">10年以上のヨガ指導経験があります。</textarea>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">専門分野</label>
+                                <input type="text" class="form-input" value="ヨガ, ピラティス">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">連絡先</label>
+                                <input type="email" class="form-input" value="yamada@example.com">
+                            </div>
+                            <button class="btn" style="background: #059669;">保存</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Admin Pages -->
+            <h3 style="color: #92400e; margin: 40px 0 20px 0;">⚙️ Admin Pages</h3>
+            <div class="wireframe-grid">
+                <!-- Admin Login -->
+                <div id="admin-login" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">管理者ログイン</div>
+                        <div class="wireframe-url">/admin/login</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <h2 style="text-align: center; margin-bottom: 30px;">管理者ログイン</h2>
+                        <div class="card" style="background: #fef3c7;">
+                            <div style="background: #f59e0b; color: white; padding: 10px; margin: -15px -15px 15px -15px; border-radius: 6px 6px 0 0;">
+                                ⚠️ 管理者専用エリア
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">管理者ID</label>
+                                <input type="text" class="form-input" placeholder="admin01">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">パスワード</label>
+                                <input type="password" class="form-input" placeholder="••••••">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">2段階認証コード</label>
+                                <input type="text" class="form-input" placeholder="000000">
+                            </div>
+                            <button class="btn" style="width: 100%; background: #f59e0b;">管理者としてログイン</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Admin Home -->
+                <div id="admin-home" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">管理者ホーム</div>
+                        <div class="wireframe-url">/admin</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <div class="header-mock" style="background: #f59e0b;">
+                            <span>予約サイト - Admin</span>
+                            <span>admin01</span>
+                        </div>
+                        <h1 style="margin-bottom: 20px;">管理者コンソール</h1>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-value">1,234</div>
+                                <div class="stat-label">総予約数</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">456</div>
+                                <div class="stat-label">アクティブユーザー</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">12</div>
+                                <div class="stat-label">インストラクター</div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3>管理メニュー</h3>
+                            <div style="display: grid; gap: 10px; margin-top: 10px;">
+                                <button class="btn" style="background: #f59e0b;">サービス管理</button>
+                                <button class="btn" style="background: #f59e0b;">ユーザー管理</button>
+                                <button class="btn" style="background: #f59e0b;">サイト設定</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Admin Dashboard -->
+                <div id="admin-dashboard" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">管理者ダッシュボード</div>
+                        <div class="wireframe-url">/admin/dashboard</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <div class="header-mock" style="background: #f59e0b;">
+                            <span>予約サイト - Admin</span>
+                            <span>admin01</span>
+                        </div>
+                        <h2 style="margin-bottom: 20px;">サイト統計</h2>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-value">82%</div>
+                                <div class="stat-label">稼働率</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">5.2%</div>
+                                <div class="stat-label">キャンセル率</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">¥1.2M</div>
+                                <div class="stat-label">月間売上</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">+12%</div>
+                                <div class="stat-label">成長率</div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3>システムステータス</h3>
+                            <div style="margin-top: 10px;">
+                                <div style="display: flex; justify-content: space-between; padding: 5px 0;">
+                                    <span>API応答時間</span>
+                                    <span class="badge badge-success">正常</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 5px 0;">
+                                    <span>データベース</span>
+                                    <span class="badge badge-success">正常</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 5px 0;">
+                                    <span>メール配信</span>
+                                    <span class="badge badge-warning">遅延</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Admin Services -->
+                <div id="admin-services" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">サービス管理</div>
+                        <div class="wireframe-url">/admin/services</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <div class="header-mock" style="background: #f59e0b;">
+                            <span>予約サイト - Admin</span>
+                            <span>admin01</span>
+                        </div>
+                        <h2 style="margin-bottom: 20px;">サービス管理</h2>
+                        <button class="btn" style="background: #f59e0b; margin-bottom: 20px;">＋ 新規サービス追加</button>
+                        <table class="table-mock">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>サービス名</th>
+                                    <th>価格</th>
+                                    <th>時間</th>
+                                    <th>ステータス</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>1</td>
+                                    <td>ヨガクラス</td>
+                                    <td>¥3,000</td>
+                                    <td>60分</td>
+                                    <td><span class="badge badge-success">有効</span></td>
+                                    <td><a href="#" style="color: #f59e0b;">編集</a> | <a href="#" style="color: #ef4444;">削除</a></td>
+                                </tr>
+                                <tr>
+                                    <td>2</td>
+                                    <td>ピラティス</td>
+                                    <td>¥3,500</td>
+                                    <td>45分</td>
+                                    <td><span class="badge badge-success">有効</span></td>
+                                    <td><a href="#" style="color: #f59e0b;">編集</a> | <a href="#" style="color: #ef4444;">削除</a></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Admin Users -->
+                <div id="admin-users" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">ユーザー管理</div>
+                        <div class="wireframe-url">/admin/users</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <div class="header-mock" style="background: #f59e0b;">
+                            <span>予約サイト - Admin</span>
+                            <span>admin01</span>
+                        </div>
+                        <h2 style="margin-bottom: 20px;">ユーザー管理</h2>
+                        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                            <input type="text" class="form-input" placeholder="ユーザー検索...">
+                            <select class="form-input" style="width: auto;">
+                                <option>すべてのロール</option>
+                                <option>User</option>
+                                <option>Instructor</option>
+                                <option>Admin</option>
+                            </select>
+                        </div>
+                        <table class="table-mock">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>名前</th>
+                                    <th>メール</th>
+                                    <th>ロール</th>
+                                    <th>登録日</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>1</td>
+                                    <td>田中太郎</td>
+                                    <td>tanaka@example.com</td>
+                                    <td><span class="badge" style="background: #dbeafe; color: #1e40af;">User</span></td>
+                                    <td>2024-01-01</td>
+                                    <td><a href="#" style="color: #f59e0b;">編集</a></td>
+                                </tr>
+                                <tr>
+                                    <td>3</td>
+                                    <td>山田花子</td>
+                                    <td>yamada@example.com</td>
+                                    <td><span class="badge" style="background: #d1fae5; color: #065f46;">Instructor</span></td>
+                                    <td>2023-12-15</td>
+                                    <td><a href="#" style="color: #f59e0b;">編集</a></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Admin Settings -->
+                <div id="admin-settings" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">サイト設定</div>
+                        <div class="wireframe-url">/admin/settings</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <div class="header-mock" style="background: #f59e0b;">
+                            <span>予約サイト - Admin</span>
+                            <span>admin01</span>
+                        </div>
+                        <h2 style="margin-bottom: 20px;">サイト設定</h2>
+                        <div class="card">
+                            <h3>基本設定</h3>
+                            <div class="form-group">
+                                <label class="form-label">サイト名</label>
+                                <input type="text" class="form-input" value="予約サイト">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">サイトURL</label>
+                                <input type="text" class="form-input" value="https://example.com">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">管理者メール</label>
+                                <input type="email" class="form-input" value="admin@example.com">
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3>営業時間設定</h3>
+                            <div class="form-group">
+                                <label class="form-label">営業開始時間</label>
+                                <input type="time" class="form-input" value="09:00">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">営業終了時間</label>
+                                <input type="time" class="form-input" value="21:00">
+                            </div>
+                        </div>
+                        <button class="btn" style="background: #f59e0b;">設定を保存</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Placeholder Pages -->
+            <h3 style="color: #6b7280; margin: 40px 0 20px 0;">📋 その他のページ（プレースホルダー）</h3>
+            <div class="wireframe-grid">
+                <!-- Payments -->
+                <div id="user-payments" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">支払い</div>
+                        <div class="wireframe-url">/user/payments</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <div class="header-mock">
+                            <span>予約サイト</span>
+                            <span>user01</span>
+                        </div>
+                        <h2 style="margin-bottom: 20px;">支払い履歴</h2>
+                        <div class="card" style="text-align: center; padding: 60px 20px;">
+                            <p style="font-size: 48px; margin-bottom: 20px;">💳</p>
+                            <p>支払い履歴ページ</p>
+                            <p style="color: #6b7280; font-size: 14px; margin-top: 10px;">準備中</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Reviews -->
+                <div id="user-reviews" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">レビュー</div>
+                        <div class="wireframe-url">/user/reviews</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <div class="header-mock">
+                            <span>予約サイト</span>
+                            <span>user01</span>
+                        </div>
+                        <h2 style="margin-bottom: 20px;">レビュー</h2>
+                        <div class="card" style="text-align: center; padding: 60px 20px;">
+                            <p style="font-size: 48px; margin-bottom: 20px;">⭐</p>
+                            <p>レビュー管理ページ</p>
+                            <p style="color: #6b7280; font-size: 14px; margin-top: 10px;">準備中</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Favorites -->
+                <div id="user-favorites" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">お気に入り</div>
+                        <div class="wireframe-url">/user/favorites</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <div class="header-mock">
+                            <span>予約サイト</span>
+                            <span>user01</span>
+                        </div>
+                        <h2 style="margin-bottom: 20px;">お気に入り</h2>
+                        <div class="card" style="text-align: center; padding: 60px 20px;">
+                            <p style="font-size: 48px; margin-bottom: 20px;">❤️</p>
+                            <p>お気に入りサービス</p>
+                            <p style="color: #6b7280; font-size: 14px; margin-top: 10px;">準備中</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Live -->
+                <div id="user-live" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">ライブ</div>
+                        <div class="wireframe-url">/user/live</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <div class="header-mock">
+                            <span>予約サイト</span>
+                            <span>user01</span>
+                        </div>
+                        <h2 style="margin-bottom: 20px;">ライブセッション</h2>
+                        <div class="card" style="text-align: center; padding: 60px 20px;">
+                            <p style="font-size: 48px; margin-bottom: 20px;">📹</p>
+                            <p>オンラインライブセッション</p>
+                            <p style="color: #6b7280; font-size: 14px; margin-top: 10px;">準備中</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Help -->
+                <div id="user-help" class="wireframe-page">
+                    <div class="wireframe-header">
+                        <div class="wireframe-title">ヘルプ</div>
+                        <div class="wireframe-url">/user/help</div>
+                    </div>
+                    <div class="wireframe-content">
+                        <div class="header-mock">
+                            <span>予約サイト</span>
+                            <span>user01</span>
+                        </div>
+                        <h2 style="margin-bottom: 20px;">ヘルプセンター</h2>
+                        <div class="card" style="text-align: center; padding: 60px 20px;">
+                            <p style="font-size: 48px; margin-bottom: 20px;">❓</p>
+                            <p>ヘルプ・FAQ</p>
+                            <p style="color: #6b7280; font-size: 14px; margin-top: 10px;">準備中</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- フローチャートセクション -->
+        <div class="wireframe-section">
+            <h2 style="text-align: center; margin-bottom: 30px; font-size: 28px;">🔀 ユーザーフロー</h2>
+            
+            <div class="role-section">
+                <h3 style="margin-bottom: 20px;">認証フロー</h3>
+                <div style="background: #f9fafb; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 14px;">
+                    <pre style="margin: 0;">
+1. ユーザーが / にアクセス
+   └─→ 302 リダイレクト → /user/login
+
+2. /user/login でログイン
+   ├─ user01/user01 → /user へ遷移
+   └─ 失敗 → エラーメッセージ表示
+
+3. /instructor/login でログイン
+   ├─ inst01/inst01 → /instructor へ遷移
+   └─ 失敗 → エラーメッセージ表示
+
+4. /admin/login でログイン
+   ├─ admin01/admin01 → /admin へ遷移
+   └─ 失敗 → エラーメッセージ表示
+                    </pre>
+                </div>
+            </div>
+            
+            <div class="role-section" style="margin-top: 20px;">
+                <h3 style="margin-bottom: 20px;">予約フロー（User）</h3>
+                <div style="background: #f9fafb; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 14px;">
+                    <pre style="margin: 0;">
+1. /user → サービス一覧へ
+   └─→ /user/services
+
+2. サービスを選択
+   └─→ /user/services/[id] → 予約ボタン
+
+3. 空き状況確認
+   └─→ /user/availability
+       ├─ 日付選択（カレンダー）
+       └─ 時間選択
+
+4. 予約手続き
+   └─→ /user/checkout
+       ├─ Step 1: 情報入力（名前・メール・備考）
+       ├─ Step 2: 確認（規約同意）
+       └─ Step 3: 完了（予約番号発行）
+
+5. 予約確認
+   └─→ /user/account/reservations
+                    </pre>
+                </div>
+            </div>
+            
+            <div class="role-section" style="margin-top: 20px;">
+                <h3 style="margin-bottom: 20px;">スケジュール管理フロー（Instructor）</h3>
+                <div style="background: #f9fafb; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 14px;">
+                    <pre style="margin: 0;">
+1. /instructor → ダッシュボード
+   └─→ /instructor/dashboard
+
+2. スケジュール管理
+   └─→ /instructor/schedule
+       ├─ カレンダー表示
+       └─ 空き枠作成/編集
+
+3. 予約確認
+   └─→ /instructor/reservations
+       ├─ 予約一覧表示
+       └─ ステータス変更
+
+4. プロフィール更新
+   └─→ /instructor/profile
+                    </pre>
+                </div>
+            </div>
+            
+            <div class="role-section" style="margin-top: 20px;">
+                <h3 style="margin-bottom: 20px;">管理フロー（Admin）</h3>
+                <div style="background: #f9fafb; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 14px;">
+                    <pre style="margin: 0;">
+1. /admin → 管理コンソール
+   └─→ /admin/dashboard
+
+2. サービス管理
+   └─→ /admin/services
+       ├─ 新規追加
+       ├─ 編集
+       └─ 削除
+
+3. ユーザー管理
+   └─→ /admin/users
+       ├─ 一覧表示
+       ├─ ロール変更
+       └─ アカウント編集
+
+4. サイト設定
+   └─→ /admin/settings
+       └─ 各種設定変更
+                    </pre>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 技術仕様セクション -->
+        <div class="wireframe-section">
+            <h2 style="text-align: center; margin-bottom: 30px; font-size: 28px;">⚡ 技術仕様</h2>
+            
+            <div class="role-section">
+                <h3 style="margin-bottom: 20px;">固定クラス（CSS）</h3>
+                <table class="table-mock">
+                    <thead>
+                        <tr>
+                            <th>クラス名</th>
+                            <th>用途</th>
+                            <th>スタイル</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>.page-container</code></td>
+                            <td>ページコンテナ</td>
+                            <td>max-width: 1200px; margin: 0 auto; padding: 1.5rem;</td>
+                        </tr>
+                        <tr>
+                            <td><code>.section-card</code></td>
+                            <td>セクションカード</td>
+                            <td>background: white; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1.5rem;</td>
+                        </tr>
+                        <tr>
+                            <td><code>.form-row</code></td>
+                            <td>フォーム行</td>
+                            <td>margin-bottom: 1rem; (レスポンシブ対応)</td>
+                        </tr>
+                        <tr>
+                            <td><code>.list-table</code></td>
+                            <td>一覧テーブル</td>
+                            <td>background: white; border-radius: 0.5rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="role-section" style="margin-top: 20px;">
+                <h3 style="margin-bottom: 20px;">URLルーティング</h3>
+                <table class="table-mock">
+                    <thead>
+                        <tr>
+                            <th>パターン</th>
+                            <th>ロール判定</th>
+                            <th>認証要否</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>/user/*</code></td>
+                            <td>User</td>
+                            <td>必要（loginは除く）</td>
+                        </tr>
+                        <tr>
+                            <td><code>/instructor/*</code></td>
+                            <td>Instructor</td>
+                            <td>必要（loginは除く）</td>
+                        </tr>
+                        <tr>
+                            <td><code>/admin/*</code></td>
+                            <td>Admin</td>
+                            <td>必要（loginは除く）</td>
+                        </tr>
+                        <tr>
+                            <td><code>/</code></td>
+                            <td>-</td>
+                            <td>自動リダイレクト</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="role-section" style="margin-top: 20px;">
+                <h3 style="margin-bottom: 20px;">コンポーネント構成</h3>
+                <div style="background: #f9fafb; padding: 20px; border-radius: 8px;">
+                    <ul style="list-style: none; padding: 0;">
+                        <li style="margin-bottom: 10px;">
+                            <strong>CalendarPlaceholder.tsx</strong>
+                            <ul style="list-style: disc; margin-left: 30px; margin-top: 5px;">
+                                <li>月/週/日表示切替</li>
+                                <li>日付ナビゲーション（前/今日/次）</li>
+                                <li>日付選択イベント</li>
+                            </ul>
+                        </li>
+                        <li style="margin-bottom: 10px;">
+                            <strong>Header.tsx</strong>
+                            <ul style="list-style: disc; margin-left: 30px; margin-top: 5px;">
+                                <li>ロゴ表示</li>
+                                <li>検索バー（デスクトップ）</li>
+                                <li>ユーザーメニュー</li>
+                            </ul>
+                        </li>
+                        <li style="margin-bottom: 10px;">
+                            <strong>Sidebar.tsx</strong>
+                            <ul style="list-style: disc; margin-left: 30px; margin-top: 5px;">
+                                <li>ロール別ナビゲーション</li>
+                                <li>モバイルSheet対応</li>
+                                <li>URLベース自動選択</li>
+                            </ul>
+                        </li>
+                        <li style="margin-bottom: 10px;">
+                            <strong>Footer.tsx</strong>
+                            <ul style="list-style: disc; margin-left: 30px; margin-top: 5px;">
+                                <li>利用規約</li>
+                                <li>プライバシーポリシー</li>
+                                <li>お問い合わせ</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 実装ノート -->
+        <div class="wireframe-section">
+            <h2 style="text-align: center; margin-bottom: 30px; font-size: 28px;">📝 実装ノート</h2>
+            
+            <div class="role-section" style="background: #fef3c7;">
+                <h3 style="margin-bottom: 20px;">⚠️ 重要な制約</h3>
+                <ul style="margin-left: 20px;">
+                    <li><strong>localStorage/sessionStorage使用禁止</strong> - React stateのみ使用</li>
+                    <li><strong>バックエンド実装不要</strong> - モックデータのみで動作</li>
+                    <li><strong>外部SaaS連携なし</strong> - 完全にスタンドアロン</li>
+                    <li><strong>認証は擬似実装</strong> - URL直叩きアクセス可能</li>
+                </ul>
+            </div>
+            
+            <div class="role-section" style="margin-top: 20px;">
+                <h3 style="margin-bottom: 20px;">✅ 実装完了項目</h3>
+                <ul style="margin-left: 20px;">
+                    <li>URLベースのロール判定システム</li>
+                    <li>ロール別ログインページ（3種類）</li>
+                    <li>3ステップ予約フロー with バリデーション</li>
+                    <li>カレンダー占位UI（月/週/日切替）</li>
+                    <li>レスポンシブデザイン対応</li>
+                    <li>モック認証（user01/inst01/admin01）</li>
+                </ul>
+            </div>
+            
+            <div class="role-section" style="margin-top: 20px; background: #dcfce7;">
+                <h3 style="margin-bottom: 20px;">🚀 Figmaインポート手順</h3>
+                <ol style="margin-left: 20px;">
+                    <li>このHTMLファイルを保存（reservation-wireframe.html）</li>
+                    <li>ブラウザで開いて全体を表示</li>
+                    <li>Figmaプラグイン「HTML to Figma」を使用</li>
+                    <li>各セクションを個別にインポート可能</li>
+                    <li>ワイヤーフレームページごとにフレーム作成</li>
+                </ol>
+            </div>
+        </div>
+        
+        <!-- フッター -->
+        <div style="margin-top: 80px; padding-top: 40px; border-top: 2px solid #e5e7eb; text-align: center; color: #6b7280;">
+            <p>予約サイト UIワイヤーフレーム v2.0</p>
+            <p style="font-size: 14px; margin-top: 10px;">URLベースロール判定システム実装版</p>
+            <p style="font-size: 12px; margin-top: 10px;">© 2024 - Figma対応HTML版</p>
+        </div>
+    </div>
+</body>
+</html>

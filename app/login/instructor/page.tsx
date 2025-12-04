@@ -1,19 +1,153 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import Button from '@/components/common/Button';
+import {
+  loginUser,
+  saveSession,
+  clearSession,
+  checkAuth,
+  getCurrentAuthUser,
+} from '@/lib/auth';
 
 export default function InstructorLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [error, setError] = useState('');
+  const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // マウント時に既にログイン済みかチェック（Cognitoから最新情報を取得）
+  useEffect(() => {
+    let active = true;
+    const checkSession = async () => {
+      try {
+        const hasAuthSession = await checkAuth();
+        if (!hasAuthSession) {
+          clearSession();
+          if (active) {
+            console.log('✅ 未ログイン状態を確認、ログインフォームを表示');
+            setChecking(false);
+          }
+          return;
+        }
+
+        const authUser = await getCurrentAuthUser();
+        saveSession(authUser);
+
+        console.log('🔍 既にログイン済み:', { role: authUser.role });
+        if (authUser.role === 'instructor') {
+          window.location.href = '/instructor';
+        } else if (authUser.role === 'user') {
+          window.location.href = '/user';
+        } else if (authUser.role === 'admin') {
+          window.location.href = '/admin';
+        } else if (active) {
+          setChecking(false);
+        }
+      } catch (error) {
+        clearSession();
+        if (active) {
+          console.log('✅ 未ログイン状態を確認、ログインフォームを表示');
+          setChecking(false);
+        }
+      }
+    };
+
+    checkSession();
+    return () => {
+      active = false;
+    };
+  }, [router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement login logic
-    console.log({ email, password, type: 'instructor' });
+    setLoading(true);
+    setError('');
+
+    try {
+      // 古いセッションをクリア（別アカウントでのログインをサポート）
+      clearSession();
+
+      // Cognitoでログイン
+      const { user } = await loginUser({ email, password });
+
+      // ロールがinstructorであることを確認
+      if (user.role !== 'instructor') {
+        throw new Error('クリエイターアカウントでログインしてください');
+      }
+
+      // セッションを保存
+      saveSession(user);
+
+      console.log('✅ インストラクターログイン成功、/instructor にリダイレクト');
+      // ダッシュボードへリダイレクト（window.location.hrefを使用してサーバーサイドで読み込む）
+      window.location.href = '/instructor';
+    } catch (err: any) {
+      console.error('Login error:', err);
+
+      // UserAlreadyAuthenticatedException の場合は成功扱い
+      if (err.name === 'UserAlreadyAuthenticatedException') {
+        try {
+          const authUser = await getCurrentAuthUser();
+          saveSession(authUser);
+
+          if (authUser.role === 'instructor') {
+            router.push('/instructor');
+          } else if (authUser.role === 'user') {
+            router.push('/user');
+          } else if (authUser.role === 'admin') {
+            router.push('/admin');
+          } else {
+            setError('別のアカウントで既にログイン済みです。一度ログアウトしてから再度お試しください。');
+          }
+        } catch {
+          setError('既にログイン済みです。ページをリロードしてください。');
+        }
+        setLoading(false);
+        return;
+      }
+
+      // エラーメッセージを日本語化
+      let friendlyMessage = 'ログインに失敗しました';
+
+      if (err.name === 'UserNotConfirmedException') {
+        // 未確認ユーザーの場合
+        setError('メール確認が完了していません。確認コード入力画面へ移動します...');
+        setTimeout(() => {
+          router.push(`/verify?email=${encodeURIComponent(email)}`);
+        }, 2000);
+        setLoading(false);
+        return;
+      } else if (err.name === 'NotAuthorizedException') {
+        friendlyMessage = 'メールアドレスまたはパスワードが正しくありません';
+      } else if (err.name === 'UserNotFoundException') {
+        friendlyMessage = 'このメールアドレスは登録されていません';
+      } else if (err.message) {
+        friendlyMessage = err.message;
+      }
+
+      setError(friendlyMessage);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // セッションチェック中はローディング表示
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-600 via-emerald-500 to-teal-400 flex items-center justify-center">
+        <div className="text-white text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+          <p>読み込み中...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-600 via-emerald-500 to-teal-400 flex items-center justify-center p-4">
@@ -24,7 +158,7 @@ export default function InstructorLoginPage() {
         className="bg-white rounded-2xl shadow-2xl p-8 md:p-12 max-w-md w-full"
       >
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">インストラクターログイン</h1>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">クリエイターログイン</h1>
           <p className="text-gray-600">教えたい方のログイン</p>
         </div>
 
@@ -59,8 +193,28 @@ export default function InstructorLoginPage() {
             />
           </div>
 
-          <Button type="submit" variant="primary" size="lg" className="w-full bg-green-600 hover:bg-green-700">
-            ログイン
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-600 text-sm">{error}</p>
+              {error.includes('メール確認が完了していません') && (
+                <Link
+                  href={`/verify?email=${encodeURIComponent(email)}`}
+                  className="text-green-600 hover:text-green-700 font-semibold text-sm mt-2 inline-block"
+                >
+                  → 確認コード入力画面へ
+                </Link>
+              )}
+            </div>
+          )}
+
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            className="w-full bg-green-600 hover:bg-green-700"
+            disabled={loading}
+          >
+            {loading ? 'ログイン中...' : 'ログイン'}
           </Button>
         </form>
 

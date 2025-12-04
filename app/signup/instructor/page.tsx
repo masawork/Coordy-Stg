@@ -13,6 +13,8 @@ export default function InstructorSignupPage() {
   const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneNumberError, setPhoneNumberError] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -32,6 +34,16 @@ export default function InstructorSignupPage() {
       return;
     }
 
+    // Phone number validation
+    if (phoneNumber && phoneNumber.trim() !== '') {
+      const phoneRegex = /^0\d{9,10}$/;
+      if (!phoneRegex.test(phoneNumber.replace(/-/g, ''))) {
+        setPhoneNumberError('電話番号の形式が正しくありません（例: 09012345678）');
+        setErrorMessage('入力内容を確認してください');
+        return;
+      }
+    }
+
     // Validate all fields
     const isValid = validateAll({
       email,
@@ -47,25 +59,34 @@ export default function InstructorSignupPage() {
     setIsSubmitting(true);
 
     try {
+      const userAttributes: Record<string, string> = {
+        name: name,
+        'custom:userType': 'CREATOR',
+        'custom:role': 'instructor',
+      };
+
+      // 電話番号が入力されている場合は追加
+      if (phoneNumber && phoneNumber.trim() !== '') {
+        userAttributes.phone_number = phoneNumber.replace(/-/g, '').startsWith('+81')
+          ? phoneNumber.replace(/-/g, '')
+          : '+81' + phoneNumber.replace(/-/g, '').substring(1);
+      }
+
       const result = await signUp({
         username: email,
         password,
         options: {
-          userAttributes: {
-            name: name,
-            'custom:userType': 'creator',
-            'custom:role': 'CREATORS',
-          },
+          userAttributes,
         },
       });
 
       console.log('✅ サインアップ結果:', result);
-      setSuccessMessage('登録が完了しました！TOPページに移動します。');
+      setSuccessMessage('登録が完了しました！確認コード入力画面に移動します。');
 
-      // TOPページへリダイレクト
+      // 確認コード入力画面へリダイレクト
       setTimeout(() => {
-        router.push('/');
-      }, 2000);
+        router.push(`/verify?email=${encodeURIComponent(email)}&role=instructor`);
+      }, 1500);
     } catch (error: any) {
       console.error('Signup error:', error);
       setErrorMessage(error.message || '登録に失敗しました。もう一度お試しください。');
@@ -136,6 +157,35 @@ export default function InstructorSignupPage() {
             {errors.email && (
               <p className="text-red-600 text-sm mt-1">{errors.email}</p>
             )}
+          </div>
+
+          <div>
+            <label htmlFor="phoneNumber" className="block text-sm font-semibold text-gray-700 mb-2">
+              電話番号（任意）
+            </label>
+            <input
+              type="tel"
+              id="phoneNumber"
+              value={phoneNumber}
+              onChange={(e) => {
+                setPhoneNumber(e.target.value);
+                if (phoneNumberError) {
+                  setPhoneNumberError('');
+                }
+              }}
+              className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none transition-colors ${
+                phoneNumberError
+                  ? 'border-red-500 focus:border-red-600'
+                  : 'border-gray-200 focus:border-green-600'
+              }`}
+              placeholder="09012345678"
+            />
+            {phoneNumberError && (
+              <p className="text-red-600 text-sm mt-1">{phoneNumberError}</p>
+            )}
+            <p className="text-xs text-gray-500 mt-1">
+              ※ ハイフンなしで入力してください（例: 09012345678）
+            </p>
           </div>
 
           <div>

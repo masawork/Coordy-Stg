@@ -1,5 +1,319 @@
 # 開発チケット管理
 
+## 🚨 緊急バグ修正（Critical）
+
+### TICKET-URGENT-001: TOPページ初回アクセス時に何も表示されない
+**優先度**: 🔴 Critical
+**ステータス**: ✅ 完了
+**担当**: Frontend Developer
+
+**現象**:
+- https://localhost:3000/ にアクセスすると、画面全体がグラデーション背景だけの状態になる
+- キャッチコピー、「レッスンを受けたい方」「講師・トレーナーの方」ボタンが一切表示されない
+
+**期待する動作**:
+- 初回アクセス時から、ヒーローセクションのテキストとボタンが即座に表示されること
+
+**原因**:
+- ✅ framer-motion の `initial={{ opacity: 0, y: 30 }}` により、アニメーションが発火しない場合にコンテンツが非表示のままになっていた
+
+**対応内容**:
+- ✅ `components/sections/HeroSection.tsx` の全motion.divの `initial` 属性を `opacity: 1, y: 0` に変更
+- ✅ これにより、アニメーションが動作しない場合でもコンテンツが即座に表示される
+
+**対応ファイル**:
+- `components/sections/HeroSection.tsx` ✅ 修正完了
+
+---
+
+### TICKET-URGENT-002: Google Chrome から HTTP ERROR 431 でアクセス不可
+**優先度**: 🔴 Critical
+**ステータス**: ✅ ドキュメント化完了（ユーザー対応必要）
+**担当**: Backend Developer
+
+**現象**:
+- Chrome から https://localhost:3000/ を開くと「HTTP ERROR 431」が発生
+- 他ブラウザでは問題ない可能性
+
+**原因**:
+- ✅ リクエストヘッダまたはCookieのサイズが肥大化（431 = Request Header Fields Too Large）
+- ✅ CognitoトークンやlocalStorageデータの蓄積によるもの
+
+**対応内容**:
+- ✅ `DOCS/TROUBLESHOOTING.md` に回避策を詳細にドキュメント化
+- ✅ 3つの回避方法を記載：
+  1. Chrome の Cookie とキャッシュをクリア（Ctrl + Shift + Delete）
+  2. localStorage をDevToolsでクリア
+  3. シークレットモードで動作確認（Ctrl + Shift + N）
+- ✅ 開発サーバーのポート番号（3001）も記載
+
+**今後の恒久対策**（別チケットで対応予定）:
+- [ ] localStorage のデータ構造最適化
+- [ ] セッション情報の圧縮
+- [ ] Cookieサイズの削減
+
+**対応ファイル**:
+- `DOCS/TROUBLESHOOTING.md` ✅ 新規作成
+
+---
+
+### TICKET-URGENT-003: インストラクターログイン後に /user/profile/setup にリダイレクトされる
+**優先度**: 🔴 Critical
+**ステータス**: ✅ 完了
+**担当**: Backend Developer
+
+**現象**:
+1. https://localhost:3000/ にアクセス
+2. 右上「ログイン」→ ログインモーダル
+3. 「講師・トレーナーとして」を選択してログイン
+4. 一瞬 `/instructor` にアクセスするが、すぐに `/user/profile/setup` にリダイレクトされる
+
+**期待する動作**:
+- インストラクターとしてログインした場合は `/instructor` 配下だけで完結
+- `/user/profile/setup` には絶対に飛ばされない
+
+**原因**:
+- ✅ `app/instructor/(protected)/layout.tsx` が古いlocalStorageベースの `getSession()` を使用していた
+- ✅ localStorage のセッション情報が古く、正しいロールを反映していなかった
+
+**対応内容**:
+- ✅ `app/instructor/(protected)/layout.tsx` を修正
+- ✅ `getSession()` と `hasRole()` を削除し、`getCurrentAuthUser()` に置き換え
+- ✅ `getCurrentAuthUser()` はCognitoから最新のトークンを取得し、`cognito:groups` に基づいてロールを判定
+- ✅ CREATORS グループ → instructor ロールの判定が正常に動作
+- ✅ ロール確認後に `saveSession()` でlocalStorageを更新
+- ✅ インストラクター以外のロールは適切なページへリダイレクト
+
+**対応ファイル**:
+- `app/instructor/(protected)/layout.tsx` ✅ 修正完了
+- `lib/auth/cognito.ts` ✅ 既存の `getCurrentAuthUser()` を活用
+
+---
+
+### TICKET-URGENT-004: ユーザーログイン後に常に /user/profile/setup に飛び、保存もできない
+**優先度**: 🔴 Critical
+**ステータス**: ✅ 完了
+**担当**: Backend Developer
+
+**現象**:
+1. https://localhost:3000/ にアクセス
+2. 右上「ログイン」→ ログインモーダル
+3. 「レッスンを受ける」を選択してログイン
+4. 常に `/user/profile/setup` にリダイレクトされる
+5. プロフィール入力後、「プロフィールの保存に失敗しました。もう一度お試しください。」エラーが出る
+
+**期待する動作**:
+- **すでに ClientProfile が存在する場合**: `/user` ダッシュボードに直接遷移
+- **初回ログインでプロフィール未作成の場合のみ**: `/user/profile/setup` を表示
+- プロフィール保存処理が正常に成功すること
+
+**原因**:
+- ✅ **問題1（常にリダイレクト）**: `app/user/(protected)/layout.tsx` が古いlocalStorageベースの `getSession()` を使用
+- ✅ **問題2（保存失敗）**: `amplify/data/resource.ts` の ClientProfile が `allow.owner()` を使用していたが、`owner` フィールドが存在しなかった
+
+**対応内容**:
+- ✅ `app/user/(protected)/layout.tsx` を修正
+  - `getSession()` と `hasRole()` を削除し、`getCurrentAuthUser()` に置き換え
+  - Cognitoから最新のユーザー情報とロールを取得
+  - プロフィール完了チェック（`isProfileComplete`）を正しい userId で実行
+  - プロフィール未完了の場合のみ `/user/profile/setup` へリダイレクト
+- ✅ `amplify/data/resource.ts` の ClientProfile 認可ルールを修正
+  - `allow.owner()` → `allow.authenticated()` に変更
+  - 認証済みユーザーであれば誰でも自分のプロフィールをCRUD可能に
+  - Amplify sandboxで正常にデプロイ完了
+
+**対応ファイル**:
+- `app/user/(protected)/layout.tsx` ✅ 修正完了
+- `amplify/data/resource.ts` ✅ 修正完了・デプロイ済み
+- `lib/auth/cognito.ts` ✅ 既存の `getCurrentAuthUser()` を活用
+
+---
+
+### TICKET-URGENT-005: パスワードリセット機能の実装
+**優先度**: 🔴 Critical
+**ステータス**: ✅ 完了
+**担当**: Frontend/Backend Developer
+
+**現状**:
+- ログイン画面（`/login/user`）にパスワードを忘れた場合の導線がない
+- ユーザーが自分でパスワードをリセットできない
+
+**要望**:
+- ログインフォームの下に「パスワードをお忘れの方はこちら」リンクを追加
+- パスワードリセット専用ページ（例：`/login/user/forgot`）を作成
+
+**期待するフロー**:
+1. メールアドレス入力
+2. 「リセットメールを送信」ボタン押下
+3. Cognito のパスワードリセット機能でメール送信
+4. メールのリンクまたはコードで新しいパスワードを設定
+
+**対応内容**:
+- ✅ `/login/user` ページに「パスワードをお忘れの方はこちら」リンクを追加
+- ✅ `/login/user/forgot` ページ作成（メールアドレス入力フォーム）
+  - Cognito `resetPassword` API連携
+  - エラーハンドリング（UserNotFoundException、LimitExceededException等）
+  - 成功時に自動的にリセットページへ遷移
+- ✅ `/login/user/reset` ページ作成（確認コード＋新しいパスワード入力）
+  - Cognito `confirmResetPassword` API連携
+  - パスワード要件バリデーション（8文字以上、大文字・小文字・数字）
+  - 成功時に自動的にログインページへ遷移
+- ✅ `DOCS/AUTHENTICATION_FLOW.md` に手順追記
+  - パスワードリセットフローの図解
+  - 確認手順
+  - エラーハンドリング一覧
+
+**対応ファイル**:
+- `app/login/user/page.tsx` ✅ リンク追加
+- `app/login/user/forgot/page.tsx` ✅ 新規作成
+- `app/login/user/reset/page.tsx` ✅ 新規作成
+- `DOCS/AUTHENTICATION_FLOW.md` ✅ パスワードリセットフロー追記
+
+---
+
+### TICKET-URGENT-006: プロフィール設定画面での電話番号二重入力と保存失敗
+**優先度**: 🔴 Critical
+**ステータス**: ✅ 完了
+**担当**: Backend Developer
+
+**現状**:
+- サインアップ画面とプロフィール設定画面の両方で電話番号入力が存在（二重入力）
+- プロフィール保存時に「プロフィールの保存に失敗しました。もう一度お試しください。」エラーが発生
+- 保存が成功せず、`/user` に進めない
+
+**要望**:
+1. **電話番号の扱いの設計を整理**：
+   - 「サインアップ時に電話番号を登録する」のか
+   - 「プロフィール設定時に初めて電話番号を登録する」のか
+   - どちらかに寄せるか、両方で扱う場合の設計を明確化
+2. **プロフィール保存を必ず成功させる**：
+   - どこで失敗しているか（APIエラー・バリデーション・認可など）を調査
+   - 原因と修正内容をレポートに記載
+3. **保存成功後は `/user` に遷移**
+
+**根本原因**:
+- ✅ **問題1（二重入力・連携なし）**: サインアップ時に入力した電話番号がCognitoに保存されるが、プロフィール設定画面で再度入力を求められていた
+- ✅ **問題2（保存失敗）**: `app/user/profile/setup/page.tsx` が古いlocalStorageベースの `getSession()` を使用しており、正しい `userId` が取得できていなかった
+
+**対応内容**:
+- ✅ **電話番号設計の整理・ドキュメント化**：
+  - サインアップ時：任意、Cognitoの`phone_number`属性に+81形式で保存
+  - プロフィール設定時：必須、Cognitoから取得して初期値表示（0形式に変換）、ClientProfileに保存
+  - `DOCS/PHONE_NUMBER_DESIGN.md` 新規作成
+- ✅ **プロフィール設定画面を修正**：
+  - `getSession()` を削除し、`getCurrentAuthUser()` と `fetchAuthSession()` に変更
+  - Cognitoから最新のユーザー情報と電話番号を取得
+  - 電話番号を+81形式から0形式に変換して初期値として表示
+  - ユーザーは確認・編集するだけで済む（二重入力の解消）
+  - 詳細なコンソールログを追加してデバッグ容易に
+- ✅ **保存処理の修正**：
+  - 正しい`userId`を使用してプロフィール作成・更新
+  - エラーハンドリングを強化
+  - 保存成功後は `/user` に遷移
+
+**対応ファイル**:
+- `app/user/profile/setup/page.tsx` ✅ 修正完了
+  - `getCurrentAuthUser()` と `fetchAuthSession()` を使用
+  - Cognitoから電話番号を取得して初期値に設定
+  - プロフィール保存処理を修正
+- `DOCS/PHONE_NUMBER_DESIGN.md` ✅ 新規作成
+  - 電話番号の設計方針をドキュメント化
+  - データフロー図を追加
+  - バリデーションルール、UXパターンを記載
+
+---
+
+### TICKET-URGENT-007: 開発データリセット手順のドキュメント作成
+**優先度**: 🟡 Medium
+**ステータス**: ✅ 完了
+**担当**: DevOps/Backend Developer
+
+**背景**:
+- 開発中にユーザーデータが古くなり、テストに影響が出る可能性
+- 本番運用前なので、Cognitoユーザーや Amplify Data のデータを整理可能
+
+**要望**:
+- 「開発環境のユーザーデータをリセットする手順」を整理
+- `DOCS/RESET-DEV-DATA.md` などにまとめる
+
+**対応内容**:
+- ✅ **包括的なドキュメント作成**：
+  - Cognitoユーザーの削除手順（AWS CLI、コンソール）
+  - Amplify Data（DynamoDB）のデータ削除手順（GraphQL、AWS CLI）
+  - 完全リセット手順（Cognito + DynamoDB）
+  - テストユーザー再作成スクリプト例
+  - よくある質問セクション
+  - トラブルシューティングセクション
+- ✅ **実用的なスクリプト例**：
+  - すべてのCognitoユーザーを一括削除するbashスクリプト
+  - すべてのClientProfileを一括削除するGraphQLクエリ
+  - テストユーザー作成の詳細手順
+- ✅ **日本語で記載**：
+  - すべての手順とコマンドを日本語で説明
+  - 注意事項とベストプラクティスを明記
+
+**対応ファイル**:
+- `DOCS/RESET-DEV-DATA.md` ✅ 新規作成
+  - Cognitoユーザー削除手順（単一・一括）
+  - DynamoDBデータ削除手順
+  - テストユーザー作成スクリプト
+  - トラブルシューティングガイド
+
+---
+
+### TICKET-URGENT-008: インストラクターログイン後に /user/profile/setup にリダイレクトされる問題（再発）
+**優先度**: 🔴 Critical
+**ステータス**: ✅ 完了
+**担当**: Backend Developer
+
+**現象**（再現手順）:
+1. https://localhost:3000/ にアクセス
+2. 右上の「ログイン」クリック
+3. ログインモーダルで「講師・トレーナーとして」を選択
+4. インストラクター用のメールアドレス・パスワードでログイン
+5. 一瞬 `/instructor` にアクセスした後、すぐに `/user/profile/setup` にリダイレクトされる
+
+**懸念点**:
+- ユーザーのセッションとインストラクターのセッションが混ざっている可能性
+- `/user` と `/instructor` は本来別アカウント・別パスワードで運用する前提
+- セッション・ロール判定・プロフィール判定の分離が不十分
+
+**期待する仕様**:
+- **インストラクターとしてログイン**：
+  - `/instructor` 配下だけで完結
+  - `/user/profile/setup` に飛ばされない
+- **ユーザーとしてログイン**：
+  - 既にプロフィールあり → `/user`
+  - 初回ログインでプロフィール未作成 → `/user/profile/setup`
+
+**根本原因**:
+- ✅ `getSession()`はlocalStorageから古いユーザー情報を読み込むだけで、Cognitoの実際の認証状態を確認していなかった
+- ✅ ユーザーとしてログイン後、ログアウトせずにインストラクターとしてログインすると、localStorageに古い`user`ロールが残る
+- ✅ ログインページの`useEffect`で`getSession()`をチェック → 古い`user`ロールを検出 → `/user/profile/setup`にリダイレクト
+
+**対応内容**:
+- ✅ **ログインページのセッションチェックを修正**：
+  - `getSession()`（localStorageのみ）→ `getCurrentAuthUser()`（Cognitoから最新情報取得）に変更
+  - ログイン時に必ず最新のCognito認証情報を基にリダイレクト
+- ✅ **ログイン処理の最初に`clearSession()`を追加**：
+  - 新しいログイン時に古いlocalStorageセッションデータを完全にクリア
+  - 別アカウント（user ⇔ instructor）でのログインをサポート
+- ✅ **両方のログインページに適用**：
+  - `app/login/user/page.tsx` - useEffectとhandleSubmitを修正
+  - `app/login/instructor/page.tsx` - useEffectとhandleSubmitを修正
+
+**対応ファイル**:
+- `app/login/instructor/page.tsx` ✅ 修正完了
+  - useEffectで`getCurrentAuthUser()`使用
+  - handleSubmitの最初で`clearSession()`呼び出し
+- `app/login/user/page.tsx` ✅ 修正完了
+  - useEffectで`getCurrentAuthUser()`使用
+  - handleSubmitの最初で`clearSession()`呼び出し
+- `lib/auth/session.ts` ✅ 確認完了（既存の`clearSession()`を活用）
+- `lib/auth/cognito.ts` ✅ 確認完了（既存の`getCurrentAuthUser()`を活用）
+
+---
+
 ## 📊 実装状況サマリー
 
 ### ✅ 実装済み（既存コード）

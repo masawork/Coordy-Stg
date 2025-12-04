@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(nul)",
+      "Bash(npx ampx:*)",
+      "Bash(npm install)",
+      "Bash(npm run dev:*)",
+      "Bash(aws cognito-idp list-users:*)",
+      "Bash(aws cognito-idp admin-list-groups-for-user:*)",
+      "Bash(aws cloudformation describe-stacks:*)",
+      "Bash(aws cognito-idp describe-user-pool:*)",
+      "Bash(aws cognito-idp admin-add-user-to-group:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

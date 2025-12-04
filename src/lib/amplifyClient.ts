@@ -9,27 +9,17 @@ import outputs from "../../amplify_outputs.json";
  * This file initializes Amplify configuration on the client side.
  * It should be imported once in the root layout to ensure proper initialization.
  *
- * Note: Amplify Gen2 v6 requires explicit Auth.Cognito configuration.
- * The amplify_outputs.json uses snake_case keys which need to be mapped
- * to the camelCase format expected by Amplify.configure().
+ * Amplify Gen2 configuration includes:
+ * - Auth (Cognito)
+ * - API (GraphQL/AppSync)
  */
 
-const amplifyConfig = {
-  Auth: {
-    Cognito: {
-      userPoolId: outputs.auth.user_pool_id,
-      userPoolClientId: outputs.auth.user_pool_client_id,
-      identityPoolId: outputs.auth.identity_pool_id,
-      region: outputs.auth.aws_region,
-    }
-  }
-};
-
-// Configure Amplify with SSR support
-Amplify.configure(amplifyConfig, {
+// Amplify.configure() に直接 outputs を渡す
+// Amplify Gen2 では amplify_outputs.json の形式がそのまま使える
+Amplify.configure(outputs, {
   ssr: true,
 });
 
-console.log("✅ Amplify認証初期化完了");
+console.log("✅ Amplify 初期化完了 (Auth + Data)");
 
 export default Amplify;

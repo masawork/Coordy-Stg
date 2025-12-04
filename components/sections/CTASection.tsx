@@ -18,17 +18,17 @@ export default function CTASection() {
             今すぐ始めよう
           </h2>
           <p className="text-xl mb-10 text-white/90">
-            学ぶ側も、教える側も、あなたの第一歩をサポートします
+            受講する側も、提供する側も、あなたの第一歩をサポートします
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/signup/user">
+            <Link href="/login/user">
               <Button variant="secondary" size="lg" className="text-lg">
-                ユーザー登録
+                レッスンを受けたい方
               </Button>
             </Link>
-            <Link href="/signup/instructor">
+            <Link href="/login/instructor">
               <Button variant="secondary" size="lg" className="text-lg">
-                インストラクター登録
+                講師・トレーナーの方
               </Button>
             </Link>
           </div>

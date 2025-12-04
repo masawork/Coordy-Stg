@@ -54,10 +54,10 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                       </div>
                       <div>
                         <h3 className="font-bold text-lg text-gray-800">
-                          ユーザーとしてログイン
+                          レッスンを受ける
                         </h3>
                         <p className="text-sm text-gray-600">
-                          スキルアップを始める
+                          サービスを予約・受講する
                         </p>
                       </div>
                     </div>
@@ -72,10 +72,10 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                       </div>
                       <div>
                         <h3 className="font-bold text-lg text-gray-800">
-                          インストラクターとしてログイン
+                          講師・トレーナーとして
                         </h3>
                         <p className="text-sm text-gray-600">
-                          スキルをシェアして活躍する
+                          レッスンを提供する
                         </p>
                       </div>
                     </div>
