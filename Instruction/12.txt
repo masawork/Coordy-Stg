@@ -1,0 +1,123 @@
+あなたは /mnt/Coordy リポジトリを担当するシニアフルスタックエンジニアです。
+Next.js (App Router) + AWS Amplify (Cognito, Amplify Data) を使ったサービスです。
+
+目的：
+- 開発環境・ステージング・本番環境のすべてで「https 接続」に対応できるようにしたいです。
+- 既存実装や DOCS を壊さず、最小限の変更で https 化の方針と手順を整理してください。
+
+▼ 前提・ルール
+
+- 作業ディレクトリ: `/mnt/Coordy`
+- まずプロジェクト構成と DOCS をざっと把握してください。
+
+  - `ls`
+  - `ls DOCS`
+  - `cat package.json`
+  - `cat DOCS/README.md`
+  - `cat DOCS/site-map.md`
+  - `cat DOCS/DEPLOYMENT.md`（あれば）
+  - `cat DOCS/SETUP.md`（あれば）
+  - `cat DOCS/AUTH.md`
+
+- `DOCS` 配下の `.md` は削除・リネーム禁止です。
+  - 仕様と実装がズレているときは、今回の「https 対応」の方針に合わせて **最小限の修正** を加えてください。
+- Bash の `rm -rf` は `.next` や一時ファイル以外には使わないでください。
+
+---
+
+## Task A: 現状の http/https 状態の整理
+
+1. `package.json` の `scripts`、Amplify 関連ファイル、DOCS を見て、次を整理してください。
+
+   - 開発環境：`npm run dev` でどのポート・プロトコル（http）で動いているか
+   - ステージング / 本番：どこにデプロイしている想定か
+     - Amplify Hosting / CloudFront / その他？
+   - すでに https が有効な環境があるか（例: Amplify のデフォルトドメイン）
+
+2. 上記を簡単にテキストでサマリしてください（どの URL が現状 http/https なのか）。
+
+---
+
+## Task B: 開発環境（localhost）の https 対応
+
+目的：
+- `https://localhost:xxxx` でアプリを開けるようにしたいです。
+- セキュアクッキーやブラウザ API（例: geolocation, service worker など）で「https 必須」なものを使える状態にしたいです。
+
+やってほしいこと：
+
+1. 「開発環境で https にする方法」を 1 案（もしくは 2〜3案）出してください。例えば：
+
+   - self-signed 証明書を作成して `next dev` に渡す（例: `next dev --port 3000 --experimental-https --ssl-cert ./certs/localhost.pem --ssl-key ./certs/localhost-key.pem`）
+   - Nginx / Caddy などのローカルリバースプロキシで https → http://localhost:3000 に中継
+   - など、今の構成で現実的なもの
+
+2. 選んだ案に対して、実際にリポジトリに反映する内容を具体化してください。
+
+   例：
+   - `certs/` ディレクトリを作って証明書ファイルを置く前提で、
+     - `package.json` に `dev:https` スクリプトを追加
+     - `DOCS/SETUP.md` に「ローカル https の手順」を追加
+       - 証明書作成（mkcert など）の手順
+       - `npm run dev:https` の使い方
+   - もしくは、`docker-compose` or `nginx.conf` を置くなど
+
+3. 実際にコード・設定ファイルを修正してください。
+4. 最後に、ローカルで https で起動するためのコマンド例をまとめてください。
+
+---
+
+## Task C: ステージング / 本番環境の https 対応
+
+目的：
+- 本番・ステージングの URL も https でアクセスされるようにしたいです。
+- 可能であれば http→https へのリダイレクトも設定したいです。
+
+やってほしいこと：
+
+1. DOCS や Amplify 関連の設定を見て、現在のデプロイ先を確認してください。
+   - Amplify Hosting であれば、その前提で話を進めて構いません。
+
+2. その環境で https を有効にする手順を整理してください。例えば Amplify Hosting の場合：
+
+   - カスタムドメインを使うか / Amplify の xxx.amplifyapp.com を使うか
+   - ACM 証明書の発行（Amplify が自動発行する前提で問題ないか）
+   - Route 53 や DNS CNAME 設定が必要か
+
+3. `DOCS/DEPLOYMENT.md` など適切なドキュメントに、
+
+   - 「https 付きで本番 / ステージングを公開する手順」
+   - 「http アクセスを https にリダイレクトする設定（可能なら）」
+   を追記してください。
+
+4. コード側に `http://` をハードコードしている箇所があれば、
+   - 相対パス or `https://` に変更するなど、https 対応の妨げにならないように修正してください。
+   - 検索には `rg "http://" -S` などを使ってください。
+
+---
+
+## Task D: 最終確認とレポート
+
+1. `npm run build` を実行してビルドが通ることを確認してください。
+   - ESLint が古いオプションで落ちる場合は、ビルドが通れば OK です（lint の設定は別タスクにします）。
+
+2. 確認してほしい挙動：
+
+   - 開発環境：
+     - 指定したコマンドで https の dev サーバを立ち上げられること
+     - ブラウザで `https://localhost:xxxx` にアクセスし、TLS 警告を無視すればアプリが動くこと
+   - ステージング / 本番：
+     - 可能な範囲で https でアクセスできる URL がはっきりしていること
+     - http→https リダイレクト方針が整理されていること（実装までできればベスト）
+
+3. 最後に Markdown 形式で「作業完了レポート」を出してください。  
+   各 Task A〜D について：
+
+   - 何を確認したか
+   - どこをどう修正したか
+   - どのコマンドを実行したか
+   - 最終的にどういう URL で https 動作を確認したか
+
+   を簡潔にまとめてください。
+
+以上です。順番にタスク化しながら作業を進めてください。

@@ -80,7 +80,19 @@ export default function InstructorLoginPage() {
       clearSession();
 
       // Cognitoでログイン
-      const { user } = await loginUser({ email, password });
+      const { user, nextStep } = await loginUser({ email, password });
+
+      // パスワード変更が必要な場合
+      if (nextStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
+        // パスワードリセットページへリダイレクト
+        window.location.href = '/login/instructor/reset';
+        return;
+      }
+
+      // userが存在しない場合はエラー
+      if (!user) {
+        throw new Error('ログインに失敗しました');
+      }
 
       // ロールがinstructorであることを確認
       if (user.role !== 'instructor') {

@@ -86,7 +86,19 @@ export default function UserLoginPage() {
       clearSession();
 
       // Cognitoでログイン
-      const { user } = await loginUser({ email, password });
+      const { user, nextStep } = await loginUser({ email, password });
+
+      // パスワード変更が必要な場合
+      if (nextStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
+        // パスワードリセットページへリダイレクト
+        window.location.href = '/login/user/reset';
+        return;
+      }
+
+      // userが存在しない場合はエラー
+      if (!user) {
+        throw new Error('ログインに失敗しました');
+      }
 
       // ロールがuserであることを確認
       if (user.role !== 'user') {

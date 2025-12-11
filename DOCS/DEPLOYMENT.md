@@ -514,6 +514,98 @@ aws acm request-certificate \
 
 ---
 
+## HTTPS 設定
+
+### Amplify Hosting のデフォルト HTTPS
+
+AWS Amplify Hosting は、デプロイされたすべてのアプリケーションに対して **HTTPS をデフォルトで提供** します。
+
+**デフォルトドメイン（自動 HTTPS）**:
+- `https://<branch>.<app-id>.amplifyapp.com`
+- 例: `https://main.d1234567890.amplifyapp.com`
+
+追加の設定なしで HTTPS が有効になります。
+
+### カスタムドメインの HTTPS 設定
+
+#### 1. Amplify Console でカスタムドメインを追加
+
+1. AWS Console → Amplify → アプリ選択
+2. 「App settings」→「Domain management」
+3. 「Add domain」をクリック
+4. ドメイン名を入力（例: `coordy.app`）
+
+#### 2. DNS 設定（Route 53 を使用する場合）
+
+```bash
+# Amplify が自動的に以下を設定:
+# - ACM 証明書の発行
+# - CloudFront ディストリビューションの作成
+# - DNS 検証用の CNAME レコード
+
+# Route 53 でホストゾーンを作成済みの場合:
+# Amplify が自動的に必要なレコードを追加
+```
+
+#### 3. サブドメイン設定
+
+| サブドメイン | ブランチ | URL |
+|-------------|---------|-----|
+| (なし) | main | https://coordy.app |
+| www | main | https://www.coordy.app |
+| staging | staging | https://staging.coordy.app |
+| dev | develop | https://dev.coordy.app |
+
+#### 4. HTTP → HTTPS リダイレクト
+
+Amplify Hosting は **自動的に HTTP を HTTPS にリダイレクト** します。
+
+追加の設定は不要ですが、アプリケーション側でも強制するには `next.config.js` に以下を追加:
+
+```javascript
+// next.config.js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload'
+          }
+        ]
+      }
+    ];
+  }
+};
+
+module.exports = nextConfig;
+```
+
+### 証明書の状態確認
+
+```bash
+# ACM 証明書の状態確認
+aws acm list-certificates --region us-east-1
+
+# 特定の証明書の詳細
+aws acm describe-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/xxx \
+  --region us-east-1
+```
+
+### HTTPS チェックリスト
+
+- [ ] Amplify デフォルトドメインで HTTPS アクセス確認
+- [ ] カスタムドメインの DNS 設定完了
+- [ ] ACM 証明書の発行・検証完了
+- [ ] HTTP → HTTPS リダイレクト動作確認
+- [ ] HSTS ヘッダー設定（オプション）
+
+---
+
 ## トラブルシューティング
 
 ### デプロイ失敗
