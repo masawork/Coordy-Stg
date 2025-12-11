@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { listReservations, updateReservation } from '@/lib/api/reservations';
@@ -8,7 +8,7 @@ import { getService } from '@/lib/api/services';
 import { Button } from '@/components/ui/button';
 import { Calendar, Clock, MapPin, User, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 
-export default function ReservationsPage() {
+function ReservationsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [reservations, setReservations] = useState<any[]>([]);
@@ -221,5 +221,20 @@ export default function ReservationsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ReservationsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">読み込み中...</p>
+        </div>
+      </div>
+    }>
+      <ReservationsContent />
+    </Suspense>
   );
 }

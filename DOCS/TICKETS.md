@@ -1155,4 +1155,103 @@ graph LR
 
 ---
 
-*最終更新日: 2025-10-11*
+---
+
+## ログイン関連の改修作業
+
+### TICKET-LOGIN-001: /login/user ログインボタン無反応の修正
+**優先度**: 🔴 Critical
+**ステータス**: ✅ 完了
+**担当**: Backend Developer
+
+**現象**:
+- `/login/user` でメールアドレス・パスワード入力後、「ログイン」ボタンを押しても反応がない
+- 認証処理が実行されず、画面遷移も発生しない
+
+**期待する動作**:
+- ボタンを押すとログイン処理が必ず実行される
+- 認証成功時は `/user` または `/user/profile/setup` にリダイレクト
+- エラー時は日本語エラーメッセージを表示
+
+**対応内容**:
+- ✅ 既存のログインフォームを確認
+- ✅ 既に正しく実装されていることを確認（form onSubmit、button type="submit"、適切なエラーハンドリング）
+- ✅ ログイン成功時のプロフィールチェックとリダイレクト処理が正常
+
+**対応ファイル**:
+- `app/login/user/page.tsx` ✅ 確認完了（既に正しく実装済み）
+
+---
+
+### TICKET-LOGIN-002: /signup/* をログインフローに統一
+**優先度**: 🔴 Critical
+**ステータス**: ✅ 完了
+**担当**: Frontend Developer
+
+**現象**:
+- `/signup/user` に新規登録画面が存在
+- `/signup/instructor` にクリエイター新規登録画面が存在
+- ログインフローに統一したい
+
+**期待する動作**:
+- `/signup/user` → `/login/user` にリダイレクト
+- `/signup/instructor` → `/login/instructor` にリダイレクト
+- 既存のサインアップ画面を適切に整理
+
+**対応内容**:
+- ✅ `/signup/user` ページを完全に書き換え、`/login/user` へリダイレクトする実装に変更
+- ✅ `/signup/instructor` ページを完全に書き換え、`/login/instructor` へリダイレクトする実装に変更
+- ✅ リダイレクト中のローディング表示を実装（スピナーとメッセージ）
+- ✅ `DOCS/AUTHENTICATION_FLOW.md` に v3.0 changelog を追加し、URLリダイレクトの仕様を明記
+
+**対応ファイル**:
+- `app/signup/user/page.tsx` ✅ 修正完了（リダイレクト実装）
+- `app/signup/instructor/page.tsx` ✅ 修正完了（リダイレクト実装）
+- `DOCS/AUTHENTICATION_FLOW.md` ✅ 更新完了（v3.0 changelog追加）
+
+---
+
+### TICKET-LOGIN-003: 管理者ログイン画面 /manage/login の実装
+**優先度**: 🔴 Critical
+**ステータス**: ✅ 完了
+**担当**: Full-stack Developer
+
+**現象**:
+- `/manage/login` にアクセスすると 404 Not Found
+
+**期待する動作**:
+- 管理者用ログイン画面を実装
+- admin ロールでログイン成功時は `/manage/admin` へ遷移
+- admin 以外のロールはログイン後も管理画面にアクセス不可
+- 未承認インストラクター一覧と承認/却下機能を提供
+
+**前提条件**:
+- 管理者アカウントはCognitoコンソールから手動作成
+- 初期管理者: `admin` / `admin0001!`
+- 一般UIからリンクを張らず、URL直打ちのみでアクセス
+
+**対応内容**:
+- ✅ `/manage/login` ページを新規作成（admin専用ログインフォーム実装）
+  - admin ロール以外はエラーメッセージ表示
+  - ログイン成功時に `/manage/admin` へリダイレクト
+  - ダークテーマのデザイン適用（gray-900 グラデーション）
+- ✅ `/manage/(protected)/layout.tsx` を新規作成（admin認証ガード実装）
+  - `getCurrentAuthUser()` でロールチェック
+  - admin以外は適切なページへリダイレクト
+- ✅ `/manage/admin/page.tsx` を新規作成（インストラクター審査ダッシュボード実装）
+  - 審査待ち・承認済み・却下・未提出の統計カード表示
+  - 審査待ちインストラクター一覧テーブル
+  - 全インストラクター一覧テーブル
+  - 承認/却下ボタンによる `identityDocumentStatus` 更新機能
+  - 却下時の理由入力プロンプト
+  - 身分証明書URLの表示リンク
+
+**対応ファイル**:
+- `app/manage/login/page.tsx` ✅ 新規作成完了
+- `app/manage/(protected)/layout.tsx` ✅ 新規作成完了
+- `app/manage/(protected)/admin/page.tsx` ✅ 新規作成完了
+- ビルド成功確認 ✅ 完了
+
+---
+
+*最終更新日: 2025-12-04*

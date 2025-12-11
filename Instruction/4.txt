@@ -1,0 +1,236 @@
+/mnt/Coordy リポジトリの Next.js(App Router) プロジェクトについて、
+以下の3点がまだ解決できていないので、タスクを分解したうえで実装まで行ってください。
+
+会話は最小限で、わかる範囲は自動でどんどん進めてください。
+画面テキスト・コメント・レポートはすべて日本語でお願いします。
+
+まず最初に、今回の作業を **T-001, T-002, ...** の形でタスク分解した一覧を Markdown テーブルで出力し、  
+そのあと実装に進んでください。
+
+---
+
+# 現状の問題
+
+## ① /user 初回アクセス時に Header のログインボタンが押せない
+
+- URL: `http://localhost:3000/user`
+- 「HOME（ユーザーダッシュボード）」画面で、**初回アクセス時にヘッダー右上の「ログイン」ボタンがクリックできない**。
+- 画面遷移後やリロード後に挙動が変わるかどうかも含めて、原因を特定して修正してほしい。
+
+想定される原因例（あなた側で確認して判断してほしい）：
+- `/user` 用の layout やコンテナが、ヘッダーの上に `position: absolute` / `fixed` / `z-index` などでかぶさっている
+- モーダルの透明なオーバーレイが誤って残っていて、クリックをブロックしている
+- `pointer-events: none` / `pointer-events: auto` の指定ミス
+- Hydration 時の一時的な state により、ボタンが disabled になっている など
+
+**重要**：ログイン機能そのもの（/login/user など）はすでに動いているので、  
+そこを壊さずに「ボタンのクリックがきちんと反応する状態」に直してください。
+
+---
+
+## ② /user の表示名（ようこそ「◯◯」さん！／Header の名前）の仕様
+
+- URL: `http://localhost:3000/user`
+- 現在：
+  - HOME の「ようこそ、『◯◯』さん！」や Header に表示される名前が、
+    **メールアドレスの @ より前の部分**（ローカルパート）になっている。
+  - 例）`skmtwork0+Test0019@gmail.com` → `skmtwork0+Test0019` と表示される。
+
+- 要望：
+  - **登録フェーズ（サインアップ or プロフィール登録）で記載する「名前」を表示したい**。
+  - もしくは、「表示名」という専用欄を作成して、そこに入力された名前を HOME / Header に表示してほしい。
+  - ここで言う「名前」とは：
+    - HOME の「ようこそ、『◯◯』さん！」の ◯◯
+    - Header に表示されるユーザー名
+    に使う表示名のこと。
+
+現状の実装（推定）：
+- サインアップ画面で「名前」入力を削除したあと、Cognito 登録時に `email.split('@')[0]` を仮の name として使っている可能性がある。
+- `/user/profile/setup` や何らかのプロフィール編集画面に名前項目が存在するかもしれないが、HOME / Header 側がそれを見にいっていない可能性がある。
+
+このあたりは、実際のコードを確認したうえで、**表示名の単一の正しいソース（Single Source of Truth）** を決めて実装してほしい。
+
+---
+
+## ③ /login/instructor の「パスワードをお忘れの方」＆ ログインできない問題
+
+- URL: `http://localhost:3000/login/instructor`
+
+### 3-1. パスワードをお忘れの方 リンクがない
+
+- ユーザー用 `/login/user` には「パスワードお忘れですか」があるのに、
+  **インストラクター用 `/login/instructor` には同等のリンクが存在しない**。
+- 要件：
+  - `/login/instructor` にも「パスワードをお忘れの方」リンクを追加し、
+    `/login/instructor/forgot`（または適切な URL） でパスワードリセットができるようにしてほしい。
+  - 実装方針はユーザー用 forgot とできるだけ揃えてよいが、文言は「サービス出品者」向けに整える。
+
+### 3-2. 新規登録したインストラクターユーザーでログインできない
+
+- 現象：
+  - `skmtwork0+Inst0019@gmail.com` や `skmtwork0+Inst0020@gmail.com` のような、
+    サービス出品者用に新規登録したメールアドレスとパスワードで `/login/instructor` からログインしようとすると失敗する。
+- コンソールログ（ブラウザ側）には、以下のようなエラーが出ている：
+
+  ```text
+  Login error: UserAlreadyAuthenticatedException: There is already a signed in user.
+      at assertUserNotAuthenticated ...
+  ...
+  Login error: Error: There is already a signed in user.
+cognito.ts のログを見ると：
+
+text
+コードをコピーする
+🔐 ロール判定: {userId: '...', role: 'user', customRole: 'user'}
+と出ており、既に user としてサインイン済みの状態で instructor ログインを試みているため、
+Amplify 側が UserAlreadyAuthenticatedException を返している状況。
+
+要望：
+
+まずは このエラーをユーザーにとってわかりやすいメッセージに変換 してほしい。
+
+例）「すでに他のアカウントでログインしています。別のアカウントでログインする場合は、一度ログアウトしてからやり直してください。」など。
+
+そのうえで、「1つのブラウザセッションで複数アカウントを同時ログインできない」という制約を、
+DOCS/flows/login-flow.md か DOCS/TROUBLESHOOTING.md あたりに明記してほしい。
+
+（無理に複数アカウント同時ログインを実現しようとせず、Cognito / Amplify の仕様に沿って「ログアウトしてから別アカウントにログイン」という設計にする 方向で構いません）
+
+やってほしいこと（タスク指示）
+共通方針
+まず冒頭で、今回の作業を T-001, T-002, T-003... という形でタスク分解して一覧化してください。
+
+例）T-001: /user の Header ログインボタン調査＆修正、T-002: 表示名仕様の設計と実装、T-003: /login/instructor の forgot リンク追加、T-004: UserAlreadyAuthenticatedException のハンドリングと DOCS 追記 など。
+
+そのうえで、タスクごとに実際のコード修正を行ってください。
+
+T-001: /user 初回アクセス時の Header ログインボタン問題
+対象ファイル候補：
+
+app/user/layout.tsx または app/user/page.tsx
+
+components/layout/Header.tsx（ヘッダーコンポーネント）
+
+components/modals/LoginModal.tsx（ログインモーダル）
+
+/user 向けに何かラップしているコンポーネント（セッションチェック用など）
+
+調査ポイント：
+
+/user でレンダリングされる全体 DOM 構造を確認し、
+ヘッダーより前面に透明な要素がかぶっていないか（absolute, fixed, z-index, pointer-events）。
+
+ログインボタン自体が disabled になっていないか、
+あるいは onClick が初回だけ無効化されていないか。
+
+修正方針：
+
+「初回アクセス時にクリックできない」という症状が出ないように、
+ヘッダーのレイヤー構造やモーダルのオーバーレイ制御を見直してください。
+
+修正後、/user 初回アクセスでログインボタンがクリックできることを確認してください。
+
+T-002: /user の表示名（HOME・Header）仕様の見直し
+現在、HOME と Header の表示名がどこから取られているかを調査してください。
+
+例）lib/auth/cognito.ts で email.split('@')[0] を name にしている
+
+例）getCurrentUser() や getUserProfile() の戻り値を見ている など
+
+表示名の正式なソースを設計してください。いずれか、もしくは組み合わせ：
+
+案A：プロフィール情報に「名前」または「表示名(displayName)」フィールドを持ち、そこから取得する
+
+案B：サインアップ後のプロフィール設定画面（例：/user/profile/setup）で「表示名」欄を追加し、そこに入力された値を使う
+
+既存ユーザーについては、表示名が未設定の場合のみ email.split('@')[0] をフォールバックとして使う、など
+
+実装してほしいこと：
+
+表示名フィールドの追加（必要ならスキーマ・型定義も）
+
+HOME（app/user/page.tsx 等）の「ようこそ、『◯◯』さん！」で、新しい表示名を使うように変更
+
+Header（ユーザーメニューなど）に表示される名前も同じ表示名を使うように変更
+
+表示名が未設定の場合のフォールバック（ローカルパートなど）は、仕様として明示的に決めること
+
+必要に応じて DOCS/flows/main-user-flows.md や DOCS/AUTH.md に、
+
+「ユーザー登録後、プロフィール画面で表示名を設定する」フローを1〜2行追記しても構いません。
+
+T-003: /login/instructor に「パスワードをお忘れの方」を追加
+app/login/instructor/page.tsx を開き、ユーザー用 /login/user の forgot リンク実装を参考にして、
+
+「パスワードをお忘れの方」リンクを追加してください。
+
+遷移先：/login/instructor/forgot（またはプロジェクト方針に合わせたパス）
+
+app/login/instructor/forgot/page.tsx が存在しない場合：
+
+ユーザー用 forgot ページ（/login/user/forgot）をベースに、サービス出品者向けに文言を調整したページを作成してください。
+
+エラーハンドリングはユーザー用と同程度に行ってください。
+
+DOCS 側で必要なら：
+
+DOCS/flows/login-flow.md のパスワードリセットフローに、
+/login/instructor/forgot を1行追加する程度の修正を行ってください。
+
+T-004: UserAlreadyAuthenticatedException のハンドリング＆仕様化
+コンソールログより：
+
+loginUser（lib/auth/cognito.ts）で Auth.signIn を呼び出した際に、
+UserAlreadyAuthenticatedException: There is already a signed in user. が発生している。
+
+lib/auth/cognito.ts の loginUser 関数（およびインストラクター用のラッパーがあればそれ）を開き、
+
+UserAlreadyAuthenticatedException を捕捉して、
+フロントに返すエラーを 日本語のわかりやすいメッセージ に変換してください。
+
+例）
+
+「すでに別のアカウントでログインしています。別のアカウントとしてログインする場合は、一度ログアウトしてからやり直してください。」
+
+/login/instructor/page.tsx（および /login/user/page.tsx）側では、
+
+上記のフレンドリーメッセージを画面に表示するようにしてください。
+
+生の英語エラーやスタックトレースはコンソールログにとどめ、UIには出さない。
+
+DOCS への追記：
+
+DOCS/flows/login-flow.md または DOCS/TROUBLESHOOTING.md に、
+「1ブラウザセッションで複数の Cognito アカウントを同時にログインすることはできない」という制約を明記してください。
+
+例のメッセージとともに、「別アカウントでログインしたい場合は一度ログアウトが必要」という運用ルールも書いてください。
+
+最終確認 & レポート
+実装が完了したら、次の観点でセルフチェックを行ってください（ブラウザ確認ベースでOKです）：
+
+/user 初回アクセス時に、Header のログインボタンがクリックできること。
+
+/user HOME と Header の表示名が、新しく定義した「表示名」仕様に従っていること。
+
+/login/instructor に「パスワードをお忘れの方」リンクが表示され、
+適切な forgot ページに遷移し、パスワードリセットが実行できること。
+
+/login/instructor で「すでに user としてログイン中」の状態で instructor アカウントでログインを試みたとき、
+
+UserAlreadyAuthenticatedException がフロントで日本語のメッセージに変換されて表示されること。
+
+npm run build が成功すること。
+
+最後に、今回の作業について Markdown 形式の作業完了レポート をコンソールに出力してください。
+
+タスク一覧（T-001〜）と、それぞれの対応内容
+
+変更したファイル一覧（パスと概要）
+
+/user 初回アクセス時のログインボタン問題の原因と修正内容
+
+表示名の仕様（どこに保存し、どこで表示しているか）
+
+/login/instructor のパスワードリセット対応
+
+UserAlreadyAuthenticatedException に対するUI上のメッセージと、DOCS への追記内容

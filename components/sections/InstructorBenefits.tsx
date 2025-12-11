@@ -48,7 +48,7 @@ export default function InstructorBenefits() {
           className="text-center mb-16"
         >
           <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
-            🌟 スキルを活かして教える側へ
+            🌟 サービス出品者へのメリット
           </h2>
         </motion.div>
 

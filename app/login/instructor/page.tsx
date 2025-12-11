@@ -12,6 +12,8 @@ import {
   checkAuth,
   getCurrentAuthUser,
 } from '@/lib/auth';
+// Amplify初期化を確実に行う
+import '@/src/lib/amplifyClient';
 
 export default function InstructorLoginPage() {
   const [email, setEmail] = useState('');
@@ -20,6 +22,7 @@ export default function InstructorLoginPage() {
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState('');
   const router = useRouter();
+
 
   // マウント時に既にログイン済みかチェック（Cognitoから最新情報を取得）
   useEffect(() => {
@@ -40,13 +43,14 @@ export default function InstructorLoginPage() {
         saveSession(authUser);
 
         console.log('🔍 既にログイン済み:', { role: authUser.role });
+        // インストラクターとしてログイン済みの場合のみリダイレクト
+        // ユーザーログイン中は別途インストラクターアカウントを作成/ログインできるようにする
         if (authUser.role === 'instructor') {
           window.location.href = '/instructor';
-        } else if (authUser.role === 'user') {
-          window.location.href = '/user';
         } else if (authUser.role === 'admin') {
           window.location.href = '/admin';
         } else if (active) {
+          // ユーザーログイン中でもフォームを表示（別ロールでのログインを許可）
           setChecking(false);
         }
       } catch (error) {
@@ -66,8 +70,10 @@ export default function InstructorLoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     setError('');
+    console.log('instructor login submit', { email });
 
     try {
       // 古いセッションをクリア（別アカウントでのログインをサポート）
@@ -78,7 +84,7 @@ export default function InstructorLoginPage() {
 
       // ロールがinstructorであることを確認
       if (user.role !== 'instructor') {
-        throw new Error('クリエイターアカウントでログインしてください');
+        throw new Error('インストラクターアカウントでログインしてください');
       }
 
       // セッションを保存
@@ -90,30 +96,9 @@ export default function InstructorLoginPage() {
     } catch (err: any) {
       console.error('Login error:', err);
 
-      // UserAlreadyAuthenticatedException の場合は成功扱い
-      if (err.name === 'UserAlreadyAuthenticatedException') {
-        try {
-          const authUser = await getCurrentAuthUser();
-          saveSession(authUser);
-
-          if (authUser.role === 'instructor') {
-            router.push('/instructor');
-          } else if (authUser.role === 'user') {
-            router.push('/user');
-          } else if (authUser.role === 'admin') {
-            router.push('/admin');
-          } else {
-            setError('別のアカウントで既にログイン済みです。一度ログアウトしてから再度お試しください。');
-          }
-        } catch {
-          setError('既にログイン済みです。ページをリロードしてください。');
-        }
-        setLoading(false);
-        return;
-      }
-
       // エラーメッセージを日本語化
-      let friendlyMessage = 'ログインに失敗しました';
+      // 認証エラーとその他のエラーを分離
+      let friendlyMessage = 'ログインに失敗しました。時間をおいて再度お試しください。';
 
       if (err.name === 'UserNotConfirmedException') {
         // 未確認ユーザーの場合
@@ -124,12 +109,16 @@ export default function InstructorLoginPage() {
         setLoading(false);
         return;
       } else if (err.name === 'NotAuthorizedException') {
+        // パスワード間違いなどの認証エラー
         friendlyMessage = 'メールアドレスまたはパスワードが正しくありません';
       } else if (err.name === 'UserNotFoundException') {
+        // 登録されていないユーザー
         friendlyMessage = 'このメールアドレスは登録されていません';
-      } else if (err.message) {
-        friendlyMessage = err.message;
+      } else if (err.name === 'NetworkError' || err.message?.includes('network')) {
+        // ネットワークエラー
+        friendlyMessage = 'ネットワークエラーが発生しました。インターネット接続を確認してください。';
       }
+      // その他のエラーは汎用メッセージを表示（詳細はコンソールに出力済み）
 
       setError(friendlyMessage);
     } finally {
@@ -158,8 +147,8 @@ export default function InstructorLoginPage() {
         className="bg-white rounded-2xl shadow-2xl p-8 md:p-12 max-w-md w-full"
       >
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">クリエイターログイン</h1>
-          <p className="text-gray-600">教えたい方のログイン</p>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">サービス出品者ログイン</h1>
+          <p className="text-gray-600">サービスを提供する方のログイン</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -217,6 +206,12 @@ export default function InstructorLoginPage() {
             {loading ? 'ログイン中...' : 'ログイン'}
           </Button>
         </form>
+
+        <div className="mt-4 text-center">
+          <Link href="/login/instructor/forgot" className="text-sm text-green-600 hover:text-green-700">
+            パスワードをお忘れの方はこちら
+          </Link>
+        </div>
 
         <div className="mt-6 text-center">
           <p className="text-gray-600">

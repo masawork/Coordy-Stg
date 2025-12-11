@@ -13,12 +13,15 @@ import { listTodos, type Todo } from '@/lib/api';
 import { listServices } from '@/lib/api/services';
 import { getFavoriteCreators } from '@/lib/api/favorites';
 import { getInstructor } from '@/lib/api/instructors';
+import { getClientProfile } from '@/lib/api/profile';
 import type { User } from '@/lib/auth';
 import { ServiceCard } from '@/components/features/service/ServiceCard';
+import { resolveDisplayName } from '@/lib/auth/displayName';
 
 export default function UserDashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [displayName, setDisplayName] = useState<string>('');
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [recommendedServices, setRecommendedServices] = useState<any[]>([]);
@@ -30,9 +33,20 @@ export default function UserDashboardPage() {
     const session = getSession();
     if (session) {
       setUser(session);
+      loadDisplayName(session);
       loadData(session.userId);
     }
   }, []);
+
+  const loadDisplayName = async (session: User) => {
+    try {
+      const profile = await getClientProfile(session.userId);
+      setDisplayName(resolveDisplayName(session, profile ?? undefined));
+    } catch (err) {
+      console.warn('表示名取得エラー:', err);
+      setDisplayName(resolveDisplayName(session));
+    }
+  };
 
   const loadData = async (userId: string) => {
     try {
@@ -77,7 +91,7 @@ export default function UserDashboardPage() {
 
       // おすすめサービス取得（最新の公開サービスを取得）
       try {
-        const allServices = await listServices({ status: 'published' });
+        const allServices = await listServices({ status: 'active' });
         const recommended = (allServices || [])
           .sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime())
           .slice(0, 6);
@@ -112,7 +126,7 @@ export default function UserDashboardPage() {
         const favorites = await getFavoriteCreators(userId);
         if (favorites.length > 0) {
           const instructorIds = favorites.map((fav) => fav.instructorId);
-          const allServices = await listServices({ status: 'published' });
+          const allServices = await listServices({ status: 'active' });
           const favoriteServices = (allServices || [])
             .filter((service) => instructorIds.includes(service.instructorId))
             .sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime())
@@ -187,7 +201,7 @@ export default function UserDashboardPage() {
       {/* ウェルカムセクション */}
       <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg shadow-lg p-8 text-white">
         <h1 className="text-3xl font-bold mb-2">
-          ようこそ、{user?.name || 'ゲスト'}さん！
+          ようこそ、{displayName || 'ゲスト'}さん！
         </h1>
         <p className="text-purple-100">
           今日も素晴らしい一日にしましょう

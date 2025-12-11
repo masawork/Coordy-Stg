@@ -13,7 +13,7 @@ export default function UserBenefits() {
     {
       icon: <FaLightbulb className="text-4xl text-pink-600" />,
       title: '多様な選択肢',
-      description: '様々な分野のインストラクターから、あなたに合った人を選べます',
+      description: '様々な分野のサービス出品者から、あなたに合った人を選べます',
     },
     {
       icon: <FaClock className="text-4xl text-orange-600" />,
@@ -23,7 +23,7 @@ export default function UserBenefits() {
     {
       icon: <FaHandshake className="text-4xl text-blue-600" />,
       title: '直接つながる安心感',
-      description: 'インストラクターと直接やり取り。質問や相談もしやすい環境',
+      description: 'サービス出品者と直接やり取り。質問や相談もしやすい環境',
     },
     {
       icon: <FaMapMarkerAlt className="text-4xl text-green-600" />,
@@ -48,7 +48,7 @@ export default function UserBenefits() {
           className="text-center mb-16"
         >
           <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
-            📚 学びたい方へ
+            📚 ユーザーへのメリット
           </h2>
         </motion.div>
 

@@ -1,0 +1,126 @@
+
+あなたは /mnt/Coordy リポジトリを担当するシニアフルスタックエンジニアです。
+Next.js (App Router) + AWS Amplify (Cognito, Amplify Data) を使ったサービスです。
+
+前回、以下の Task A/B/C を実施したというレポートを受け取りましたが、実際の挙動としてはまだ問題が解消していません。
+
+【前回の変更サマリ（参考情報）】
+- 管理者作成運用を明確化：registerUser で admin ロール登録を拒否、DOCS/AUTH.md に「Cognitoコンソールで ADMINS へ追加のみ」と明記。
+- プロフィール作成 GraphQL エラー修正：createClientProfile で CreateInput にないフィールドを送らないようにし、作成後に完了フラグを更新。ClientProfileInput 型を拡張。
+- インストラクター用プロフィール初期設定を追加：/instructor/profile/setup 新規ページ、作成/更新 API、レイアウトで未作成時にセットアップへ誘導。
+- DOCS 更新：ログインフローとメインフローにインストラクターのプロフィールセットアップ導線を追記。
+- 対応ファイル: lib/api/profile.ts, lib/api/instructors.ts, app/instructor/(protected)/layout.tsx, app/instructor/(protected)/profile/setup/page.tsx, DOCS/AUTH.md, DOCS/flows/login-flow.md, DOCS/flows/main-user-flows.md
+- npm run build は成功。
+
+しかし、現状は次の問題が残っています。
+この3点を「原因の特定 → 修正 → 動作確認 → DOCS修正」の流れで対応してください。
+
+------------------------------------------------
+■ 前提・ルール
+------------------------------------------------
+- 作業ディレクトリ: `/mnt/Coordy`
+- まず構成と DOCS をざっと確認してください：
+  - `ls`
+  - `ls DOCS`
+  - `cat package.json`
+  - `cat DOCS/README.md`
+  - `cat DOCS/site-map.md`
+  - `cat DOCS/flows/login-flow.md`
+  - `cat DOCS/AUTH.md`
+  - `cat DOCS/IMPLEMENTATION.md`
+  - `cat DOCS/flows/main-user-flows.md`
+- DOCS 配下の .md ファイルは削除・リネーム禁止。  
+  内容が古い場合は「最小限の修正」で、今回の仕様に合わせてください。
+- `rm -rf` は `.next` など一時ファイル以外には使わないでください。
+
+------------------------------------------------
+■ Task 1: /manage/login が「読み込み中」のまま変わらない
+------------------------------------------------
+現象：
+- `http://localhost:3000/manage/login` にアクセスすると、画面が「読み込み中」のまま変わりません（ログインフォームが出てこない）。
+
+前回のレポートでは：
+- 管理者画面は `/manage/login` → `/manage/admin` で動作、admin 以外はリダイレクト、という想定になっていました。
+
+やってほしいこと：
+1. 以下のあたりのコードを中心に、無限ローディング／条件分岐を確認してください。
+   - `app/manage/login/page.tsx`
+   - `app/manage/(protected)/layout.tsx`
+   - 認証状態を取得するヘルパー（例：`lib/auth/cognito.ts` など）
+2. 「読み込み中」状態を制御している state（例：`checking` など）が、必ずどこかで false になるようになっているか確認してください。
+   - 条件によって永遠に true のままになっていないか。
+   - admin 以外のロールでもフォームが表示されるようにする、という仕様になっているか。
+3. `http://localhost:3000/manage/login` にアクセスしたときのブラウザコンソールエラーやログも確認してください。
+4. 修正後、以下を確認してください：
+   - 未ログイン状態で `/manage/login` → 管理者ログインフォームが表示される。
+   - user / instructor ログイン中であっても、フォームが表示される（admin ログインを試せる）。
+   - admin ユーザーでログインした場合は `/manage/admin` に遷移する。
+
+※ 必要に応じて DOCS（`DOCS/AUTH.md` / `DOCS/flows/login-flow.md`）も、実際の挙動に合わせて修正してください。
+
+------------------------------------------------
+■ Task 2: /user/profile/setup の入力初期値と GraphQL エラー修正
+------------------------------------------------
+現象1：
+- `http://localhost:3000/user/profile/setup`
+  - 「指名」や「表示名」の入力欄に、初期状態で「メールアドレスの @ より前（ローカル部）」が自動で入っています。
+  - これを **最初から入れない** ようにしてほしいです（ユーザーに毎回消させたくない）。
+
+現象2：
+- 同じページでプロフィール保存をすると、まだ以下のエラーが出ます：
+
+  「プロフィールの保存に失敗しました。プロフィールの作成に失敗しました:  
+  `[{"path":null,"locations":null,"message":"The variables input contains a field that is not defined for input object type 'CreateClientProfileInput' "}]`」
+
+前回のレポートでは「CreateClientProfileInput にないフィールドを送らないように修正した」とありましたが、実際にはまだエラーが出ています。
+
+やってほしいこと：
+
+1. 名前・表示名の初期値について
+   - `app/user/profile/setup/page.tsx`
+   - `lib/auth/displayName.ts`（もし使っていれば）
+   などを確認し、
+   - 「メールアドレスのローカル部」を初期値に入れている処理を削除するか、
+   - 少なくとも `name` / `displayName` の初期値としては使わないようにしてください。
+   - 既に保存済みのプロフィールがある場合は、その値を表示するのはOKです（未作成の場合のみ空欄にする）。
+
+2. GraphQL エラーについて
+   - 以下を確認して原因を特定し、修正してください：
+
+   スキーマ側：
+   - `amplify/data/resource.ts`（ClientProfile 関連の定義）
+   - 生成された GraphQL 型（`CreateClientProfileInput`）が参照できるファイル
+
+   API・画面側：
+   - `lib/api/profile.ts`（createClientProfile / updateClientProfile）
+   - `app/user/profile/setup/page.tsx`
+
+   確認ポイント：
+   - `CreateClientProfileInput` に存在しないフィールドを `input` に含めていないか。
+     - 例：`displayName` や `isCompleted` などを、Create 用の input に直接渡していないか。
+   - 必要であれば「作成 → 完了フラグ更新」という2ステップに分ける。
+
+3. 修正後にブラウザで確認してください：
+   - 新規ユーザーで `/user/profile/setup` を開くと、名前・表示名は空欄（もしくは既存プロフィールの値のみ）になっている。
+   - 必須項目を入力して「保存」すると、上記 GraphQL エラーが出ずに成功する。
+   - 再読み込みしてもプロフィールが取得・表示できる。
+
+4. 原因と修正内容を、簡単なコメントかレポートにまとめてください。
+
+------------------------------------------------
+■ Task 3: 作業レポート
+------------------------------------------------
+最後に、Markdown 形式の簡易レポートを出力してください。最低限、次を含めてください：
+
+- Task 1 / Task 2 ごとに：
+  - 何を見て（どのファイル／どのロジック）
+  - 何が原因で
+  - どのように修正したか
+- 変更・参照したファイル一覧
+- 実行したコマンド（例：`npm run build`）と結果
+- ブラウザで確認した URL と、そのときの最終挙動：
+  - `/manage/login`
+  - `/user/profile/setup`
+
+以上です。原因調査から順番に、タスクとして整理しながら進めてください。
+

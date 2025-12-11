@@ -15,6 +15,7 @@ export function getRoleFromPath(pathname: string): 'user' | 'instructor' | 'admi
   const segments = pathname.split('/');
   const firstSegment = segments[1];
 
+  if (firstSegment === 'manage') return 'admin';
   if (firstSegment === 'admin') return 'admin';
   if (firstSegment === 'instructor') return 'instructor';
   if (firstSegment === 'user') return 'user';

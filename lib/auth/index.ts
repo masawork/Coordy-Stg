@@ -14,7 +14,11 @@ export {
   getCurrentAuthUser,
   getAuthSession,
   checkAuth,
+  completeNewPasswordChallenge,
 } from './cognito';
+
+// ログイン結果の型
+export type { LoginResult } from './cognito';
 
 // セッション管理
 export {

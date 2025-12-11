@@ -45,6 +45,36 @@ export async function getInstructor(id: string) {
 }
 
 /**
+ * インストラクター作成
+ */
+export async function createInstructor(input: {
+  userId: string;
+  displayName: string;
+  bio?: string;
+  specialties?: string[];
+  profileImage?: string;
+  hourlyRate?: number;
+  status?: string;
+}) {
+  try {
+    const client = getDataClient();
+    const { data, errors } = await client.models.Instructor.create({
+      ...input,
+    });
+
+    if (errors) {
+      console.error('Error creating instructor:', errors);
+      throw new Error('インストラクター情報の作成に失敗しました');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Create instructor error:', error);
+    throw error;
+  }
+}
+
+/**
  * ユーザーIDからインストラクター情報を取得
  */
 export async function getInstructorByUserId(userId: string) {
@@ -72,6 +102,12 @@ export async function getInstructorByUserId(userId: string) {
  * インストラクター情報を更新
  */
 export async function updateInstructor(id: string, updates: {
+  displayName?: string;
+  bio?: string;
+  specialties?: string[];
+  profileImage?: string;
+  hourlyRate?: number;
+  status?: string;
   identityDocumentUrl?: string;
   identityDocumentStatus?: 'notSubmitted' | 'pending' | 'approved' | 'rejected';
   identityDocumentSubmittedAt?: string;

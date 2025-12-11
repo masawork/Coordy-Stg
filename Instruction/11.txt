@@ -1,0 +1,255 @@
+あなたは /mnt/Coordy リポジトリを担当するシニアフルスタックエンジニアです。
+Next.js (App Router) + AWS Amplify (Cognito, Amplify Data) を使ったサービスです。
+
+今回お願いしたいのは、以下 4 点の問題の原因分析と修正です：
+
+1. `/` 初回アクセス時に Header のログインボタンを押してもログインモーダルが開かない
+2. `/manage/login` で ADMINS グループに追加した管理者ユーザでもログインできない（読み込み中のまま）
+3. `/user` の表示名がプロフィールで設定した名前にならない
+4. `/instructor/profile/setup` が「読み込み中」のまま進まない
+
+前回 Codex が実施した変更内容も貼っておくので、まずそれを踏まえて状況を整理したうえで原因を特定してほしいです。
+
+------------------------------------------------
+■ 0. 前提・ルール
+------------------------------------------------
+- 作業ディレクトリ: `/mnt/Coordy`
+- まずプロジェクト構成と DOCS をざっと確認してください：
+
+  - `ls`
+  - `ls DOCS`
+  - `cat package.json`
+  - `cat DOCS/README.md`
+  - `cat DOCS/site-map.md`
+  - `cat DOCS/flows/login-flow.md`
+  - `cat DOCS/AUTH.md`
+  - `cat DOCS/IMPLEMENTATION.md`
+  - `cat DOCS/flows/main-user-flows.md`
+
+- `DOCS` 配下の `.md` ファイルは **削除・リネーム禁止**。
+  - 内容が現状とズレている場合は、「今回の要望に合わせて最小限の修正」で整合させてください。
+- Bash の `rm -rf` は `.next` など一時ファイル・キャッシュ以外には使わないでください。
+
+- すべてのタスクについて
+  1. 関連ファイル・ロジックの現状把握
+  2. 「なぜそうなっているか」の原因を言語化
+  3. 修正方針の整理
+  4. 実装
+  5. ブラウザでの動作確認
+  6. DOCS への反映（必要なもののみ）
+  の流れで進めてください。
+
+------------------------------------------------
+■ 1. `/` 初回アクセス時 Header ログインボタンが効かない問題（Task 1）
+------------------------------------------------
+現象：
+- `http://localhost:3000` に **ブラウザを開いた直後の初回アクセス** をすると、
+  - Header の「ログイン」ボタンをクリックしても、
+    「ユーザー / サービス出品者（インストラクター）を選ぶポップアップ（モーダル）」が出てきません。
+  - 下にスクロールしても特に何も出てきません。
+- ページを一度リロードすると、その後はログインボタンが正常に動きます。
+
+やってほしいこと：
+1. 関連しそうなコンポーネントやレイアウトを確認してください。
+   - 例：
+     - `app/layout.tsx`（ルートレイアウト。サーバー/クライアントの分離状態）
+     - `app/providers.tsx`（Amplify 初期化や SidebarProvider など）
+     - `components/common/Header.tsx`（公開ヘッダー）
+     - `components/modals/LoginModal.tsx`
+     - `components/sections/HeroSection.tsx`, `components/sections/CTASection.tsx` など、TOP ページからモーダルを開く導線
+
+2. 初回アクセス時に、
+   - ヘッダーのクリックイベントがバインドされていない
+   - 何か透明なオーバーレイ（Sheet や Sidebar）がヘッダーの上にかぶっている
+   - Hydration エラーや ChunkLoadError が起きていて、クライアント側の JS が途中で死んでいる
+   のどれかになっていないかを、コードとコンソールログ両方から分析してください。
+
+3. 原因を特定したうえで、
+   - 「なぜリロードすると直るのに、初回だけ動かないのか」
+   を説明できるレベルまで整理し、
+   - クリックが初回から確実に効くように修正してください。
+   - 必要なら `app/layout.tsx` と `app/providers.tsx` の責務分担や、モーダルのマウントタイミングを調整してください。
+
+4. 修正後の確認：
+   - ブラウザを完全に閉じて開き直す or シークレットウィンドウで
+     `http://localhost:3000` にアクセス
+   - Header のログインボタン → ユーザ/インストラクター選択モーダルが **初回から** 開くこと
+   - スクロールしても何かにブロックされていないこと
+
+------------------------------------------------
+■ 2. `/manage/login` で admin ログインできない問題（Task 2）
+------------------------------------------------
+現象：
+- Cognito の User Pool で、管理者用ユーザを作成し、グループ `ADMINS` に追加しました。
+- ただし、そのユーザの確認ステータスが UI 上で「パスワードを強制的に変更」と表示されています（FORCE_CHANGE_PASSWORD 状態と思われます）。
+- `http://localhost:3000/manage/login` からログインしようとしても、画面が「読み込み中」のまま変わらず、管理者としてログインできません。
+
+前提：
+- 管理者アカウントは Web サインアップからは作らず、Cognito コンソールで作成 → `ADMINS` グループに追加する運用にしたいです。
+- これまでの実装で、`registerUser` では admin ロールを拒否するようにしてあるはずです。
+
+やってほしいこと：
+1. 管理者ログインまわりのコードを確認してください。
+   - `app/manage/login/page.tsx`
+   - `app/manage/(protected)/layout.tsx`
+   - `lib/auth/cognito.ts`（特に admin ロール判定、サインイン処理、`UserAlreadyAuthenticatedException` や `NEW_PASSWORD_REQUIRED` の扱い）
+
+2. Cognito 側で「パスワードを強制的に変更」ステータス（FORCE_CHANGE_PASSWORD）のユーザでログインすると、
+   - `Auth.signIn` から `NEW_PASSWORD_REQUIRED` チャレンジが返るはずですが、
+   - 現状のコードがこの分岐をまったく処理しておらず、読み込み中のまま詰まっていないかを確認してください。
+
+3. 対応案：
+   - 最低限、管理者ログインについては、
+     - FORCE_CHANGE_PASSWORD 状態のユーザでもログインフローを完了できるようにする  
+       もしくは
+     - フロントから「一時パスワード → 新パスワード」に変更する UI を用意する
+   - または、今回は開発用途なので、
+     - 一時的に Cognito コンソール上で「パスワードをリセット → すでに変更済み」にしたうえで、
+       通常サインインできる状態にする運用でも構いません。
+   - どの方針を取るかは、現状のコードベースに合わせて現実的なものを選んでください。
+
+4. 修正後の確認：
+   - ADMINS グループにいるユーザで `/manage/login` からログイン
+   - 正常に `/manage/admin` に遷移すること
+   - admin 以外のユーザは適切に弾かれること（必要ならログイン画面にエラー表示）
+
+5. 必要に応じて、`DOCS/AUTH.md` や `DOCS/flows/login-flow.md` に、
+   - 管理者アカウント作成・ログイン手順
+   - FORCE_CHANGE_PASSWORD 状態に関する注意点
+   を追記してください。
+
+------------------------------------------------
+■ 3. `/user` の表示名がプロフィールの「表示名」にならない問題（Task 3）
+------------------------------------------------
+現象：
+- `http://localhost:3000/user` の HOME 画面で、
+  - 「ようこそ、『○○』さん！」や Header に表示される名前が、
+  - プロフィール画面で設定した「表示名」に反映されていません。
+
+前回の変更（Codex レポート）では、
+- 表示名解決ロジックを `resolveDisplayName` にまとめ、
+- displayName → name → Cognito → email ローカル部、という優先度で決めるようにした、
+とありますが、実際の表示が意図通りになっていません。
+
+やってほしいこと：
+1. 以下を中心に、表示名がどのように決まっているか確認してください。
+   - `lib/auth/displayName.ts`
+   - `lib/auth/cognito.ts`（ユーザ情報取得部分）
+   - `app/user/(protected)/layout.tsx`
+   - `app/user/(protected)/page.tsx`
+   - プロフィール保存処理：
+     - `lib/api/profile.ts`
+     - `app/user/(protected)/profile/setup/page.tsx`
+
+2. プロフィール保存時に、
+   - ClientProfile だけでなく、Cognito 側の `name` や `custom:displayName` なども更新する設計になっているか確認してください。
+
+3. 修正方針：
+   - 「/user や Header に出す表示名」は、
+     - まず ClientProfile の displayName
+     - なければ ClientProfile の name
+     - それもなければ Cognito の displayName/name
+     - 最後の最後に email ローカル部
+     のような優先順で決まるよう統一してください。
+   - そのうえで、
+     - プロフィールで設定した「表示名」があれば、必ずそれが /user に出るように修正してください。
+
+4. 修正後の確認：
+   - `/user/profile/setup` で表示名を設定 → 保存
+   - `/user` にアクセスして、「ようこそ、『表示名』さん！」のようにプロフィールの表示名になっていること
+   - Header のユーザ名表示も同じルールでそろえること
+
+5. この仕様は `DOCS/flows/main-user-flows.md` にも反映してください（既に記載があればアップデート）。
+
+------------------------------------------------
+■ 4. `/instructor/profile/setup` が「読み込み中」のまま進まない問題（Task 4）
+------------------------------------------------
+現象：
+- インストラクター新規登録 → メール確認 → ログイン後、
+  - `http://localhost:3000/instructor/profile/setup`
+  - で「読み込み中」表示のまま画面が進みません。
+
+前回のレポートでは、
+- `/instructor/profile/setup` を新規追加し、
+- インストラクター初回ログイン時にプロフィール未作成ならここへ誘導する、
+という実装をしたことになっていますが、実際の画面はフリーズしている状態です。
+
+やってほしいこと：
+1. 以下のファイルを中心に確認してください。
+   - `app/instructor/(protected)/profile/setup/page.tsx`
+   - `app/instructor/(protected)/layout.tsx`
+   - `lib/api/instructors.ts` もしくはインストラクタープロフィール取得系の API
+   - 認証チェック・プロフィール存在チェックのロジック
+
+2. 「読み込み中」状態が解除されない原因を特定してください。
+   - プロフィール取得の Promise が reject しているのに catch で state を更新していない
+   - useEffect の依存関係ミスで無限ループになっている
+   - 認証チェックとプロフィールチェックが互いに待ち合っている
+   などがないか、実コードを見て判断してください。
+
+3. 修正方針：
+   - 認証状態・プロフィール取得結果に応じて、
+     - 新規作成モード（フォーム表示）
+     - 既存編集モード
+     - エラー時のメッセージ表示
+   がちゃんと切り替わるように、ローディング state の扱いを見直してください。
+
+4. 修正後の確認：
+   - 新規インストラクターでログイン → `/instructor/profile/setup` に遷移
+   - 読み込み中から適切にフォームが表示され、プロフィールを保存できる
+   - 保存後は `/instructor` に遷移（または、DOCS どおりの遷移）する
+
+5. 必要に応じて、
+   - `DOCS/flows/login-flow.md`
+   - `DOCS/flows/main-user-flows.md`
+   にインストラクターのプロフィールセットアップフローを最新状態で反映してください。
+
+------------------------------------------------
+■ 5. Codex が直近で行った変更（参考として確認してほしい）
+------------------------------------------------
+
+（※ここから下は「参考情報」です。内容が正しいとは限らないので、必ず実装と挙動を照らし合わせて検証してください）
+
+--- Codex の実装レポート（引用） ---
+作業レポート
+
+Task 1 /manage/login
+
+調査: app/manage/login/page.tsx の初期セッションチェックと lib/auth/cognito.ts の checkAuth/getCurrentAuthUser を確認。
+原因: セッション取得がハング/失敗した場合や別ロールログイン中に checking がfalseにならずローディングが解除されない分岐があり、フォーム表示まで進めない可能性があった。
+修正: セッション確認を Promise.race(4sタイムアウト) 付きで実行し、全ての経路で checking を確実に false にする finally を追加。admin 以外は必ずフォーム表示、admin は即 /manage/admin へ遷移するよう安定化（app/manage/login/page.tsx）。
+
+Task 2 /user/profile/setup
+
+調査: app/user/(protected)/profile/setup/page.tsx, lib/api/profile.ts, amplify_outputs.json の ClientProfile スキーマ、lib/auth/displayName.ts を確認。
+原因: 実バックエンドの CreateClientProfileInput に displayName が存在せず（amplify_outputs.json にも未掲載）なのに作成/更新入力に含めて送っていたため GraphQL で拒否されていた。加えてサインアップ時の仮名（メールローカル部）がそのまま name/displayName 初期値に流れていた。
+修正:
+Profile API から displayName を送らないよう入力型と create/update ペイロードを整理（lib/api/profile.ts）。
+フォーム初期化時、新規ユーザーは name/displayName を空欄にし、既存プロフィールのみ既存値＋Cognito の displayName（メールローカル部と同じ場合は除外）を表示（app/user/(protected)/profile/setup/page.tsx）。
+保存時は GraphQL に許容されるフィールドのみ送信し、custom:displayName と name は Cognito 属性に更新するように変更（同上）。
+表示名解決ロジックで Cognito の displayName を優先するよう改善し、ドキュメントも更新（lib/auth/displayName.ts, DOCS/flows/main-user-flows.md）。
+変更・参照ファイル: app/manage/login/page.tsx, app/user/(protected)/profile/setup/page.tsx, lib/api/profile.ts, lib/auth/displayName.ts, DOCS/flows/main-user-flows.md（分析で amplify_outputs.json も参照のみ）。
+
+実行コマンド: npm run lint → 失敗（Next.js が ES Lint の古いオプション useEslintrc/resolvePluginsRelativeTo 等を未知として終了）。Lint 設定が未対応のままのため、設定調整後に再実行してください。
+
+ブラウザ確認（期待挙動）
+
+/manage/login: 未ログイン・user・instructor ログイン中はいずれも即フォーム表示。admin ログイン中は /manage/admin へリダイレクト。セッション取得が詰まってもタイムアウト後にフォームが出る。
+/user/profile/setup: 新規ユーザーは氏名/表示名が空欄（メールローカル部が自動入力されない）。必須項目入力後の保存で displayName を含まない GraphQL リクエストとなりエラーなく作成/更新され、Cognito 側に displayName/name を反映。
+--- 引用ここまで ---
+
+※ 実際には、上記の「期待挙動」になっていません。
+　そのため、レポート内容を鵜呑みにせず、実装と実際の挙動を必ず突き合わせて確認しながら修正してください。
+
+------------------------------------------------
+■ 6. 最後に（レポート）
+------------------------------------------------
+作業完了後、Markdown 形式で簡単な作業レポートを出してください。  
+各 Task 1〜4 について：
+
+- どのファイル／ロジックを見て
+- 何が原因だったか
+- どう修正したか
+- どの URL でどういう挙動を確認したか
+
+を短くまとめてもらえると助かります。

@@ -43,8 +43,11 @@ export default function ForgotPasswordPage() {
         friendlyMessage = 'このメールアドレスは登録されていません。';
       } else if (err.name === 'LimitExceededException') {
         friendlyMessage = 'リクエスト回数の上限に達しました。しばらく時間をおいてからお試しください。';
-      } else if (err.message) {
-        friendlyMessage = err.message;
+      } else if (err.name === 'InvalidParameterException' ||
+                 (err.message && err.message.includes('no registered/verified email'))) {
+        friendlyMessage = 'このアカウントはメール認証が完了していないか、連絡先情報が登録されていません。お手数ですが、新しくユーザー登録をやり直してください。';
+      } else if (err.name === 'NotAuthorizedException') {
+        friendlyMessage = 'パスワードリセットが許可されていません。管理者にお問い合わせください。';
       }
 
       setError(friendlyMessage);

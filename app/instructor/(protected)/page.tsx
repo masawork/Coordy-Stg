@@ -126,9 +126,23 @@ export default function InstructorDashboardPage() {
             クイックアクション
           </h2>
           <div className="space-y-2">
-            <button className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-              新規サービス作成
-            </button>
+            {instructor?.identityDocumentStatus === 'approved' ? (
+              <button className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                新規サービス作成
+              </button>
+            ) : (
+              <div>
+                <button
+                  disabled
+                  className="w-full px-4 py-2 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed"
+                >
+                  新規サービス作成
+                </button>
+                <p className="text-xs text-gray-500 mt-1">
+                  ※サービス作成には管理者の承認が必要です
+                </p>
+              </div>
+            )}
             <button className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
               スケジュール管理
             </button>

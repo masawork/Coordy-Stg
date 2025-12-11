@@ -18,14 +18,12 @@ export default function FavoritesPage() {
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   useEffect(() => {
+    // 認証はレイアウトで実施済み、セッションからユーザーID取得
     const session = getSession();
-    if (!session) {
-      router.push('/login/user');
-      return;
+    if (session) {
+      loadFavorites(session.userId);
     }
-
-    loadFavorites(session.userId);
-  }, [router]);
+  }, []);
 
   const loadFavorites = async (userId: string) => {
     try {
@@ -57,7 +55,7 @@ export default function FavoritesPage() {
       // お気に入りクリエイターのサービスを取得
       if (favoriteData.length > 0) {
         const instructorIds = favoriteData.map((f) => f.instructorId);
-        const allServices = await listServices({ status: 'published' });
+        const allServices = await listServices({ status: 'active' });
         const favoriteServices = (allServices || [])
           .filter((service) => instructorIds.includes(service.instructorId))
           .sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
@@ -114,15 +112,14 @@ export default function FavoritesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* ヘッダー */}
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">お気に入り</h1>
-          <p className="mt-2 text-gray-600">
-            お気に入りのクリエイターとサービスを管理できます
-          </p>
-        </div>
+    <div className="space-y-8">
+      {/* ヘッダー */}
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">お気に入り</h1>
+        <p className="mt-2 text-gray-600">
+          お気に入りのクリエイターとサービスを管理できます
+        </p>
+      </div>
 
         {loading ? (
           <div className="text-center py-12">
@@ -229,7 +226,6 @@ export default function FavoritesPage() {
             )}
           </>
         )}
-      </div>
     </div>
   );
 }

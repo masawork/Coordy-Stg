@@ -99,7 +99,6 @@ export default function ServiceDetailPage() {
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
         participants,
-        status: 'pending',
         price: totalPrice,
         notes,
       });

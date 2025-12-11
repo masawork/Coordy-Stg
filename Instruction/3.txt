@@ -1,0 +1,203 @@
+/mnt/Coordy リポジトリの Next.js(App Router) プロジェクトについて、
+ユーザー／サービス出品者（instructorロール）のログイン状態に応じた画面遷移と、
+DOCS のフロー図の更新を行ってください。
+
+まず最初に「今回の修正タスク一覧（T-001, T-002…）」をMarkdownテーブルで出力し、  
+そのあと実装に進んでください。
+
+会話は最小限で、わかる範囲は自動でどんどん進めてください。
+画面テキスト・コメント・レポートはすべて日本語でお願いします。
+
+# 前提・いま起きていること
+
+- ユーザーとしてログインした状態で `/` にアクセスし、
+  「サービス出品者の新規登録はこちら」をクリックすると **`/user` に遷移してしまう**。
+  - 期待値は `/signup/instructor`。
+- ユーザーログイン自体（/login/user → /user）は動いているので、**ここは壊さずに** 修正したい。
+- すでに `components/sections/HeroSection.tsx` / `CTASection.tsx` には
+  「ログイン状態に応じたボタン遷移先分岐ロジック」が入っているが、
+  「ユーザーログイン状態でサービス出品者ボタンを押した場合」の条件が期待通りになっていない。
+
+- また、`DOCS/flows/login-flow.md` に記載しているログインフロー図にも、
+  「ユーザー／サービス出品者のログイン状態に応じたリダイレクト条件」を追記してほしい。
+
+# やりたいこと（仕様）
+
+「ユーザー」と「サービス出品者(instructorロール)」のログイン状態を組み合わせたときの
+**ログイン画面／新規登録画面の挙動** を、次のように揃えたいです。
+
+ここで：
+- 「ユーザーログイン状態」 = userロールの有効なセッションがある
+- 「インストラクターログイン状態」 = instructorロールの有効なセッションがある
+- 両方ログイン = 両方のロールセッションがある
+
+## 1. ユーザーログイン状態のみ
+
+1-1. ユーザーログイン画面 or 新規登録画面  
+- `/login/user`
+- `/signup/user`  
+→ **`/user` にリダイレクト**
+
+1-2. インストラクターログイン画面 or 新規登録画面  
+- `/login/instructor`
+- `/signup/instructor`  
+→ **そのまま各ページにアクセスできる**（/signup/instructor or /login/instructor にアクセス）  
+  - ここでは「サービス出品者アカウントをこれから作る／ログインする」という前提で、ブロックしない。
+
+## 2. インストラクターログイン状態のみ
+
+2-1. ユーザーログイン画面 or 新規登録画面  
+- `/login/user`
+- `/signup/user`  
+→ **そのまま各ページにアクセスできる**（/login/user or /signup/user にアクセス）  
+  - ここでは「ユーザーアカウントを別途作る／ログインする」ことを許可したい。
+
+2-2. インストラクターログイン画面 or 新規登録画面  
+- `/login/instructor`
+- `/signup/instructor`  
+→ **`/instructor` にリダイレクト**
+
+## 3. ユーザーログイン状態 かつ インストラクターログイン状態（両方）
+
+3-1. ユーザーログイン画面 or 新規登録画面  
+- `/login/user`
+- `/signup/user`  
+→ **`/user` にリダイレクト**
+
+3-2. インストラクターログイン画面 or 新規登録画面  
+- `/login/instructor`
+- `/signup/instructor`  
+→ **`/instructor` にリダイレクト**
+
+## 4. トップページ（/）のCTAボタン
+
+トップページの2ボタンも、上記の意図と矛盾しないようにしてください。
+
+- 「ユーザーの新規登録はこちら」ボタン
+  - 未ログイン： `/signup/user`
+  - ユーザーログイン済（のみ or 両方）： `/user` に行く or 「マイページへ」テキストでもOK
+  - インストラクターログインのみ： `/signup/user`（ユーザーアカウントを別途作れる）
+
+- 「サービス出品者の新規登録はこちら」ボタン
+  - 未ログイン： `/signup/instructor`
+  - ユーザーログインのみ： `/signup/instructor`（← ここが **まだ直っていないポイント**。`/user` に飛ばさない）
+  - インストラクターログインのみ： `/instructor`
+  - 両方ログイン： `/instructor`
+
+**重要:**  
+すでに実装済みの「ユーザー／サービス出品者のログイン処理や、  
+/verify → /login/user, /login/instructor への遷移」は壊さないでください。  
+今回の修正は「ログイン状態に応じたリダイレクト条件」と「トップページCTAの遷移先」に限定します。
+
+# やってほしいこと（実装タスクの方向性）
+
+※ 具体的なコードはあなたに任せますが、以下の方針で進めてください。
+
+## T-001: ログイン状態を判定する共通ロジックの確認／整理
+
+- すでに HeroSection / CTASection などで利用している
+  「ユーザー／サービス出品者のログイン状態を取得する関数 or Hook」があれば、それを再利用してください。
+  - 例：`useCurrentUser()`, `useSession()`, `getCurrentUserRole()` など
+- user/instructor 両方のセッションを判定できるようなインターフェースを確認し、
+  なければ最小限の共通関数を追加してください（例：`getUserLoggedIn()`, `getInstructorLoggedIn()` など）。
+
+## T-002: トップページ CTA（HeroSection / CTASection）の分岐修正
+
+- `components/sections/HeroSection.tsx`
+- `components/sections/CTASection.tsx`
+
+を開き、現在実装されている「ログイン状態に応じたボタン遷移先の分岐」を  
+**上記仕様に完全に合わせる** ように修正してください。
+
+特に直してほしいポイント：
+
+- 「ユーザーログイン状態で『サービス出品者の新規登録こちら』を押したとき、
+  `/user` ではなく `/signup/instructor` に飛ぶ」ようにする。
+
+実装のポイント例：
+
+- `isUserLoggedIn` / `isInstructorLoggedIn` をもとに
+  - 未ログイン
+  - userのみ
+  - instructorのみ
+  - 両方  
+  を if/else で分岐して、`href` とボタンテキストを決定する。
+
+## T-003: /login*/ /signup* ページのリダイレクト条件実装
+
+対象：
+
+- `app/login/user/page.tsx`
+- `app/signup/user/page.tsx`
+- `app/login/instructor/page.tsx`
+- `app/signup/instructor/page.tsx`
+
+それぞれのページで、SSR またはクライアントサイド（`useEffect`）のいずれかの方法で  
+上記「1〜3の条件表」に従ったリダイレクトを実装してください。
+
+例：
+
+- userログイン状態のみ：
+  - `/login/user`, `/signup/user` → `/user` へ `redirect()` or `router.replace('/user')`
+  - `/login/instructor`, `/signup/instructor` → そのままアクセス許可（リダイレクトしない）
+- instructorログイン状態のみ：
+  - `/login/instructor`, `/signup/instructor` → `/instructor`
+  - `/login/user`, `/signup/user` → そのままアクセス許可
+- 両方ログイン：
+  - `/login/user`, `/signup/user` → `/user`
+  - `/login/instructor`, `/signup/instructor` → `/instructor`
+
+既存の「ログイン成功時に /user や /instructor へ遷移するロジック」は変えず、  
+**ページ表示直後のガード処理だけ追加／修正** するイメージでお願いします。
+
+## T-004: DOCS/flows/login-flow.md への条件追記
+
+- `DOCS/flows/login-flow.md` を開き、既存のログインフロー（ユーザー／サービス出品者）に、
+  上記の条件を反映してください。
+
+やってほしいこと：
+
+1. テキストによる条件一覧を追記：
+   - 「ユーザーログイン状態」「インストラクターログイン状態」「両方ログイン状態」のときに  
+     各ログイン画面／新規登録画面へアクセスした場合の挙動（リダイレクト／表示）をまとめた表を追加。
+
+2. 可能であれば、Mermaidのフロー図にも簡単に条件を追記：
+   - 例）分岐ノードとして `[ユーザーログイン中?]`, `[インストラクターログイン中?]` を追加し、  
+     `/user` や `/instructor` への矢印を追加する程度でOKです。
+
+**注意：**
+- DOCS のファイル削除や大規模な構成変更は今回行わないでください。
+- あくまで「login-flow.md に条件を追記する」レベルにとどめてください。
+
+# 最終確認
+
+実装後、最低限次の動作を自己テストしてください（コード+簡易ブラウザ確認ベースでOK）。
+
+1. ユーザーログイン状態のみ
+   - `/` → 「ユーザーの新規登録はこちら」→ `/user`
+   - `/` → 「サービス出品者の新規登録はこちら」→ `/signup/instructor`
+   - `/login/user` / `/signup/user` → `/user` にリダイレクト
+   - `/login/instructor` / `/signup/instructor` → 画面にそのままアクセス可能
+
+2. インストラクターログイン状態のみ
+   - `/login/instructor` / `/signup/instructor` → `/instructor` にリダイレクト
+   - `/login/user` / `/signup/user` → 画面にそのままアクセス可能
+
+3. ユーザー＆インストラクターログイン状態（両方）
+   - `/login/user` / `/signup/user` → `/user` にリダイレクト
+   - `/login/instructor` / `/signup/instructor` → `/instructor` にリダイレクト
+
+4. 既存のログインフロー：
+   - `/signup/user` → `/verify?email=...` → `/login/user`
+   - `/signup/instructor` → `/verify?email=...&role=instructor` → `/login/instructor`  
+   が壊れていないこと。
+
+# 作業完了レポート
+
+最後に、次の内容を含む「作業完了レポート」を Markdown でコンソールに出力してください。
+
+- 変更したファイル一覧（パス・概要）
+- トップページの2ボタンの挙動が、各ログイン状態ごとにどう変わったか（表形式で）
+- /login*/ /signup* ページのリダイレクト条件（ユーザー／サービス出品者／両方ログイン時）のまとめ
+- `DOCS/flows/login-flow.md` に追記した内容の要約
+- 既存のログイン／サインアップフローが壊れていないことの確認結果

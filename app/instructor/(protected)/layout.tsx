@@ -6,18 +6,21 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { getCurrentAuthUser, saveSession } from '@/lib/auth';
 import type { User } from '@/lib/auth';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { SidebarProvider, useSidebar } from '@/components/layout/SidebarProvider';
+import { useSidebar } from '@/components/layout/SidebarProvider';
 import { X } from 'lucide-react';
+import { getInstructorByUserId } from '@/lib/api/instructors';
 
 function ProtectedContent({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [displayName, setDisplayName] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
   const { open, close } = useSidebar();
 
   useEffect(() => {
@@ -41,17 +44,36 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
 
         // セッションを更新
         saveSession(authUser);
+
+        // プロフィール未作成ならセットアップへ
+        if (!pathname.includes('/profile/setup')) {
+          try {
+            const instructor = await getInstructorByUserId(authUser.userId);
+            if (!instructor) {
+              router.push('/instructor/profile/setup');
+              return;
+            }
+            setDisplayName(instructor.displayName || authUser.displayName || authUser.name);
+          } catch (err) {
+            console.error('インストラクタープロフィール取得エラー:', err);
+            setDisplayName(authUser.displayName || authUser.name);
+          }
+        } else {
+          setDisplayName(authUser.displayName || authUser.name);
+        }
+
         setUser(authUser);
         setLoading(false);
       } catch (error) {
         console.error('認証チェックエラー:', error);
         // 認証エラーの場合はログインページへ
+        setLoading(false);
         router.push('/login/instructor');
       }
     };
 
     checkAuth();
-  }, [router]);
+  }, [router, pathname]);
 
   if (loading) {
     return (
@@ -71,7 +93,7 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ヘッダー */}
-      <AppHeader userName={user.name} />
+      <AppHeader userName={displayName || user.name} />
 
       <div className="flex">
         {/* サイドバー - デスクトップ */}
@@ -82,14 +104,14 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
         {/* サイドバー - モバイル */}
         {open && (
           <>
-            {/* Overlay */}
+            {/* Overlay - ヘッダー(z-50)より下 */}
             <div
-              className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+              className="fixed inset-x-0 top-14 bottom-0 bg-black/50 z-40 lg:hidden"
               onClick={close}
             />
 
-            {/* Sidebar */}
-            <aside className="fixed left-0 top-0 bottom-0 w-64 bg-white z-50 overflow-y-auto lg:hidden shadow-xl">
+            {/* Sidebar - オーバーレイより上、ヘッダーより下 */}
+            <aside className="fixed left-0 top-14 bottom-0 w-64 bg-white z-[45] overflow-y-auto lg:hidden shadow-xl">
               {/* Close button */}
               <div className="flex items-center justify-between p-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-800">メニュー</h2>
@@ -122,9 +144,5 @@ export default function InstructorProtectedLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <SidebarProvider>
-      <ProtectedContent>{children}</ProtectedContent>
-    </SidebarProvider>
-  );
+  return <ProtectedContent>{children}</ProtectedContent>;
 }

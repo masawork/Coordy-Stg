@@ -1,99 +1,129 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { signUp } from 'aws-amplify/auth';
-import { useRouter } from 'next/navigation';
 import Button from '@/components/common/Button';
-import { useValidation } from '@/lib/hooks/useValidation';
-import '../../../src/lib/amplifyClient'; // Ensure Amplify is configured
+import { registerUser, checkAuth, getCurrentAuthUser, saveSession } from '@/lib/auth';
+// Amplify初期化を確実に行う
+import '@/src/lib/amplifyClient';
 
-export default function InstructorSignupPage() {
-  const router = useRouter();
-  const [name, setName] = useState('');
+export default function SignupInstructorPage() {
   const [email, setEmail] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [phoneNumberError, setPhoneNumberError] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [error, setError] = useState('');
+  const router = useRouter();
 
-  const { errors, validate, validateAll } = useValidation();
+  // マウント時に既にログイン済みかチェック
+  useEffect(() => {
+    let active = true;
+    const checkSession = async () => {
+      try {
+        const hasAuthSession = await checkAuth();
+        if (!hasAuthSession) {
+          if (active) {
+            console.log('✅ 未ログイン状態を確認、サインアップフォームを表示');
+            setChecking(false);
+          }
+          return;
+        }
+
+        const authUser = await getCurrentAuthUser();
+        saveSession(authUser);
+
+        console.log('🔍 既にログイン済み:', { role: authUser.role });
+        // インストラクターとしてログイン済みの場合のみリダイレクト
+        // ユーザーログイン中は別途インストラクターアカウントを作成できるようにする
+        if (authUser.role === 'instructor') {
+          window.location.href = '/instructor';
+        } else if (authUser.role === 'admin') {
+          window.location.href = '/admin';
+        } else if (active) {
+          // ユーザーログイン中でもフォームを表示（別ロールでの登録を許可）
+          setChecking(false);
+        }
+      } catch {
+        if (active) {
+          console.log('✅ 未ログイン状態を確認、サインアップフォームを表示');
+          setChecking(false);
+        }
+      }
+    };
+
+    checkSession();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSuccessMessage('');
-    setErrorMessage('');
+    setLoading(true);
+    setError('');
 
-    // Password confirmation check
+    // パスワード確認
     if (password !== confirmPassword) {
-      setErrorMessage('パスワードが一致しません');
+      setError('パスワードが一致しません');
+      setLoading(false);
       return;
     }
 
-    // Phone number validation
-    if (phoneNumber && phoneNumber.trim() !== '') {
-      const phoneRegex = /^0\d{9,10}$/;
-      if (!phoneRegex.test(phoneNumber.replace(/-/g, ''))) {
-        setPhoneNumberError('電話番号の形式が正しくありません（例: 09012345678）');
-        setErrorMessage('入力内容を確認してください');
-        return;
-      }
-    }
-
-    // Validate all fields
-    const isValid = validateAll({
-      email,
-      password,
-      displayName: name,
-    });
-
-    if (!isValid) {
-      setErrorMessage('入力内容を確認してください');
+    // パスワード要件チェック
+    if (password.length < 8) {
+      setError('パスワードは8文字以上で入力してください');
+      setLoading(false);
       return;
     }
-
-    setIsSubmitting(true);
 
     try {
-      const userAttributes: Record<string, string> = {
-        name: name,
-        'custom:userType': 'CREATOR',
-        'custom:role': 'instructor',
-      };
-
-      // 電話番号が入力されている場合は追加
-      if (phoneNumber && phoneNumber.trim() !== '') {
-        userAttributes.phone_number = phoneNumber.replace(/-/g, '').startsWith('+81')
-          ? phoneNumber.replace(/-/g, '')
-          : '+81' + phoneNumber.replace(/-/g, '').substring(1);
-      }
-
-      const result = await signUp({
-        username: email,
+      // Cognitoでインストラクター登録（名前はプロフィール設定時に入力）
+      await registerUser({
+        email,
         password,
-        options: {
-          userAttributes,
-        },
+        name: email.split('@')[0], // 仮の名前としてメールアドレスの前部分を使用
+        role: 'instructor',
       });
 
-      console.log('✅ サインアップ結果:', result);
-      setSuccessMessage('登録が完了しました！確認コード入力画面に移動します。');
+      console.log('✅ インストラクター登録成功、確認コード入力画面へ');
+      // 確認コード入力画面へリダイレクト（role=instructor パラメータ付き）
+      router.push(`/verify?email=${encodeURIComponent(email)}&role=instructor`);
+    } catch (err: any) {
+      console.error('Signup error:', err);
 
-      // 確認コード入力画面へリダイレクト
-      setTimeout(() => {
-        router.push(`/verify?email=${encodeURIComponent(email)}&role=instructor`);
-      }, 1500);
-    } catch (error: any) {
-      console.error('Signup error:', error);
-      setErrorMessage(error.message || '登録に失敗しました。もう一度お試しください。');
+      // エラーメッセージを日本語化
+      let friendlyMessage = '登録に失敗しました。時間をおいて再度お試しください。';
+
+      if (err.name === 'UsernameExistsException' || err.message?.includes('already exists')) {
+        friendlyMessage = 'このメールアドレスは既に登録されています';
+      } else if (err.name === 'InvalidPasswordException') {
+        friendlyMessage = 'パスワードの要件を満たしていません（8文字以上、大文字・小文字・数字・記号を含む）';
+      } else if (err.name === 'InvalidParameterException') {
+        friendlyMessage = '入力内容に問題があります。メールアドレスとパスワードを確認してください。';
+      } else if (err.message) {
+        friendlyMessage = err.message;
+      }
+
+      setError(friendlyMessage);
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
+
+  // セッションチェック中はローディング表示
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-600 via-emerald-500 to-teal-400 flex items-center justify-center">
+        <div className="text-white text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+          <p>読み込み中...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-600 via-emerald-500 to-teal-400 flex items-center justify-center p-4">
@@ -104,138 +134,64 @@ export default function InstructorSignupPage() {
         className="bg-white rounded-2xl shadow-2xl p-8 md:p-12 max-w-md w-full"
       >
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">クリエイター新規登録</h1>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">サービス出品者 新規登録</h1>
           <p className="text-gray-600">サービスを提供する方のアカウント作成</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label htmlFor="name" className="block text-sm font-semibold text-gray-700 mb-2">
-              お名前
-            </label>
-            <input
-              type="text"
-              id="name"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                validate('displayName', e.target.value);
-              }}
-              onBlur={(e) => validate('displayName', e.target.value)}
-              className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none transition-colors ${
-                errors.displayName
-                  ? 'border-red-500 focus:border-red-600'
-                  : 'border-gray-200 focus:border-green-600'
-              }`}
-              placeholder="山田太郎"
-            />
-            {errors.displayName && (
-              <p className="text-red-600 text-sm mt-1">{errors.displayName}</p>
-            )}
-          </div>
-
-          <div>
             <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
-              メールアドレス
+              メールアドレス<span className="text-red-500">*</span>
             </label>
             <input
               type="email"
               id="email"
               value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                validate('email', e.target.value);
-              }}
-              onBlur={(e) => validate('email', e.target.value)}
-              className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none transition-colors ${
-                errors.email
-                  ? 'border-red-500 focus:border-red-600'
-                  : 'border-gray-200 focus:border-green-600'
-              }`}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-green-600 focus:outline-none transition-colors"
               placeholder="your@email.com"
             />
-            {errors.email && (
-              <p className="text-red-600 text-sm mt-1">{errors.email}</p>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="phoneNumber" className="block text-sm font-semibold text-gray-700 mb-2">
-              電話番号（任意）
-            </label>
-            <input
-              type="tel"
-              id="phoneNumber"
-              value={phoneNumber}
-              onChange={(e) => {
-                setPhoneNumber(e.target.value);
-                if (phoneNumberError) {
-                  setPhoneNumberError('');
-                }
-              }}
-              className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none transition-colors ${
-                phoneNumberError
-                  ? 'border-red-500 focus:border-red-600'
-                  : 'border-gray-200 focus:border-green-600'
-              }`}
-              placeholder="09012345678"
-            />
-            {phoneNumberError && (
-              <p className="text-red-600 text-sm mt-1">{phoneNumberError}</p>
-            )}
-            <p className="text-xs text-gray-500 mt-1">
-              ※ ハイフンなしで入力してください（例: 09012345678）
-            </p>
           </div>
 
           <div>
             <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
-              パスワード
+              パスワード<span className="text-red-500">*</span>
             </label>
             <input
               type="password"
               id="password"
               value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                validate('password', e.target.value);
-              }}
-              onBlur={(e) => validate('password', e.target.value)}
-              className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none transition-colors ${
-                errors.password
-                  ? 'border-red-500 focus:border-red-600'
-                  : 'border-gray-200 focus:border-green-600'
-              }`}
-              placeholder="8文字以上（英大文字・小文字・数字を含む）"
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-green-600 focus:outline-none transition-colors"
+              placeholder="8文字以上"
             />
-            {errors.password && (
-              <p className="text-red-600 text-sm mt-1">{errors.password}</p>
-            )}
+            <p className="text-xs text-gray-500 mt-1">
+              大文字・小文字・数字・記号を含む8文字以上
+            </p>
           </div>
 
           <div>
             <label htmlFor="confirmPassword" className="block text-sm font-semibold text-gray-700 mb-2">
-              パスワード確認
+              パスワード（確認）<span className="text-red-500">*</span>
             </label>
             <input
               type="password"
               id="confirmPassword"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              minLength={8}
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-green-600 focus:outline-none transition-colors"
               placeholder="パスワードを再入力"
             />
           </div>
 
-          {successMessage && (
-            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg">
-              {successMessage}
-            </div>
-          )}
-
-          {errorMessage && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
-              {errorMessage}
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-600 text-sm">{error}</p>
             </div>
           )}
 
@@ -243,20 +199,23 @@ export default function InstructorSignupPage() {
             type="submit"
             variant="primary"
             size="lg"
-            className={`w-full bg-green-600 hover:bg-green-700 transition-all duration-300 ${
-              isSubmitting || errors.email || errors.password || errors.displayName
-                ? 'opacity-50 cursor-not-allowed'
-                : ''
-            }`}
-            disabled={isSubmitting || !!errors.email || !!errors.password || !!errors.displayName}
+            className="w-full bg-green-600 hover:bg-green-700"
+            disabled={loading}
           >
-            {isSubmitting ? '登録中...' : '新規登録'}
+            {loading ? '登録中...' : '新規登録'}
           </Button>
         </form>
 
+        <div className="mt-4 p-4 bg-green-50 rounded-lg">
+          <p className="text-sm text-green-800">
+            <strong>サービス出品者登録について</strong><br />
+            登録後、本人確認書類の提出が必要になる場合があります。
+          </p>
+        </div>
+
         <div className="mt-6 text-center">
           <p className="text-gray-600">
-            すでにアカウントをお持ちの方は
+            既にアカウントをお持ちの方は
             <Link href="/login/instructor" className="text-green-600 hover:text-green-700 font-semibold ml-1">
               ログイン
             </Link>

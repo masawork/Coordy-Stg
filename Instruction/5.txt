@@ -1,0 +1,209 @@
+あなたは /mnt/Coordy リポジトリで動作している AI 開発アシスタントです。
+Next.js(App Router) + Amplify(Cognito) プロジェクトのログインまわり・表示名まわりを修正してもらいます。
+
+前回、別のツール（Codex）が以下の変更を行いましたが、**ユーザー側から見ると症状がほとんど改善していません**。
+一度、仕様と DOCS を踏まえてゼロから見直して、原因特定〜修正〜再確認までをお願いします。
+
+---
+
+## 0. 前回の変更内容（参考）
+
+Codex が実施したと報告している内容は以下です（※この内容が正しく動いていない前提で再確認してください）：
+
+- 変更ファイル一覧:
+  - lib/auth/displayName.ts
+  - lib/auth/types.ts
+  - lib/auth/cognito.ts
+  - app/user/(protected)/layout.tsx
+  - app/user/(protected)/page.tsx
+  - app/instructor/(protected)/layout.tsx
+  - app/login/user/page.tsx
+  - app/login/instructor/page.tsx
+  - app/login/instructor/forgot/page.tsx
+  - app/login/instructor/reset/page.tsx
+  - DOCS/flows/login-flow.md
+  - DOCS/flows/main-user-flows.md
+
+- 実装サマリ（Codex自己申告）:
+  - /user・/instructor のモバイルサイドバーオーバーレイをヘッダー下に限定（top-14）し、初回アクセス時にヘッダー上の操作がブロックされないように調整。
+  - 表示名の単一ソースとして resolveDisplayName ユーティリティを追加し、ダッシュボード挨拶と AppHeader に適用。
+  - loginUser の UserAlreadyAuthenticatedException を日本語フレンドリーメッセージで投げ直し、/login/user と /login/instructor の UI で案内を表示。
+  - インストラクター向けパスワードリセットフローで Amplify 初期化を明示。
+  - 表示名利用の仕様を DOCS に追記。
+  - npm run lint は ESLint 設定のプロンプトで中断、npm run build は未実施。
+
+→ しかし、ユーザーが実際に触った結果、**前回依頼したポイントがほぼ直っていない**状態です。
+
+---
+
+## 1. 事前ルール（必ず守ってください）
+
+### 1-1. 作業前に必ず読む DOCS
+
+作業を始める前に、必ず以下のファイルを読み、現時点の仕様・用語・フローを把握してください：
+
+- DOCS/README.md
+- DOCS/site-map.md
+- DOCS/flows/login-flow.md
+- DOCS/AUTH.md
+- DOCS/IMPLEMENTATION.md
+- DOCS/flows/main-user-flows.md
+
+※ displayName の扱いやログインフローについても、まずドキュメントを確認した上でコードを読み込んでください。
+
+### 1-2. DOCS の扱い
+
+- DOCS 配下の .md ファイルは **削除しない／リネームしない**。
+- 仕様と実装にズレがあれば、今回の依頼内容を優先しつつ、
+  - DOCS の該当箇所のみ **最小限** 修正して整合性をとる。
+  - 章構成を大きく変えたり、大量削除はしない。
+- 新しい仕様を書き足す場合も、
+  - セクション追加 or 表の行追加レベルでとどめる。
+
+### 1-3. タスク化ルール
+
+- 最初に、今回の作業を **T-001, T-002, ...** の形で Markdown テーブルで宣言してください。
+- そのあと、タスクごとに実装を進めてください。
+- すべて完了後、「作業完了レポート」を Markdown で出力してください。
+  - 変更ファイル一覧
+  - タスクごとの対応内容
+  - 実行した確認（npm run lint / npm run build / ブラウザ or curl ベースのテストなど）
+  - 残っている懸念点があれば TODO として明示
+
+### 1-4. 既存フローで壊してはいけないもの
+
+可能な限り、次のフローは維持してください（必要があれば調整しても良いが、意図せず壊さないこと）：
+
+- /signup/user → /verify?email=... → /login/user
+- /signup/instructor → /verify?email=...&role=instructor → /login/instructor
+- verify 画面のロール別色分け（ユーザー: ピンク系 / サービス出品者: グリーン系）
+- すでに実装済みの「ユーザー」「サービス出品者」の基本的なログイン・サインアップフロー全般
+
+---
+
+## 2. 現在ユーザーが困っているポイント（再確認と修正依頼）
+
+ここからが「実際にまだ直っていない／直っているか怪しい」部分です。  
+下記のポイントについて、**コードと挙動の両方を確認したうえで、原因特定〜修正まで** 行ってください。
+
+### P-001: /user 初回アクセス時に Header のログインボタンが押せない問題
+
+- URL: http://localhost:3000/user
+- 症状（ユーザー報告）:
+  - 初回アクセス時に、Header（ヘッダー）の「ログイン」ボタンがクリックできない。
+  - Codex は「モバイルサイドバーオーバーレイをヘッダー下(top-14)にした」と報告しているが、体感としてはまだ直っていない。
+
+やってほしいこと：
+
+1. /user ページの DOM 構造とレイヤー構成を実際に確認してください。
+   - app/user/(protected)/layout.tsx
+   - app/user/(protected)/page.tsx
+   - 共通 Header コンポーネント（components/layout系）
+   - モバイルサイドバーやオーバーレイコンポーネント
+2. どの要素がヘッダー上にかぶさってクリックをブロックしているのか特定し、
+   - position / z-index / pointer-events を適切に修正してください。
+3. 修正後、少なくとも以下を自己確認してください：
+   - `/user` に初回アクセスした状態で、ヘッダーのログインボタンまたはユーザーメニューが普通にクリックできること。
+   - レイアウト崩れや、他画面（/instructor など）で同じ問題が出ていないこと。
+
+### P-002: /user の表示名仕様（HOME と Header の名前）
+
+- URL: http://localhost:3000/user
+- 現在：
+  - HOME の「ようこそ、『◯◯』さん！」や Header に表示される名前が、
+    メールアドレスの @ 前（ローカルパート）になってしまうケースがある。
+- 要望：
+  - 登録フェーズ or プロフィール設定で記載する「表示名(displayName)」を正しく使ってほしい。
+  - ここでの「名前」は：
+    - HOME の「ようこそ、『◯◯』さん！」の ◯◯
+    - Header に表示されるユーザー名
+    のこと。
+
+Codex は以下のように報告していますが、実際には期待どおり動いていません：
+
+- lib/auth/displayName.ts に resolveDisplayName ユーティリティを追加
+- ダッシュボード挨拶と AppHeader に適用
+- DOCS/flows/main-user-flows.md に表示名利用の仕様を追記
+
+やってほしいこと：
+
+1. 実際に表示名がどこから取られているかをコードで確認してください。
+   - プロフィールモデル（Amplify Data or API）のフィールド構造
+   - セッションから取得しているユーザー情報の構造
+   - resolveDisplayName の実装内容と、呼び出し箇所
+2. 表示名の仕様を明確にして実装してください：
+   - 推奨仕様の例：
+     - `displayName` フィールドをプロフィールの正式な表示名として使う
+     - 表示名の優先順位：
+       1. displayName が設定されていればそれを使用
+       2. なければ email ローカル部をフォールバックとして一時的に使用
+   - `/user/profile/setup` などに「表示名」項目があるか確認し、
+     - 無ければ最小限の形で追加する、
+     - すでにあるなら HOME / Header がそれを読むように修正する。
+3. HOME と Header の両方で、
+   - 同じロジック（resolveDisplayName 等）で名前が表示されていることを保証してください。
+4. 必要であれば DOCS の関連箇所（主に DOCS/flows/main-user-flows.md）に
+   - 「表示名は displayName を使う」「未設定時の挙動」などを追記してください（最小限でOK）。
+
+### P-003: /login/instructor の「パスワード忘れ」とログインエラー
+
+- URL: http://localhost:3000/login/instructor
+
+Codex の報告：
+- /login/instructor にパスワードリセットフローを実装し、
+  Amplify 初期化を明示したとのこと。
+- loginUser の UserAlreadyAuthenticatedException を日本語メッセージ付きで投げ直し、
+  /login/instructor 側で案内を表示しているとのこと。
+
+しかし、実際のユーザー体験としてはまだ問題が残っています。
+
+やってほしいこと：
+
+1. `/login/instructor` に「パスワードをお忘れの方」が正しく表示されているか確認し、
+   - 押下時に `/login/instructor/forgot`（など正しいURL）へ遷移すること。
+   - forgot / reset フローがエラーなく最後まで完了すること。
+2. インストラクター用アカウントでログインするケースを再確認してください：
+   - ユーザーとして既にログインしている状態で、
+     `/login/instructor` からインストラクターアカウントでログインを試みたとき、
+     Cognito が `UserAlreadyAuthenticatedException` を返します。
+   - このケースで、UI に表示されるメッセージがユーザーにとってわかりやすいか確認してください。
+     - 例）「すでに別のアカウントでログインしています。別のアカウントでログインする場合は、一度ログアウトしてからやり直してください。」
+   - 英語の生エラーやスタックトレースが UI に出ていないことを確認。
+3. DOCS への反映：
+   - `DOCS/flows/login-flow.md` または `DOCS/TROUBLESHOOTING.md` に、
+     - 「1ブラウザセッションで複数の Cognito アカウントを同時ログインできない」
+     - 「別アカウントでログインしたい場合はログアウトが必要」
+     といった仕様を、簡潔に追記してください。
+
+---
+
+## 3. タスク化してから作業してください
+
+最初に、次のような形でタスク一覧を作ってから実装に入ってください：
+
+| Task ID | 内容 |
+|--------|------|
+| T-001  | /user 初回アクセス時の Header ログインボタンの原因調査と修正 |
+| T-002  | /user の表示名仕様（displayName）の設計・実装・DOCS反映 |
+| T-003  | /login/instructor のパスワードリセット導線と UserAlreadyAuthenticatedException のハンドリング見直し |
+
+必要に応じて T-004 以降を増やしても構いません。
+
+---
+
+## 4. 最終確認とレポート
+
+作業完了後、次を必ず確認してください：
+
+- /user 初回アクセス時に、Header のボタン（ログイン／ユーザーメニューなど）がクリックできる。
+- /user の HOME と Header に表示される名前が、決めた displayName 仕様どおりになっている。
+- /login/instructor で「パスワードをお忘れの方」から forgot/reset フローが完走する。
+- UserAlreadyAuthenticatedException が UI 上では日本語メッセージのみ表示され、挙動がわかりやすくなっている。
+- `npm run build` が成功する。
+
+最後に「作業完了レポート」を Markdown で出力してください：
+
+- タスクごとの対応内容（T-001〜）
+- 変更したファイル一覧（パスと概要）
+- 実行したコマンド（lint, build など）と結果
+- 発見した制約や今後の TODO（もしあれば）

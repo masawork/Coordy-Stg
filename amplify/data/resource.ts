@@ -147,7 +147,8 @@ const schema = a.schema({
   ClientProfile: a
     .model({
       clientId: a.id().required(), // Cognito User ID
-      name: a.string().required(),
+      name: a.string().required(), // 本名（必須）
+      displayName: a.string(), // 表示名（ニックネーム）
       address: a.string(), // 住所（既存）
       phoneNumber: a.phone(), // 電話番号（phone型に変更）
       dateOfBirth: a.date(),

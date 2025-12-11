@@ -80,7 +80,7 @@ export function AppHeader({ userName }: AppHeaderProps) {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-40 h-14 bg-white border-b border-gray-200 px-4">
+    <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-white border-b border-gray-200 px-4 pointer-events-auto">
       <div className="flex items-center justify-between h-full">
         {/* Left: Hamburger → Back */}
         <div className="flex items-center gap-2">

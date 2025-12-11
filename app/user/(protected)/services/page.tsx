@@ -1,36 +1,29 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { getSession } from '@/lib/auth';
 import { listServices } from '@/lib/api/services';
 import { ServiceCard } from '@/components/features/service/ServiceCard';
 import { getInstructor } from '@/lib/api/instructors';
+import type { ServiceCategory } from '@/lib/api/data-client';
 
 export default function ServicesPage() {
-  const router = useRouter();
   const [services, setServices] = useState<any[]>([]);
   const [filteredServices, setFilteredServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<ServiceCategory | null>(null);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [instructorSearch, setInstructorSearch] = useState('');
 
   useEffect(() => {
-    const session = getSession();
-    if (!session) {
-      router.push('/login/user');
-      return;
-    }
-
+    // 認証はレイアウトで実施済み
     loadServices();
-  }, [router, selectedCategory]);
+  }, [selectedCategory]);
 
   const loadServices = async () => {
     try {
       setLoading(true);
 
-      const filters = selectedCategory ? { status: 'published' as const, category: selectedCategory } : { status: 'published' as const };
+      const filters = selectedCategory ? { status: 'active' as const, category: selectedCategory } : { status: 'active' as const };
       const allServices = await listServices(filters);
 
       // インストラクター情報を追加
@@ -87,11 +80,13 @@ export default function ServicesPage() {
     setFilteredServices(result);
   }, [services, searchKeyword, instructorSearch]);
 
-  const categories = [
+  const categories: Array<{ value: ServiceCategory | null; label: string }> = [
     { value: null, label: 'すべて' },
-    { value: 'yoga', label: 'ヨガ' },
-    { value: 'personalTraining', label: 'パーソナルトレーニング' },
-    { value: 'pilates', label: 'ピラティス' },
+    { value: 'coaching', label: 'コーチング' },
+    { value: 'training', label: 'トレーニング' },
+    { value: 'consultation', label: 'コンサルテーション' },
+    { value: 'workshop', label: 'ワークショップ' },
+    { value: 'seminar', label: 'セミナー' },
     { value: 'other', label: 'その他' },
   ];
 

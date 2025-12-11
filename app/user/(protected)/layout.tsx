@@ -11,16 +11,18 @@ import { getCurrentAuthUser, saveSession } from '@/lib/auth';
 import type { User } from '@/lib/auth';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { SidebarProvider, useSidebar } from '@/components/layout/SidebarProvider';
-import { isProfileComplete } from '@/lib/api/profile';
+import { useSidebar } from '@/components/layout/SidebarProvider';
+import { getClientProfile } from '@/lib/api/profile';
 import { X } from 'lucide-react';
+import { resolveDisplayName } from '@/lib/auth/displayName';
 
 function ProtectedContent({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [displayName, setDisplayName] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
-  const { open, close } = useSidebar();
+  const { open, isDesktop, close } = useSidebar();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -44,17 +46,22 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
         // セッションを更新
         saveSession(authUser);
 
-        // プロフィール完了チェック（プロフィール設定ページ以外）
+        // プロフィール情報を取得（プロフィール設定ページ以外）
         if (!pathname.includes('/profile/setup')) {
           try {
-            const profileComplete = await isProfileComplete(authUser.userId);
-            if (!profileComplete) {
+            const profile = await getClientProfile(authUser.userId);
+            if (!profile || !profile.isProfileComplete) {
               router.push('/user/profile/setup');
               return;
             }
+            setDisplayName(resolveDisplayName(authUser, profile));
           } catch (err) {
             console.error('プロフィールチェックエラー:', err);
+            setDisplayName(resolveDisplayName(authUser));
           }
+        } else {
+          // プロフィール設定ページではCognitoの名前を使用
+          setDisplayName(resolveDisplayName(authUser));
         }
 
         setUser(authUser);
@@ -62,6 +69,7 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.error('認証チェックエラー:', error);
         // 認証エラーの場合はログインページへ
+        setLoading(false);
         router.push('/login/user');
       }
     };
@@ -87,25 +95,26 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ヘッダー */}
-      <AppHeader userName={user.name} />
+      <AppHeader userName={displayName} />
 
       <div className="flex">
-        {/* サイドバー - デスクトップ */}
-        <aside className="hidden lg:block fixed left-0 top-14 bottom-0 w-64 bg-white border-r border-gray-200 overflow-y-auto">
-          <Sidebar />
-        </aside>
-
-        {/* サイドバー - モバイル */}
+        {/* サイドバー - デスクトップ: 固定表示でメインが縮む / モバイル: オーバーレイ */}
         {open && (
           <>
-            {/* Overlay */}
-            <div
-              className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-              onClick={close}
-            />
+            {/* Overlay - モバイル時のみ表示 */}
+            {!isDesktop && (
+              <div
+                className="fixed inset-x-0 top-14 bottom-0 bg-black/50 z-40"
+                onClick={close}
+              />
+            )}
 
             {/* Sidebar */}
-            <aside className="fixed left-0 top-0 bottom-0 w-64 bg-white z-50 overflow-y-auto lg:hidden shadow-xl">
+            <aside
+              className={`fixed left-0 top-14 bottom-0 w-64 bg-white overflow-y-auto border-r border-gray-200 ${
+                isDesktop ? 'z-30' : 'z-[45] shadow-xl'
+              }`}
+            >
               {/* Close button */}
               <div className="flex items-center justify-between p-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-800">メニュー</h2>
@@ -117,13 +126,17 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
                   <X className="h-5 w-5 text-gray-600" />
                 </button>
               </div>
-              <Sidebar onNavigate={close} />
+              <Sidebar onNavigate={isDesktop ? undefined : close} />
             </aside>
           </>
         )}
 
-        {/* メインコンテンツ */}
-        <main className="flex-1 lg:ml-64 pt-14 min-h-screen">
+        {/* メインコンテンツ - サイドバーが開いている時は左マージンを確保 */}
+        <main
+          className={`flex-1 pt-14 min-h-screen transition-all duration-300 ${
+            open && isDesktop ? 'ml-64' : ''
+          }`}
+        >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {children}
           </div>
@@ -138,9 +151,5 @@ export default function UserProtectedLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <SidebarProvider>
-      <ProtectedContent>{children}</ProtectedContent>
-    </SidebarProvider>
-  );
+  return <ProtectedContent>{children}</ProtectedContent>;
 }

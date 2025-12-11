@@ -7,10 +7,13 @@ import { getDataClient } from './data-client';
 export interface ClientProfileInput {
   clientId: string;
   name: string;
+  displayName?: string;
   address?: string;
   phoneNumber?: string;
   dateOfBirth?: string;
   gender?: string;
+  themeColor?: string;
+  isProfileComplete?: boolean;
 }
 
 /**
@@ -51,14 +54,28 @@ export async function createClientProfile(input: ClientProfileInput) {
     console.log('📝 createClientProfile 開始:', input);
     const client = getDataClient();
     const { data, errors } = await client.models.ClientProfile.create({
-      ...input,
-      isProfileComplete: true,
+      clientId: input.clientId,
+      name: input.name,
+      displayName: input.displayName,
+      address: input.address,
+      phoneNumber: input.phoneNumber,
+      dateOfBirth: input.dateOfBirth,
+      gender: input.gender,
+      themeColor: input.themeColor,
     });
 
     if (errors) {
       console.error('❌ ClientProfile作成エラー:', errors);
       console.error('エラー詳細:', JSON.stringify(errors, null, 2));
       throw new Error(`プロフィールの作成に失敗しました: ${JSON.stringify(errors)}`);
+    }
+
+    // プロフィール完了フラグを明示的に更新（Create入力で受け付けない場合の保険）
+    if (data?.id) {
+      await client.models.ClientProfile.update({
+        id: data.id,
+        isProfileComplete: true,
+      });
     }
 
     console.log('✅ ClientProfile作成成功:', data);
@@ -87,8 +104,14 @@ export async function updateClientProfile(
     const client = getDataClient();
     const { data, errors } = await client.models.ClientProfile.update({
       id,
-      ...updates,
-      isProfileComplete: true,
+      name: updates.name,
+      displayName: updates.displayName,
+      address: updates.address,
+      phoneNumber: updates.phoneNumber,
+      dateOfBirth: updates.dateOfBirth,
+      gender: updates.gender,
+      themeColor: updates.themeColor,
+      isProfileComplete: updates.isProfileComplete ?? true,
     });
 
     if (errors) {

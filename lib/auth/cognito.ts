@@ -3,7 +3,10 @@
  * Amplify Gen2 の認証機能を使用
  */
 
-import { signUp, signIn, signOut, confirmSignUp, getCurrentUser, fetchAuthSession } from '@aws-amplify/auth';
+// Amplify初期化を確実に行う（このモジュールが使われる前に初期化）
+import '@/src/lib/amplifyClient';
+
+import { signUp, signIn, signOut, confirmSignUp, confirmSignIn, getCurrentUser, fetchAuthSession } from '@aws-amplify/auth';
 import type { SignUpParams, SignInParams, ConfirmSignUpParams, User, AuthSession, Role } from './types';
 
 /**
@@ -12,6 +15,10 @@ import type { SignUpParams, SignInParams, ConfirmSignUpParams, User, AuthSession
 export async function registerUser(params: SignUpParams): Promise<{ userId: string; email: string }> {
   try {
     const { email, password, name, role } = params;
+
+    if (role === 'admin') {
+      throw new Error('管理者アカウントはCognitoコンソールでADMINSグループに追加して作成してください');
+    }
 
     const { userId } = await signUp({
       username: email,
@@ -52,16 +59,34 @@ export async function confirmEmail(params: ConfirmSignUpParams): Promise<void> {
 }
 
 /**
- * ログイン
+ * ログイン結果の型
  */
-export async function loginUser(params: SignInParams): Promise<{ user: User }> {
-  try {
-    const { email, password } = params;
+export interface LoginResult {
+  user?: User;
+  nextStep?: 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED' | 'DONE';
+}
 
+/**
+ * ログイン
+ * 既に別アカウントでログイン中の場合、自動的にサインアウトしてから新しいアカウントでサインインする
+ */
+export async function loginUser(params: SignInParams): Promise<LoginResult> {
+  const { email, password } = params;
+
+  // 内部のサインイン処理
+  const attemptSignIn = async (): Promise<LoginResult> => {
     const { isSignedIn, nextStep } = await signIn({
       username: email,
       password,
     });
+
+    // NEW_PASSWORD_REQUIRED チャレンジの場合
+    if (nextStep?.signInStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
+      console.log('🔐 パスワード変更が必要です');
+      return {
+        nextStep: 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED',
+      };
+    }
 
     if (!isSignedIn) {
       throw new Error('ログインに失敗しました');
@@ -70,10 +95,68 @@ export async function loginUser(params: SignInParams): Promise<{ user: User }> {
     // ユーザー情報を取得
     const user = await getCurrentAuthUser();
 
-    return { user };
+    return { user, nextStep: 'DONE' };
+  };
+
+  try {
+    return await attemptSignIn();
   } catch (error: any) {
     console.error('Login error:', error);
-    throw new Error(error.message || 'ログインに失敗しました');
+    const errorName = error?.name || error?.code;
+    const isAlreadySignedIn =
+      errorName === 'UserAlreadyAuthenticatedException' ||
+      error?.message?.includes('already a signed in user');
+
+    // 既に別アカウントでログイン中の場合、自動的にサインアウトしてリトライ
+    if (isAlreadySignedIn) {
+      console.log('🔄 既にログイン中のため、自動サインアウトしてリトライします');
+      try {
+        // 現在のセッションをサインアウト
+        await signOut();
+        console.log('✅ 自動サインアウト完了、新しいアカウントでサインインします');
+
+        // リトライ
+        return await attemptSignIn();
+      } catch (retryError: any) {
+        console.error('Retry login error:', retryError);
+        // リトライに失敗した場合は元のエラーを投げる
+        const wrappedError = new Error(retryError?.message || 'ログインに失敗しました');
+        (wrappedError as any).name = retryError?.name || 'Error';
+        (wrappedError as any).code = retryError?.code || retryError?.name;
+        throw wrappedError;
+      }
+    }
+
+    // その他のエラーはそのまま投げる
+    const wrappedError = new Error(error?.message || 'ログインに失敗しました');
+    (wrappedError as any).name = errorName || 'Error';
+    (wrappedError as any).code = error?.code || errorName;
+    throw wrappedError;
+  }
+}
+
+/**
+ * 新しいパスワードを設定（FORCE_CHANGE_PASSWORD 状態のユーザー用）
+ */
+export async function completeNewPasswordChallenge(newPassword: string): Promise<{ user: User }> {
+  try {
+    console.log('🔐 新しいパスワードを設定します');
+    const { isSignedIn, nextStep } = await confirmSignIn({
+      challengeResponse: newPassword,
+    });
+
+    if (!isSignedIn) {
+      throw new Error('パスワードの設定に失敗しました');
+    }
+
+    // ユーザー情報を取得
+    const user = await getCurrentAuthUser();
+
+    console.log('✅ パスワード設定完了:', { userId: user.userId, role: user.role });
+    return { user };
+  } catch (error: any) {
+    console.error('Password challenge error:', error);
+    throw new Error(error?.message || 'パスワードの設定に失敗しました');
   }
 }
 
@@ -121,6 +204,14 @@ export async function getCurrentAuthUser(): Promise<User> {
     // グループからロールを判定（より確実）
     const groups = (payload['cognito:groups'] as string[]) || [];
     let role: Role = 'user';
+    const displayName =
+      (payload['custom:displayName'] as string) ||
+      (payload.name as string) ||
+      '';
+
+    // カスタム属性を取得
+    const customRole = payload['custom:role'] as string | undefined;
+    const customUserType = payload['custom:userType'] as string | undefined;
 
     if (groups.includes('ADMINS')) {
       role = 'admin';
@@ -128,17 +219,23 @@ export async function getCurrentAuthUser(): Promise<User> {
       role = 'instructor';
     } else if (groups.includes('CLIENTS')) {
       role = 'user';
-    } else {
-      // カスタム属性からフォールバック
-      role = ((payload['custom:role'] as string) || 'user') as Role;
+    } else if (customRole === 'instructor' || customRole === 'admin' || customRole === 'user') {
+      // カスタム属性からフォールバック（明示的に valid なロールをチェック）
+      role = customRole as Role;
+    } else if (customUserType === 'CREATOR') {
+      // custom:userType からもフォールバック
+      role = 'instructor';
+    } else if (customUserType === 'CLIENT') {
+      role = 'user';
     }
 
-    console.log('🔐 ロール判定:', { userId, groups, role, customRole: payload['custom:role'] });
+    console.log('🔐 ロール判定:', { userId, groups, role, customRole, customUserType });
 
     const user: User = {
       userId: userId,
       email: (payload.email as string) || username,
       name: (payload.name as string) || '',
+      displayName,
       role: role,
       emailVerified: payload.email_verified as boolean,
     };
@@ -157,7 +254,7 @@ export async function getAuthSession(): Promise<AuthSession | null> {
   try {
     const session = await fetchAuthSession();
 
-    if (!session.tokens) {
+    if (!session.tokens || !session.tokens.idToken) {
       return null;
     }
 

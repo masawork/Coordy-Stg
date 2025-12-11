@@ -1,24 +1,36 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-Coordy is a Next.js App Router project. Primary routes live in `app/` (e.g., `app/admin`, `app/user`, `app/test` for the Amplify sandbox) with `app/layout.tsx` controlling shared wrappers. UI primitives sit in `components/` (subfolders `common`, `sections`, `modals`, etc.) and stateful helpers stay in `lib/` plus `src/lib` for legacy utilities. AWS Amplify definitions are under `amplify/` and `test/amplify`, and static assets plus global styles stay in `public/` and `app/globals.css`. Keep documentation and specs in `DOCS/` and reference credentials via `amplify_outputs.json`.
+- Routes live in `app/` using the Next.js App Router; `app/layout.tsx` supplies shared wrappers.
+- UI primitives sit under `components/` (`common`, `sections`, `modals`), while stateful helpers use `lib/` and legacy utilities stay in `src/lib/`.
+- Amplify infrastructure is split between `amplify/` (prod) and `test/amplify` (sandbox); `amplify_outputs.json` reflects the active backend.
+- Static assets and global styles belong in `public/` and `app/globals.css`; documentation goes inside `DOCS/`.
 
 ## Build, Test, and Development Commands
-- `npm install` once to sync dependencies listed in `package.json`.
-- `npm run dev` starts the Next.js dev server with Amplify auth, available at `http://localhost:3000`.
-- `npm run build` compiles the production bundle and validates route handlers.
-- `npm run start` runs the optimized build locally; use it before releasing.
-- `npm run lint` executes Next.js + ESLint + Tailwind rules; CI expects a clean pass.
-- `npx ampx sandbox --once` deploys the lightweight backend defined in `test/amplify` and refreshes `amplify_outputs.json`.
+- `npm install` — sync package dependencies once per environment.
+- `npm run dev` — start the Next.js dev server with Amplify auth at `http://localhost:3000`.
+- `npm run build` — compile the production bundle and validate route handlers.
+- `npm run start` — serve the optimized build locally before release.
+- `npm run lint` — run the Next.js + ESLint + Tailwind config expected by CI.
+- `npx ampx sandbox --once` — deploy the lightweight backend in `test/amplify` and refresh `amplify_outputs.json`.
 
 ## Coding Style & Naming Conventions
-Use TypeScript everywhere. Follow the existing two-space indentation and favor arrow or function components returning JSX fragments. Exported React components are PascalCase (`HeroSection.tsx`), hooks/utilities are camelCase, and route segment folders match the URL slug (`app/verify`). Keep Tailwind classes ordered logically (layout -> spacing -> color) and rely on `clsx` or `class-variance-authority` for conditional styling. Run `npm run lint` before pushing; it enforces Next.js defaults plus accessibility checks.
+- Use TypeScript everywhere with two-space indentation and React function components that return JSX fragments.
+- Route segment folders mirror URL paths (`app/verify`), components use PascalCase (`HeroSection.tsx`), and hooks/utilities use camelCase.
+- Order Tailwind classes logically (layout → spacing → color) and leverage `clsx` or `class-variance-authority` for conditional styles.
+- Run `npm run lint` before commits; it enforces formatting, accessibility, and import rules.
 
 ## Testing Guidelines
-Smoke-test Amplify flows inside `/app/test/signup` using the sandbox backend. After `npx ampx sandbox --once`, run `npm run dev` and navigate to `/test/signup`, watching for the `Amplify（/test環境）初期化完了` log. Add Playwright or React Testing Library specs under `test/lib` or `app/**/__tests__` and mirror file names (`HeroSection.test.tsx`) with the component they cover. Document any manual verification steps in `DOCS/` and flag gaps in the PR.
+- Favor React Testing Library or Playwright specs colocated at `app/**/__tests__` or `test/lib`.
+- Name tests after the component (`HeroSection.test.tsx`) and document manual checks in `DOCS/`.
+- Smoke-test Amplify flows by running `npx ampx sandbox --once`, `npm run dev`, then visiting `/test/signup` to confirm the `Amplify（/test環境）初期化完了` log.
 
 ## Commit & Pull Request Guidelines
-Commits follow Conventional Commits, as seen in `docs:` and `feat:` history; keep scopes short (`feat(auth): add MFA prompt`). PRs need a crisp summary, linked issues (for example, "Closes #42"), screenshots for UI-facing changes, and notes on Amplify migrations or environment updates. Rebase onto the latest `main`, ensure `npm run build && npm run lint` pass locally, and describe any new AWS resources or secrets added.
+- Follow Conventional Commits (`feat(auth): add MFA prompt`) and keep scopes tight.
+- PRs need a clear summary, linked issues (e.g., “Closes #42”), screenshots for UI changes, and notes about Amplify migrations or secrets.
+- Ensure `npm run build && npm run lint` pass locally before opening a PR, and rebase on the latest `main`.
 
 ## Security & Configuration Tips
-Never edit `amplify_outputs.json` manually; regenerate it via the Amplify CLI and keep secrets in `.env.local` (excluded by `.gitignore`). Clear sensitive data before committing logs, and restrict test credentials to disposable accounts. Running `npm run build` surfaces auth misconfigurations early, so add that to your pre-PR checklist.
+- Never edit `amplify_outputs.json` manually; regenerate via the Amplify CLI.
+- Store secrets in `.env.local` (gitignored) and scrub sensitive data from logs.
+- Run `npm run build` during QA to surface authentication or configuration issues early.

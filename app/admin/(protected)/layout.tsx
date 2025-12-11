@@ -26,19 +26,12 @@ export default function AdminProtectedLayout({
 
       if (!session) {
         // 未ログインの場合はログインページへ
-        router.push('/login/user');
+        router.push('/manage/login?next=/admin');
         return;
       }
 
       if (!hasRole('admin')) {
-        // ロールが異なる場合は適切なページへ
-        if (hasRole('user')) {
-          router.push('/user');
-        } else if (hasRole('instructor')) {
-          router.push('/instructor');
-        } else {
-          router.push('/login/user');
-        }
+        router.push('/manage/login?next=/admin');
         return;
       }
 

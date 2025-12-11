@@ -1,6 +1,44 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { getSession } from '@/lib/auth/session';
+import type { User } from '@/lib/auth/types';
 
 export default function HeroSection() {
+  const [session, setSession] = useState<User | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const currentSession = getSession();
+    setSession(currentSession);
+  }, []);
+
+  // ユーザーボタンの遷移先を決定
+  const getUserButtonHref = () => {
+    if (!mounted || !session) return '/signup/user';
+    if (session.role === 'user') return '/user';
+    return '/signup/user';
+  };
+
+  // サービス出品者ボタンの遷移先を決定
+  const getInstructorButtonHref = () => {
+    if (!mounted || !session) return '/signup/instructor';
+    if (session.role === 'instructor') return '/instructor';
+    // ユーザーとしてログイン中でも /signup/instructor へ（別ロールのアカウント作成を許可）
+    return '/signup/instructor';
+  };
+
+  // ボタンテキストを決定（ログイン状態でもラベルは変えない）
+  const getUserButtonText = () => {
+    return 'ユーザーの新規登録はこちら';
+  };
+
+  const getInstructorButtonText = () => {
+    return 'サービス出品者の新規登録はこちら';
+  };
+
   return (
     <section className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 text-white overflow-hidden pt-14">
       {/* Content */}
@@ -18,15 +56,15 @@ export default function HeroSection() {
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-20">
-          <Link href="/login/user">
+        <div className="flex flex-col sm:flex-row gap-6 justify-center mb-20">
+          <Link href={getUserButtonHref()} className="text-center">
             <button className="text-lg px-10 py-4 font-semibold rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white w-full sm:w-auto">
-              レッスンを受けたい方
+              {getUserButtonText()}
             </button>
           </Link>
-          <Link href="/login/instructor">
+          <Link href={getInstructorButtonHref()} className="text-center">
             <button className="text-lg px-10 py-4 font-semibold rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white w-full sm:w-auto">
-              講師・トレーナーの方
+              {getInstructorButtonText()}
             </button>
           </Link>
         </div>

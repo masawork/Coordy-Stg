@@ -20,7 +20,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black bg-opacity-50 z-40"
+            className="fixed inset-0 bg-black bg-opacity-50 z-[60]"
           />
 
           {/* Modal */}
@@ -28,7 +28,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            className="fixed inset-0 flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 flex items-center justify-center z-[70] p-4"
           >
             <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 relative">
               {/* Close button */}
@@ -72,10 +72,10 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                       </div>
                       <div>
                         <h3 className="font-bold text-lg text-gray-800">
-                          講師・トレーナーとして
+                          サービス出品者として
                         </h3>
                         <p className="text-sm text-gray-600">
-                          レッスンを提供する
+                          サービスを提供する
                         </p>
                       </div>
                     </div>
