@@ -1,5 +1,8 @@
 /**
  * プロフィール関連のAPI操作
+ *
+ * ClientProfileスキーマには displayName フィールドが存在します。
+ * displayName は ClientProfile と Cognito の custom:displayName 属性の両方で管理されます。
  */
 
 import { getDataClient } from './data-client';
@@ -7,7 +10,7 @@ import { getDataClient } from './data-client';
 export interface ClientProfileInput {
   clientId: string;
   name: string;
-  displayName?: string;
+  displayName?: string; // ClientProfile スキーマに存在する（ニックネーム）
   address?: string;
   phoneNumber?: string;
   dateOfBirth?: string;
@@ -48,21 +51,44 @@ export async function getClientProfile(clientId: string) {
 
 /**
  * プロフィール作成
+ *
+ * 注意: ClientProfile スキーマに存在するフィールドのみを送信すること。
  */
 export async function createClientProfile(input: ClientProfileInput) {
   try {
     console.log('📝 createClientProfile 開始:', input);
     const client = getDataClient();
-    const { data, errors } = await client.models.ClientProfile.create({
+
+    // CreateClientProfileInputに定義されているフィールドのみを送信
+    const createInput: Record<string, unknown> = {
       clientId: input.clientId,
       name: input.name,
-      displayName: input.displayName,
-      address: input.address,
-      phoneNumber: input.phoneNumber,
-      dateOfBirth: input.dateOfBirth,
-      gender: input.gender,
-      themeColor: input.themeColor,
-    });
+    };
+
+    // オプショナルフィールドは値がある場合のみ追加
+    // displayName は ClientProfile スキーマに存在するため、値がある場合のみ送信
+    if (input.displayName !== undefined && input.displayName !== '') {
+      createInput.displayName = input.displayName;
+    }
+    if (input.address !== undefined && input.address !== '') {
+      createInput.address = input.address;
+    }
+    if (input.phoneNumber !== undefined && input.phoneNumber !== '') {
+      createInput.phoneNumber = input.phoneNumber;
+    }
+    if (input.dateOfBirth !== undefined && input.dateOfBirth !== '') {
+      createInput.dateOfBirth = input.dateOfBirth;
+    }
+    if (input.gender !== undefined && input.gender !== '') {
+      createInput.gender = input.gender;
+    }
+    if (input.themeColor !== undefined && input.themeColor !== '') {
+      createInput.themeColor = input.themeColor;
+    }
+
+    console.log('📝 実際に送信するデータ:', createInput);
+
+    const { data, errors } = await client.models.ClientProfile.create(createInput as any);
 
     if (errors) {
       console.error('❌ ClientProfile作成エラー:', errors);
@@ -94,6 +120,8 @@ export async function createClientProfile(input: ClientProfileInput) {
 
 /**
  * プロフィール更新
+ *
+ * 注意: ClientProfile スキーマに存在するフィールドのみを送信すること。
  */
 export async function updateClientProfile(
   id: string,
@@ -102,17 +130,34 @@ export async function updateClientProfile(
   try {
     console.log('📝 updateClientProfile 開始:', { id, updates });
     const client = getDataClient();
-    const { data, errors } = await client.models.ClientProfile.update({
-      id,
-      name: updates.name,
-      displayName: updates.displayName,
-      address: updates.address,
-      phoneNumber: updates.phoneNumber,
-      dateOfBirth: updates.dateOfBirth,
-      gender: updates.gender,
-      themeColor: updates.themeColor,
-      isProfileComplete: updates.isProfileComplete ?? true,
-    });
+
+    // ClientProfile スキーマに存在するフィールドのみを更新
+    const updateInput: Record<string, unknown> = { id };
+
+    if (updates.name !== undefined) {
+      updateInput.name = updates.name;
+    }
+    if (updates.displayName !== undefined) {
+      updateInput.displayName = updates.displayName;
+    }
+    if (updates.address !== undefined) {
+      updateInput.address = updates.address;
+    }
+    if (updates.phoneNumber !== undefined) {
+      updateInput.phoneNumber = updates.phoneNumber;
+    }
+    if (updates.dateOfBirth !== undefined) {
+      updateInput.dateOfBirth = updates.dateOfBirth;
+    }
+    if (updates.gender !== undefined) {
+      updateInput.gender = updates.gender;
+    }
+    if (updates.themeColor !== undefined) {
+      updateInput.themeColor = updates.themeColor;
+    }
+    updateInput.isProfileComplete = updates.isProfileComplete ?? true;
+
+    const { data, errors } = await client.models.ClientProfile.update(updateInput as any);
 
     if (errors) {
       console.error('❌ ClientProfile更新エラー:', errors);

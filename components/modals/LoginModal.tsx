@@ -14,21 +14,21 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
+          {/* Backdrop - z-[110]に変更してHeaderより上に表示 */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black bg-opacity-50 z-[60]"
+            className="fixed inset-0 bg-black bg-opacity-50 z-[110]"
           />
 
-          {/* Modal */}
+          {/* Modal - z-[120]に変更してBackdropより上に表示 */}
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            className="fixed inset-0 flex items-center justify-center z-[70] p-4"
+            className="fixed inset-0 flex items-center justify-center z-[120] p-4"
           >
             <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 relative">
               {/* Close button */}
