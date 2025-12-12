@@ -21,7 +21,9 @@
       "mcp__serena__find_symbol",
       "mcp__serena__find_file",
       "Bash(lsof:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

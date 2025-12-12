@@ -19,11 +19,14 @@
 # misc
 .DS_Store
 *.pem
+!certs/localhost.pem
+!certs/localhost-key.pem
 
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.cache
 
 # local env files
 .env*.local
@@ -42,3 +45,5 @@ amplifyconfiguration*
 
 
 /.old
+
+certificates

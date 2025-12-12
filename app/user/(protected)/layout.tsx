@@ -36,9 +36,9 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
           if (authUser.role === 'instructor') {
             router.push('/instructor');
           } else if (authUser.role === 'admin') {
-            router.push('/admin');
+            router.push('/manage/admin');
           } else {
-            router.push('/login/user');
+            router.push('/');
           }
           return;
         }
@@ -68,9 +68,9 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
         setLoading(false);
       } catch (error) {
         console.error('認証チェックエラー:', error);
-        // 認証エラーの場合はログインページへ
+        // 認証エラーの場合はトップページへ（未ログイン状態）
         setLoading(false);
-        router.push('/login/user');
+        router.push('/');
       }
     };
 

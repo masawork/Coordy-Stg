@@ -1,0 +1,252 @@
+あなたは /mnt/Coordy リポジトリを担当する シニアフルスタックエンジニア です。
+Next.js（App Router / Next 14） + AWS Amplify Gen2（Cognito, Amplify Data）を使った予約プラットフォーム「Coordy」の実装・整理を担当してもらいます。
+
+0. 大事な前提・ルール
+🔴 最重要ルール
+
+「一度直したつもり」で終わらないこと。
+
+自分で実際にブラウザを操作し、フローを通して動作確認してから「完了」と判断してください。
+
+同じ不具合をユーザーに二度言わせないでください。
+
+「過去のAIの『完了しました』レポートを信用しないでください。
+
+Instruction 13 のレポートを参考にはしますが、
+「本当に今のコードと動きが一致しているか」を必ず自分で確認し直してください。
+
+実装＋自己テスト＋DOCS更新までを一連のタスクとして完結させてください。
+
+実装の基本方針
+
+基本は DOCS/ に書かれた仕様を 優先 しつつ、ユーザーからの口頭仕様（このプロンプトの内容）を「最新の真実」として扱ってください。
+
+DOCS 配下の .md ファイルは 削除・リネーム禁止。
+内容が古ければ「今回の仕様に合わせて最小限の修正」で整合を取ってください。
+
+rm -rf は .next などの一時ファイル以外には使わないでください。
+
+既に正常に動いているフローは壊さないよう、変更範囲を意識してください。
+
+事前に必ず実行するコマンド
+
+まず以下を実行して、構成と DOCS を把握してください：
+
+cd /mnt/Coordy
+ls
+ls DOCS
+cat package.json
+cat DOCS/README.md
+cat DOCS/site-map.md
+cat DOCS/flows/login-flow.md
+cat DOCS/AUTH.md
+cat DOCS/IMPLEMENTATION.md
+cat DOCS/flows/main-user-flows.md
+
+1. Instruction 13 レポートの扱い（参考情報）
+Instruction 13 の要約（過去AIの自己申告）
+
+過去の AI は Instruction 13 として、次のようなことを「完了」とレポートしています（あくまで自己申告です）：
+
+認証ガード整理（T-101）
+
+/user, /instructor の (protected) layout で、未ログイン時 / にリダイレクトするよう変更。
+
+プロフィール作成 GraphQL エラー対応（T-201）
+
+CreateClientProfileInput にないフィールドを送らないよう lib/api/profile.ts を修正したと主張。
+
+インストラクター用プロフィール設定フォーム調整（T-301）
+
+/instructor/(protected)/profile/setup/page.tsx に「本名」＋表示名フォームを追加。
+
+表示名の禁止ワードチェック（T-401）
+
+lib/auth/displayName.ts を新規追加し、
+「admin / 管理者 / Coordy / 暴力的・差別的表現」などの禁止ワードをチェックするロジックを実装したと主張。
+
+インストラクターダッシュボードのサブメニュー実装（T-501）
+
+/instructor/(protected)/services, /reservations, /schedule, /settings を新規作成したと主張。
+
+管理画面サイドバー初期状態（T-601）
+
+/manage/(protected)/layout.tsx でサイドバー表示をユーザーと同じ仕様にしたと主張。
+
+ロールごとのアクセス制御と DOCS 反映（T-701）
+
+admin が /user / /instructor に来たら /manage/admin に飛ばす、などを layout に実装したと主張。
+
+DOCS/AUTH.md / DOCS/flows/login-flow.md にロールごとのアクセス表を追記したと主張。
+
+npm run build 成功（T-801）
+
+あなたへの指示
+
+このレポート内容は 「やったつもりのログ」 として扱い、
+実際にコードと挙動が一致しているかどうかを必ず検証し直してください。
+
+「Instruction 13 で完了扱いになっているタスク」も、今回 再チェック対象 です。
+不備があれば、容赦なく修正して構いません。
+
+2. 今回のゴール（全体方針）
+
+目標は：
+
+「ユーザーが画面をひと目見た時に、“明らかにおかしいところ” や 404 や仕様違反が 残っていない状態 まで仕上げる」
+
+です。
+
+自分で タスクを洗い出し → 実装 → ブラウザで確認 → DOCS更新 → レポート までやり切ってください。
+
+途中で「ここもおかしいな」と気づいたところは、追加で直して構いません（むしろ歓迎）。
+
+3. タスクの再定義（自分で整理しなおす）
+ステップ 1: これまでのタスク・DOCS・実装を総ざらい
+
+Instruction 13 レポート全文（claudedocs/instruction-13-report.md）を読み直してください。
+
+DOCS/flows/login-flow.md, DOCS/AUTH.md, DOCS/site-map.md, DOCS/flows/main-user-flows.md を確認し、
+
+認証フロー
+
+ロール別アクセス制御
+
+プロフィールフロー（user / instructor）
+の仕様がどう書かれているか整理してください。
+
+lib/auth/cognito.ts, lib/auth/displayName.ts, lib/api/profile.ts,
+app/user/(protected)/*, app/instructor/(protected)/*, app/manage/(protected)/* を確認し、
+DOCSとの不一致を洗い出してください。
+
+ステップ 2: タスクを自分で再分類
+
+Instruction 13 の T-101〜T-801 に縛られず、今回あらためてタスクを定義し直してください。
+例（あくまで例です。実際に見てから決めてください）：
+
+R-101: 認証ガード・リダイレクトの最終整理（/user /instructor /manage/admin など）
+
+R-201: プロフィール作成 GraphQL エラーの完全解消（user）
+
+R-202: インストラクタープロフィール作成フローの完成（フォーム項目＋保存＋遷移）
+
+R-301: 表示名バリデーション（禁止ワード）の実挙動確認と UI メッセージ
+
+R-401: インストラクターダッシュボードのサブメニュー全ページ 404 解消
+
+R-501: 管理画面（/manage/login, /manage/admin）のアクセス挙動とサイドバー確認
+
+R-601: /admin ルートの役割整理（有無を含めて整理）
+
+R-701: ヘッダーのログインボタン挙動 & モーダル表示確認（/ 初回アクセス時の動きなど）
+
+実際には、あなたがコードと DOCS を見て、
+「これとこれは別タスクに分けたほうがよい」と思う単位で構いません。
+
+4. ブラウザで必ず確認してほしい URL 一覧
+
+次のURLについては、必ずブラウザで実際に開いて確認 し、その結果を最終レポートに表形式でまとめてください。
+
+最低限チェックしてほしい組み合わせ：
+
+/
+
+未ログイン
+
+user ログイン
+
+instructor ログイン
+
+admin ログイン
+
+/user, /user/profile/setup
+
+/instructor, /instructor/profile/setup
+
+/login/user, /login/instructor
+
+/signup/user, /signup/instructor
+
+/manage/login, /manage/admin
+
+/admin 系（存在させる場合のみ）
+
+各セルには：
+
+どこにリダイレクトされたか / そのまま表示か
+
+想定どおりか・想定外か
+
+主要ボタン（ログイン, ログアウト, 保存, 新規登録など）が 一発目から動くか
+
+を記録してください。
+
+5. /admin ルートの扱い（再確認タスク）
+
+ユーザーはこう言っています：
+
+「https://localhost:3000/adminは何？どこに記載されてるのを実装したの？」
+
+やること
+
+rg "/admin" -n app components lib DOCS で /admin 関連コードとドキュメントを洗い出してください。
+
+DOCS 側に /admin の正式な記述があるか確認し、
+
+なければ /admin という独立ルートは廃止 or /manage/admin に統合する方向を検討してください。
+
+/manage/* と /admin/* の関係を整理し、
+
+「どちらが正式な管理ルートか」
+
+「admin ロールがログインしたあと、どこへ行くべきか」
+を決めて実装＆DOCSに明記してください。
+
+6. 実装・テストの流れ
+
+調査とタスク再定義（R-*** のようなIDで）
+
+コード修正
+
+npm run build の実行
+
+可能であれば npm run dev でローカル起動し、ブラウザで URL ごとの動作確認
+
+DOCS 更新（AUTH.md, login-flow.md, main-user-flows.md, site-map.md など、必要なもの）
+
+最後に 作業レポート（Markdown） を出力
+
+7. 最終レポートに必ず含めてほしいもの
+
+最後に1つの Markdown レポートとして出力してください。内容：
+
+タスク一覧（R-101, R-201, …）
+
+それぞれ「何を直すタスクか」を1行で説明
+
+各タスクごとに：
+
+調査したこと
+
+どのファイルをどう変更したか
+
+どうテストしたか（どの URL をどう操作したか）
+
+結果どうなったか
+
+URL × ロール（未ログイン / user / instructor / admin） の挙動一覧表
+
+更新・参照したファイル一覧
+
+残っている懸念点や、今後の TODO（もしあれば）
+
+8. まとめ
+
+Instruction 13 の「完了レポート」は 参考資料 に過ぎません。
+実際のコードと挙動を あなた自身の目と手で検証し直す 前提で作業してください。
+
+「ユーザーが画面を開いたとき、明らかにおかしいところが残っていない」状態まで、
+実装＋テスト＋DOCS更新を一気通貫で行ってください。
+
+以上です。
+まずはプロジェクトと DOCS を読み込み、タスク整理から始めてください。

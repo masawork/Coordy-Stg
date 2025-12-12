@@ -118,36 +118,36 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         },
       ];
     } else if (role === 'admin') {
-      // 管理者用メニュー
+      // 管理者用メニュー（/manage/admin 配下）
       return [
         {
           label: 'ホーム',
-          href: `/admin`,
+          href: `/manage/admin`,
           icon: LayoutDashboard,
         },
         {
           label: 'ダッシュボード',
-          href: `/admin/dashboard`,
+          href: `/manage/admin/dashboard`,
           icon: BarChart,
         },
         {
           label: 'ユーザー管理',
-          href: `/admin/users`,
+          href: `/manage/admin/users`,
           icon: Users,
         },
         {
           label: 'サービス管理',
-          href: `/admin/services`,
+          href: `/manage/admin/services`,
           icon: Package,
         },
         {
           label: '銀行振込承認',
-          href: `/admin/pending-charges`,
+          href: `/manage/admin/pending-charges`,
           icon: CreditCard,
         },
         {
           label: '設定',
-          href: `/admin/settings`,
+          href: `/manage/admin/settings`,
           icon: Settings,
         },
       ];

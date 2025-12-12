@@ -1,147 +1,335 @@
 /mnt/Coordy リポジトリの Next.js(App Router) プロジェクトについて、
-前回あなたが実施した修正（文言統一・フロー整理など）を前提に、
-以下の **追加修正** を行ってください。
+以下の点をまとめて修正してください。
 
 会話は最小限で、わかる範囲は自動でどんどん進めてください。
 画面テキスト・コメント・レポートはすべて日本語でお願いします。
 
-# 1. トップページ（/）のボタン遷移をロール別に修正
+# 今回のゴール（必ず守ってほしいこと）
 
-## 現状
+1. **トップページ（/）**
+   - 初回アクセス時から「ログイン」ボタンが普通にクリックできる状態にすること  
+     （いまは最初だけ押せない）
+2. **文言ポリシーの修正**
+   - 「学びたい方（受講者）」という表現は **使わない**  
+   - 「インストラクター（サービス提供者）」という表現も **使わない**
+   - 日本語 UI では：
+     - 学ぶ側 → **「ユーザー」**（または「ユーザー（サービス利用者）」程度）
+     - 教える側 → **「サービス出品者」** に **固定**  
+       （「インストラクター」や「クリエイター」など他の呼称を混ぜない）
+   - すでに導入してしまった「学びたい方（受講者）」「インストラクター（サービス提供者）」などの表現は UI / DOCS から撤去し、上記の表現にそろえること
+   - ただし、コード上のロール名やキー（`user`, `instructor` など）は **変更しない**  
+     （DB・ミドルウェア・権限判定には影響させない）
 
-- ユーザーとしてログインした状態で `/` にアクセスし、
-  「サービス出品者の新規登録はこちら」をクリックすると **`/user` に飛んでしまう**。
-- 要件としては：
-  - ログイン済みユーザーがサービス出品者ボタンを押しても、
-    `/signup/instructor` に行きたい。
+3. **パスワードリセット（/login/user/forgot）**
+   - 実装失敗時代に作成したユーザー  
+     例: `skmtwork0+Test0014@gmail.com`
+   - このユーザーで「パスワードお忘れですか？」を実行すると  
+     `/login/user/forgot` で  
+     `Cannot reset password for the user as there is no registered/verified email or phone_number`  
+     というエラーが出る
+   - この Cognito エラーを **フロント側で分かりやすくハンドリング** してほしい
+     - 例）「このアカウントはメール認証が完了していない可能性があります。お手数ですが、新しくユーザー登録をやり直してください。」のようなメッセージに変換
+     - スタックトレースや英語の生エラーはユーザーに見せない
 
-## 変更したい挙動
+4. **インストラクター（＝サービス出品者）関連の挙動**
+   - `/`（トップ）で「サービス出品者の新規登録」に相当するボタンを押したときに **/signup/instructor に飛ぶ** こと
+     - 現状：インストラクター新規登録 → `/user` に飛んでしまう（ユーザーと混ざっている）
+   - `/signup/instructor` → 正しく「サービス出品者」用サインアップ画面が出ること
+   - `/login/instructor` からログインしたあと、**ユーザーとは別のパス**（例：`/instructor`）に遷移すること  
+     - `/user` に飛ばさない  
+     - 「ユーザー」と「サービス出品者」はログイン後の行き先をきちんと分ける
 
-トップページにある 2 つのボタンについて、**ユーザーログイン状態での挙動** を次のようにしてください。
-
-1. 「ユーザーの新規登録はこちら」（ユーザー向け CTA）
-
-   - **未ログイン時**：`/signup/user` に遷移（現状どおりで OK）
-   - **ユーザーとしてログイン済みの時**：
-     - クリックしたら `/user` に遷移する  
-       → すでにユーザーアカウントを持っているので、新規登録ではなくマイページに行きたいイメージ
-
-2. 「サービス出品者の新規登録はこちら」（サービス出品者向け CTA）
-
-   - **ユーザーとしてログイン済みの時も含めて**：  
-     クリックしたら **必ず `/signup/instructor` に遷移** するようにしてください。
-   - つまり、「サービス出品者側のアカウントを新しく作りたい」ケースを塞がないようにします。
-   - もし既に instructor ロールでログイン済みかどうか判定している場合、
-     そのときだけ `/instructor` に飛ばす、などの追加ロジックを入れるのは OK ですが、
-     少なくとも「ユーザーログイン中に `/user` に飛んでしまう」挙動はやめてください。
-
-### 実装ポイントのヒント
-
-- 変更対象候補：
-  - `components/sections/HeroSection.tsx`
-  - `components/sections/CTASection.tsx`
-  - もしくはトップページ `app/page.tsx` 内のボタンラッパー
-- すでに「ログインしている場合はまとめて `/user` に飛ばす」ような共通ロジックを噛ませている場合、
-  ボタンごとに挙動を分岐するように書き換えてください。
+5. **DOCS の扱い**
+   - 既に DOCS はかなり整理済みなので、**今回の作業では DOCS の大規模整理やファイル削除はしない**  
+   - 必要があれば、`AUTH.md`, `site-map.md`, `flows/login-flow.md` などの「用語」だけ最小限修正
+   - API 一覧や構造などには手を入れない
 
 ---
 
-# 2. /signup/instructor → /verify → /login/instructor の見た目と遷移
+## Step 0: 現状確認（コード検索）
 
-## 現状
+まずは現在の文言とフローの把握から始めてください。
 
-- `/signup/instructor` で新規登録 → メールアドレス入力後、
-  `/verify?email=skmtwork0%2BInst0017%40gmail.com` に遷移する。
-- しかし：
-  - verify 画面の背景が「ユーザー用（ピンクっぽい）」になっている。
-  - メール確認（confirm）を実行すると、**`/login/user` に飛んでしまう**。
-    本来は instructor 用のログイン `/login/instructor` に行きたい。
+1. 文言の検索
 
-## 要件
+   ```bash
+   cd /mnt/Coordy
 
-1. **サービス出品者（instructor ロール）の verify 画面の色を変える**
+   rg "学びたい方" .
+   rg "受講者" .
+   rg "インストラクター（サービス提供者）" .
+   rg "サービス提供者" .
+   rg "サービス出品者" .
+UI コンポーネント（components/sections/*, app/page.tsx, app/login/*, app/signup/* など）
 
-   - `/signup/instructor` から遷移してきた verify 画面は、
-     「ユーザーではなくサービス出品者用」であることが見た目でも分かるようにしてください。
-   - 具体的には：
-     - 今ユーザー用 verify 画面に使っている「ピンク系の背景/アクセントカラー」ではなく、
-       サービス出品者用サインアップ画面と合わせた色（例：緑系など、あなたが以前使っていた instructor テーマカラー）に切り替えてください。
-   - 既存の verify ページを共通化している場合は、
-     クエリパラメータなどで「user / instructor」を判定して、Tailwind のクラスを出し分けるイメージで OK です。
+DOCS（DOCS/*.md, DOCS/flows/*.md, DOCS/AUTH.md, DOCS/site-map.md）
 
-2. **verify 完了後の遷移先をロール別にする**
+を対象に、どこにどの表現が残っているかを把握してください。
 
-   - **ユーザーのメール確認完了時**：
-     - 現状どおり `/login/user` へ遷移（この挙動は維持）
-   - **サービス出品者（instructor ロール）のメール確認完了時**：
-     - `/login/instructor` に遷移させてください。
-   - つまり、「誰の verify なのか」によって、完了時の redirect 先を分けたいです。
+トップページまわり
 
-## 実装方針（提案）
+app/page.tsx
 
-具体的なやり方は任せますが、一例として：
+components/sections/HeroSection.tsx
 
-1. `/signup/instructor` 側で verify への遷移を
+components/sections/CTASection.tsx
 
-   ```ts
-   router.push(`/verify?email=${encodeURIComponent(email)}&role=instructor`);
-のように、role=instructor パラメータ付きで飛ばす。
+components/layout/* （ヘッダーでログインボタンを出しているなら）
 
-app/verify/page.tsx（もしくは verify 用のページ）で：
+を読み、「ログイン」ボタンと「サービス出品者の新規登録」ボタンがどのように実装されているか確認してください。
 
-searchParams.role を見る
+認証フロー関連 DOCS
 
-role === 'instructor' の場合：
+DOCS/AUTH.md
 
-画面の背景色・アクセントカラーをサービス出品者用に変更
+DOCS/site-map.md
 
-確認完了後の redirect を /login/instructor にする
+DOCS/flows/login-flow.md
 
-それ以外（クエリに role が無い or 'user' の場合）：
+を読み、用語（ユーザー / インストラクター / サービス出品者）がどう使われているか確認してください。
 
-既存どおりユーザー向け verify の見た目（ピンク系）と /login/user redirect を維持
+Step 1: トップページ（/）のログインボタンが押せない問題
+現象：
+http://localhost:3000/ 初回アクセス時に、画面上の「ログイン」ボタンがクリックできない。
 
-もし既に verify 周りのロジックをどこかの lib に切り出している場合は、
-そこに role パラメータを渡して分岐しても OK です。
+想定原因として、次のようなものを順に疑ってください。
 
-3. 変更範囲の注意
-認証ロジック（Cognito 側の設定や role 名：user / instructor / admin）は変更しないでください。
+オーバーレイやレイヤーの問題
 
-DOCS は今回、大きく構造をいじらない でください。
+HeroSection / CTASection などで、画面全面に重なっている div（例：absolute inset-0 や pointer-events-none ではないラッパー）が
+ボタンの上にかぶさっていないか
 
-必要であれば、AUTH.md や flows/login-flow.md に「verify 完了後の instructor redirect が /login/instructor である」程度の追記は OK ですが、必須ではありません。
+z-index (z-10, z-20 など) の指定が原因で、透明な要素がボタンの上を塞いでいないか
 
-すでに直してある次の点は 壊さない でください：
+ボタン側の disabled or pointer-events
 
-日本語表現：「学びたい方（受講者）」→「ユーザー」、「インストラクター（サービス提供者）」→「サービス出品者」
+<Button> が disabled={true} のままになっていないか
 
-ユーザー/サービス出品者のログイン・サインアップフロー
+クライアント側の状態（例：isLoading, isCheckingSession）が初期レンダリング後に false にならないまま disabled を維持していないか
 
-パスワードリセット時のエラーハンドリング改善 など
+CSS に pointer-events: none がついていないか
 
-4. 最終確認 & レポート
-作業後、最低限次をセルフチェックしてください。
+Link/ボタン構造の問題
 
-ユーザーとしてログインした状態で / を開き：
+Next.js の <Link> と <Button> の組み合わせが不自然になっていないか
 
-「ユーザーの新規登録はこちら」→ /user に遷移すること
+例：<Link href="/login/user"><Button asChild>…</Button></Link> のように正しいパターンになっているか
 
-「サービス出品者の新規登録はこちら」→ /signup/instructor に遷移すること
+onClick を書き忘れている or 間違った場所に付けていないか
 
-/signup/instructor → メールアドレス登録 → /verify?email=...&role=instructor（または同等）に遷移し：
+修正方針
+ログインボタンは、トップからユーザー用ログインページ /login/user へ遷移する単純なボタンにしてください。
 
-verify 画面の背景/アクセントカラーがユーザー用とは異なる「サービス出品者カラー」になっていること
+例（書き方の一例）:
 
-メール確認完了後に /login/instructor に遷移すること
+tsx
+コードをコピーする
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
-/signup/user → /verify?email=...（role 指定なし）→ メール確認完了後に /login/user に遷移する挙動は維持されていること。
+<Link href="/login/user">
+  <Button size="lg">
+    ログイン
+  </Button>
+</Link>
+もしセッションチェックなどが必要なら、ログインページ側で行う ことを優先し、
+トップページのボタンは極力シンプルにしてください。
 
-最後に、今回の変更について Markdown 形式の作業完了レポート をコンソールに出力してください。
+透明なオーバーレイや、不要な pointer-events: none、不要な高い z-index のせいでクリックできない状態があれば削除 / 調整してください。
+
+Step 2: 日本語表現の統一（UI & DOCS）
+2-1. UI の文言
+UI（React コンポーネント）では、次のルールに統一してください。
+
+学ぶ側 → 「ユーザー」
+
+必要なら「ユーザー（サービス利用者）」など、補足は OK
+
+ただし、「学びたい方」「受講者」は今後使わない
+
+教える側 → 「サービス出品者」
+
+これで固定してください
+
+「インストラクター」「クリエイター」「サービス提供者」「教えたい方」などは使わない
+
+対象ファイルの例：
+
+components/sections/HeroSection.tsx
+
+components/sections/CTASection.tsx
+
+app/signup/user/page.tsx
+
+app/signup/instructor/page.tsx
+
+app/login/user/page.tsx
+
+app/login/instructor/page.tsx
+
+そのほか「学びたい」「教えたい」「受講者」「インストラクター（サービス提供者）」などの文言が出てくるコンポーネント
+
+2-2. DOCS の文言（最小限）
+DOCS 側は最低限、次のファイルだけ用語を合わせてください（大規模な構造変更は禁止）。
+
+DOCS/AUTH.md
+
+DOCS/site-map.md
+
+DOCS/flows/login-flow.md
+
+方針：
+
+ロールの説明文やフロー説明に出てくる日本語表現を：
+
+学ぶ側 → 「ユーザー」
+
+教える側 → 「サービス出品者」
+
+ただし、ロールキー・英語ラベル（user, instructor, admin）は そのまま。
+
+例）表のカラム名やシステム内部のロール名は instructor のままで OK
+
+説明文だけ「サービス出品者（instructor ロール）」といった形にしてもよい
+
+Step 3: ユーザーのパスワードリセットエラーの扱い
+対象：/login/user/forgot などパスワードリセット画面。
+
+現象：
+
+メールアドレス skmtwork0+Test0014@gmail.com で「パスワードお忘れですか？」を実行すると、
+
+Cannot reset password for the user as there is no registered/verified email or phone_number
+という Cognito エラーが UI に出てしまう。
+
+3-1. エラーハンドリングの改善
+パスワードリセット処理を行っているコード（例：requestPasswordReset, forgotPassword など）を特定してください。
+
+Cognito のエラーコードまたはメッセージで以下のケースを判定し、
+ユーザー向けの日本語メッセージに変換 してください。
+
+Cannot reset password for the user as there is no registered/verified email or phone_number
+
+→ 表示メッセージ例：
+
+「このアカウントはメール認証が完了していないか、連絡先情報が登録されていません。お手数ですが、新しくユーザー登録をやり直してください。」
+
+そのほかのエラー（ネットワークエラー、内部エラーなど）は、
+汎用メッセージに落とし込んでください。
+
+例）「パスワードリセットに失敗しました。時間をおいて再度お試しください。」
+
+英語の生エラー文やスタックトレースはユーザーには出さず、
+console.error に留めるなど開発者向けログにしてください。
+
+3-2. DOCS へのメモ（任意）
+DOCS/AUTH.md か DOCS/TROUBLESHOOTING.md あたりに、
+「メール未確認ユーザーに対するパスワードリセットの挙動」を簡単に追記しても構いませんが、必須ではありません。
+
+Step 4: サービス出品者（instructor ロール）のフロー修正
+4-1. トップページの「サービス出品者の新規登録」ボタン
+トップページの Hero / CTA セクションで、
+「サービス出品者の新規登録」に相当するボタンを出している箇所を確認してください。
+
+以下を保証してください。
+
+文言：
+例）サービス出品者の新規登録はこちら
+
+クリック時： 必ず /signup/instructor に遷移
+→ /user や /signup/user に飛ばないこと
+
+実装例：
+
+tsx
+コードをコピーする
+<Link href="/signup/instructor">
+  <Button size="lg">
+    サービス出品者の新規登録はこちら
+  </Button>
+</Link>
+4-2. /signup/instructor
+app/signup/instructor/page.tsx を開き、次を確認・修正してください。
+
+画面タイトルや説明文で「サービス出品者」という表現を使っていること
+
+ここは「サービス出品者」用の新規登録フォームであり、
+ユーザー用とは別であることが UI 上も明確であること
+
+サインアップ成功後の流れは DOCS/flows/login-flow.md の instructor ロールに合わせること
+
+例：/verify?email=... → /login/instructor → /instructor
+
+ユーザー用と混ざって /user に飛んでしまうようなコード（router.push("/user") など）があれば、
+instructor 用の遷移先に修正してください。
+
+4-3. /login/instructor
+app/login/instructor/page.tsx を確認し、次を保証してください。
+
+"use client";
+
+<form onSubmit={handleSubmit}> + Button type="submit"
+
+正しいメール＋パスワードでログイン成功 → /instructor など instructor 用トップへ
+
+ユーザー用の /user には飛ばさない
+
+すでにログイン済みのサービス出品者が /login/instructor に来た場合は、
+/instructor にリダイレクトするようにしてください。
+
+エラーメッセージはユーザー側と同じトーンで、
+日本語でわかりやすく表示してください（英語生文は出さない）。
+
+Step 5: 仕上げと作業レポート
+npm run build を実行し、ビルドが通ることを確認してください。
+
+npm run dev で立ち上げ、少なくとも次を自己テストしてください（ブラウザでの軽い確認でOKです）。
+
+/
+
+初回アクセス時から「ログイン」ボタンがクリックできること
+
+サービス出品者向けボタンが /signup/instructor に遷移すること
+
+文言に「学びたい方（受講者）」や「インストラクター（サービス提供者）」が残っていないこと
+
+/login/user/forgot
+
+問題のユーザー（例：skmtwork0+Test0014@gmail.com）で実行したとき、
+生の英語エラーではなく、日本語の説明メッセージが表示されること
+
+/login/instructor → /instructor
+
+ログインフローがユーザーとは別で動いていること
+
+最後に「作業完了レポート」を Markdown でコンソールに出力してください。
+
+レポートには少なくとも次を含めてください：
 
 変更したファイル一覧（パス・概要）
 
-トップページの 2 ボタンの挙動がどう変わったか（ロール別の動き）
+トップページのログインボタン問題の原因と修正内容
 
-verify 画面の色分けと redirect 先のロール別挙動
+日本語表現の統一ルール（ユーザー / サービス出品者）と、その適用ファイル
 
-既存フロー（ユーザーの verify → /login/user）が壊れていないことの確認結果
+パスワードリセットエラー Cannot reset password for the user as there is no registered/verified email or phone_number の扱い
+
+サービス出品者（instructor ロール）のログイン・サインアップフローの概要
+
+既知の制約（Cognito 側でしか直せないものがある場合は、その旨を明記）
+
+※ DOCS の構造（ファイル削除・大規模統合）は、今回のタスクでは変更しないでください。
+　必要な場合でも、用語の置き換えなど最小限に留めてください。
+
+yaml
+コードをコピーする
+
+---
+
+もしこのプロンプト投げたあとで、
+
+- トップのログインまだ押せない  
+- サービス出品者の遷移がおかしい  
+- エラーメッセージの日本語が微妙  
+
+みたいなところが残っていたら、その画面のスクショか該当 TSX を貼ってくれれば、コードレベルで一緒に詰めていこう。

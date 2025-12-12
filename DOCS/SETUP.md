@@ -130,31 +130,32 @@ npm run db:seed
 
 ## 開発サーバーの起動
 
-### HTTP モード（通常）
+### デフォルト（HTTPS）
 
 ```bash
-# 開発サーバー起動
+# HTTPS 開発サーバー起動（デフォルト）
 npm run dev
-
-# ブラウザで確認
-# http://localhost:3000
-```
-
-### HTTPS モード（セキュアクッキー・Service Worker 等が必要な場合）
-
-```bash
-# HTTPS 開発サーバー起動
-npm run dev:https
 
 # ブラウザで確認
 # https://localhost:3000
 ```
 
-> **Note**: 初回起動時に Next.js が自動的に自己署名証明書を生成します。
-> ブラウザで「この接続ではプライバシーが保護されません」等の警告が表示されますが、
-> 「詳細設定」→「localhost にアクセスする（安全ではありません）」で続行できます。
+初回起動時に Next.js が自己署名証明書を自動生成します。
+ブラウザで警告が出る場合は「詳細設定」→「localhost にアクセスする」で継続してください。
+リポジトリ同梱の `certs/localhost.pem` / `certs/localhost-key.pem` を利用するため、追加セットアップは不要です。
+（`scripts/dev-https.js` が mkcert ダウンロードをスキップし、自己署名証明書をコピーして起動します）
 
-**HTTPS が必要なケース**:
+### HTTP モード（互換・フォールバック用）
+
+```bash
+# HTTP で起動したい場合
+npm run dev:http
+
+# ブラウザで確認
+# http://localhost:3000
+```
+
+**HTTPS が必要なケースの例**:
 - セキュアクッキー（`Secure` 属性）のテスト
 - Service Worker のテスト
 - Geolocation API のテスト
