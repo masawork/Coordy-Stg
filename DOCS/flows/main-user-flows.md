@@ -173,12 +173,24 @@ export function resolveDisplayName(
   user: Pick<User, 'email' | 'name' | 'displayName'>,
   profile?: ProfileLike
 ): string {
-  const profileName = (profile?.displayName || profile?.name || '').trim();
+  // プロフィールから表示名を取得
+  // ClientProfile / Instructor 両方に displayName が存在するため、まず displayName をチェック
+  const profileDisplayName = (profile?.displayName || '').trim();
+  if (profileDisplayName) return profileDisplayName;
+
+  // displayName がない場合は name を使用
+  const profileName = (profile?.name || '').trim();
   if (profileName) return profileName;
-  const displayName = (user.displayName || '').trim();
-  if (displayName) return displayName;
+
+  // Cognito の custom:displayName から取得
+  const cognitoDisplayName = (user.displayName || '').trim();
+  if (cognitoDisplayName) return cognitoDisplayName;
+
+  // Cognito の name から取得
   const cognitoName = (user.name || '').trim();
   if (cognitoName) return cognitoName;
+
+  // メールアドレスのローカル部（最後のフォールバック）
   const emailLocal = (user.email || '').split('@')[0]?.trim();
   return emailLocal || 'ゲスト';
 }

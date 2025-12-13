@@ -160,13 +160,6 @@ export default function AdminIdentityDocumentsPage() {
               {/* アクションボタン */}
               <div className="flex gap-4">
                 <button
-                  onClick={() => handleApprove(instructor.id)}
-                  disabled={processing}
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                >
-                  承認する
-                </button>
-                <button
                   onClick={() => setSelectedInstructor(instructor)}
                   disabled={processing}
                   className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"

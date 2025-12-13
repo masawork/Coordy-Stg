@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getSession, hasRole } from '@/lib/auth';
 import { getPendingCharges, approveCharge, rejectCharge } from '@/lib/api/admin';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, Clock, User, DollarSign } from 'lucide-react';
@@ -14,19 +13,9 @@ export default function PendingChargesPage() {
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const session = getSession();
-
-      if (!session || !hasRole('admin')) {
-        router.push('/login/user');
-        return;
-      }
-
-      loadPendingCharges();
-    };
-
-    checkAuth();
-  }, [router]);
+    // 親レイアウトで認証チェック済みのため、データのみロード
+    loadPendingCharges();
+  }, []);
 
   const loadPendingCharges = async () => {
     try {
@@ -93,7 +82,7 @@ export default function PendingChargesPage() {
         {/* ヘッダー */}
         <div>
           <Button
-            onClick={() => router.push('/admin')}
+            onClick={() => router.push('/manage/admin')}
             variant="ghost"
             className="mb-4"
           >

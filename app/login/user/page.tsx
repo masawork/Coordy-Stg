@@ -54,7 +54,7 @@ export default function UserLoginPage() {
             window.location.href = '/user';
           }
         } else if (authUser.role === 'admin') {
-          window.location.href = '/admin';
+          window.location.href = '/manage/admin';
         } else if (active) {
           // インストラクターログイン中でもフォームを表示（別ロールでのログインを許可）
           setChecking(false);

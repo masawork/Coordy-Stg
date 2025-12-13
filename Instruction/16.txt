@@ -1,0 +1,243 @@
+あなたは /mnt/Coordy リポジトリを担当する **シニアフルスタックエンジニア** です。
+Next.js 14 (App Router) + AWS Amplify Gen2（Cognito / Amplify Data）で構成された「Coordy」予約プラットフォームの実装と総点検を行ってください。
+
+ポイント：
+- 「実装しました」と言う前に **必ず自分でブラウザで動作確認** し、不具合が残っていないかチェックしてください。
+- 私への確認質問は原則禁止です。仕様があいまいな部分は DOCS を根拠に、自分で一番妥当な案を決めてください。
+- レポートは最後にまとめて1回だけ出してください（途中経過の返答は不要です）。
+
+──────────────────
+■ 0. 事前ルール
+──────────────────
+
+- 作業ディレクトリは `/mnt/Coordy` 固定。
+- まず以下を実行して、構成と仕様・過去レポートを把握してください：
+
+  - `ls`
+  - `ls DOCS`
+  - `cat package.json`
+  - `cat DOCS/README.md`
+  - `cat DOCS/site-map.md`
+  - `cat DOCS/flows/login-flow.md`
+  - `cat DOCS/AUTH.md`
+  - `cat DOCS/IMPLEMENTATION.md`
+  - `cat DOCS/flows/main-user-flows.md`
+  - `ls claudedocs`
+  - `cat claudedocs/instruction-13-report.md`
+  - `cat claudedocs/instruction-14-report.md`
+  - もしあれば `cat claudedocs/instruction-15-report.md`
+
+- DOCS 配下の `.md` ファイルは **削除・リネーム禁止**。
+  内容が現状と食い違っていれば、今回の要件を正として「最小限の修正」で整合させてください。
+- `.next` やキャッシュ系以外への `rm -rf` は禁止。
+- git の巻き戻し（`git reset --hard` / `git checkout .`）は行わないでください。
+
+- すでに存在する「Instruction 13 / 14 / 15 のレポート」は、  
+  「そう書いてあるだけで、実際には直っていない」という前提で扱ってください。
+  → **レポート内容を信用せず、必ずコードとブラウザで実動を確認すること。**
+
+- 私への問いかけ・許可取りは不要です。  
+  「最も自然で安全な仕様」を自分で決めて実装し、その前提をレポートに書いてください。
+
+──────────────────
+■ 1. 今回必ず直してほしい症状（優先バグ一覧）
+──────────────────
+
+以下は「現時点でユーザーが確認した不具合」です。この内容を **絶対に取りこぼさないでください**。
+
+### (1) / の Header ログインボタン問題・初回スクロール問題
+
+- `http://localhost:3000/`
+  - **初回アクセス時** に Header の「ログイン」ボタンを押しても、  
+    「ユーザーかインストラクターかを選ぶポップアップ（LoginModal）」が出てこない。
+  - ページをリロードすると出るようになるが、UX的にリロード前提はNG。
+  - 初回アクセス時に下にスクロールしても何も出てこない（本来のセクションが見えない／レイアウトがおかしい可能性）。
+
+やること：
+- Layout / providers / Sidebar / Modal 周りをコードレベルで分析し、
+  - なぜ初回アクセス時だけログインモーダルが開かないのか
+  - なぜスクロールしてもセクションが見えない／イベントが効かないのか
+  を特定してください。
+- ハイドレーション・ChunkLoadError・z-index・シートのマウントタイミングなど、  
+  これまでの修正を踏まえた上で根本原因を見つけて修正してください。
+- **「なんとなく回避」ではなく、原因をコメントかレポートに明記** してください。
+
+### (2) 管理者ログイン周り
+
+- `http://localhost:3000/manage/login`
+  - 以前は「読み込み中」から変わらない問題があった。
+  - 現状も挙動が怪しい可能性が高いので再検証が必要。
+- `http://localhost:3000/manage/admin`
+  - Cognito で ADMINS グループに追加したユーザーでログインしても、期待通りアクセスできないことがあった。
+  - ユーザーが見た Cognito 画面では、そのユーザーが「パスワードを強制的に変更」状態になっていた。
+    → これが原因でログインできないのか、アプリ側のロール判定なのかを切り分けてください。
+
+やること：
+- `lib/auth/cognito.ts` のロール判定（ADMINS グループ → admin）を確認。
+- `/manage/login` / `/manage/admin` のページ実装・レイアウト・ガードロジックを確認。
+- 「Cognitoで管理者アカウントを作る手順」を DOCS にきちんと書くこと：
+  - User Pool を開く
+  - ユーザー作成（メール / 一時パスワード / メール検証）
+  - ADMINS グループに追加
+  - 初回ログイン時の強制パスワード変更フローの扱い（どうすればよいか）
+- Web サイトから admin ロールのサインアップはできない仕様に統一し、
+  - その旨を `DOCS/AUTH.md` に明記。
+  - コード（registerUser など）もその仕様と一致させる。
+
+### (3) ユーザープロフィール作成エラー / 初期値の問題
+
+- `http://localhost:3000/user/profile/setup`
+  - プロフィール保存で以下のエラーが **いまだに出ている**：
+
+    > プロフィールの保存に失敗しました。  
+    > プロフィールの作成に失敗しました:  
+    > `[{"path":null,"locations":null,"message":"The variables input contains a field that is not defined for input object type 'CreateClientProfileInput' "}]`
+
+  - さらに、新規ユーザーで開いたときに
+    - メールアドレスのローカル部（@より前）がそのまま「氏名」「表示名」に入ってしまっているので、**空欄** にしてほしい。
+
+やること：
+- `CreateClientProfileInput` の定義を amplify_outputs / 型定義から確認し、
+  - いま送っている `input` から余計なフィールドを洗い出して修正。
+- `lib/api/profile.ts`・`app/user/(protected)/profile/setup/page.tsx` を中心に、
+  - **本当に** 不要フィールドが消えているか / まだ送ってしまっているかを確認。
+- フォーム初期値：
+  - 新規ユーザーの `name` / `displayName` は原則空欄にし、メールローカル部を勝手に埋めない。
+  - 既存プロフィールがあれば、その値をそのまま表示する。
+
+### (4) 表示名の反映
+
+- `http://localhost:3000/user`
+  - ここでの HOME 表示「ようこそ、『○○』さん！」や Header に出る名前が、  
+    プロフィールで設定した表示名になっていない。
+
+やること：
+- `lib/auth/displayName.ts` のロジックと、`/user` / `/instructor` の layout / page を確認し、
+  - 表示名の解決順序（displayName → name → Cognito 属性 → fallback）が仕様通りか。
+  - 実際の画面で、プロフィール変更後に反映されるか。
+- メールアドレスがそのまま見えるのは避ける（最後の完全な fallback だけにする）。
+
+### (5) インストラクター用プロフィール設定フロー
+
+- `http://localhost:3000/instructor/profile/setup`
+  - 「読み込み中」から進まない。
+  - 名前（本名）を入力する欄がない（Admin 承認時に使う本名）。
+  - 「時給」という項目があるが不要（サービスごとの料金はサービス作成時に決めるため）。
+
+やること：
+- `/instructor/profile/setup` が
+  - 未作成時 → セットアップフォーム表示
+  - 作成済み → 既存値を読み込んで編集できる
+  ようにする（スピナーのまま固まらない）。
+- 本名（管理者のみ使う）フィールドを追加し、Cognito / Profile のどこに保存するか決める。
+- 「時給」フィールドは削除する（スキーマとの整合も確認）。
+- ユーザーと同じく、表示名の禁止ワードバリデーションも有効にする。
+
+### (6) 表示名の禁止文言
+
+ユーザーからの要望：
+- user / instructor ともに、表示名に
+  - 人が不快になるもの
+  - 暴力的 / 差別的なもの
+  - 「admin」「管理者」「Coordy」などのなりすまし系
+  を禁止したい。
+
+やること：
+- `lib/auth/displayName.ts` の禁止ワードリストを確認し、
+  - user / instructor のプロフィールセットアップ画面で実際にチェックが走っているかをテスト。
+  - 禁止ワードで保存しようとした場合、分かりやすいエラーメッセージを表示する。
+
+### (7) インストラクターダッシュボードのサブメニュー 404
+
+- `http://localhost:3000/instructor`
+  - サブメニューから飛ぶ各ページが 404 になっていたことがある
+    （services / reservations / schedule / settings など）。
+
+やること：
+- `/instructor` サイドバーの全メニューを実際にクリックし、
+  - 404 にならないか確認。
+- もし存在しないページがあれば、最低限の stub ページ（ダッシュボード風の空画面）を追加。
+- URLパターンと Sidebar のリンク先を揃える。
+
+### (8) 管理画面のサイドバー初期表示
+
+- `http://localhost:3000/manage/admin`
+  - ユーザー画面同様、管理者画面でもデスクトップではサイドバー（ハンバーガーメニュー）が最初から開いている状態にしたい。
+
+やること：
+- `app/manage/(protected)/layout.tsx` や SidebarProvider 周りを確認し、
+  - ユーザー画面と同じロジックで、管理画面でもデスクトップ時はサイドバーをデフォルト表示にする。
+
+### (9) ロールごとのアクセス制御と /admin の扱い
+
+- 管理者ログイン状態でユーザーログインしようとしたら `https://localhost:3000/admin` にリダイレクトされた、という過去事象あり。
+- `/admin` と `/manage/admin` の扱いがレポート上もコード上も混線している。
+
+やること：
+- 仕様としては：
+  - 正式な管理者エリア：`/manage/admin` 配下
+  - `/admin` 配下は「古いパス → /manage/admin にリダイレクト」程度に収束させる、など **一つの方針に決める**。
+- admin ログイン時に：
+  - `/user` / `/instructor` / `/login/*` / `/signup/*` にアクセスした場合、どこへリダイレクトするかを整理。
+- これを `DOCS/AUTH.md` / `DOCS/flows/login-flow.md` / `DOCS/site-map.md` に反映。
+- user / instructor ロールのときに `/manage/admin` へアクセスした場合の挙動も DOCS に明記。
+
+### (10) HTTPS 開発 / HTTP アクセスの整理（優先度は少し低め）
+
+- `npm run dev:https` で https://localhost:3000 は立ち上がるが、  
+  依然として `npm run dev` で http://localhost:3000 も動く状態。
+- これは Next.js 的には自然なので、**挙動そのものを変える必要は必須ではない** が、
+  - SETUP / DEPLOYMENT の DOCS に現状を正しく書いておいてほしい。
+  - 「開発中は http / https の両方が利用可能であるが、本番は Amplify Hosting が https 強制」など。
+
+──────────────────
+■ 2. 実装・テストの進め方
+──────────────────
+
+1. コード調査：
+   - `rg` や `cat` で該当箇所を洗い出し、上記のバグがどこから来ているか原因を特定する。
+
+2. 実装：
+   - 必要な TSX / TS / DOCS を修正または追加する。
+   - DOCS は「現状と合っていない箇所だけ」最小限修正する。
+
+3. ブラウザでの実機テスト（必須）：
+   - `npm run dev` または `npm run dev:https` で起動。
+   - 以下の URL を少なくとも確認すること：
+     - `/`
+     - `/login/user`, `/login/instructor`
+     - `/signup/user`, `/signup/instructor`
+     - `/user` とその配下（`/user/profile/setup`, `/user/services`, `/user/favorites`, `/user/reservations`, `/user/wallet`, `/user/payment`, `/user/settings` 等）
+     - `/instructor` とその配下（`/instructor/profile/setup`, `/instructor/services`, `/instructor/reservations`, `/instructor/schedule`, `/instructor/settings` 等）
+     - `/manage/login`, `/manage/admin` とその配下（`/manage/admin/dashboard`, `/users`, `/services`, `/pending-charges`, `/identity-documents`, `/settings` 等）
+     - `/admin` 系が残っている場合はそれも
+   - 未ログイン / user / instructor / admin の 4パターンで、
+     - アクセス時にどこへ遷移するか / 404 やスピナー固まりがないかを確認する。
+
+4. ビルド確認：
+   - 最後に `npm run build` を実行し、ビルド成功を確認。
+   - ESLint の Next.js/ESLint 9 の互換性警告は、ビルド通過する限りブロッカー扱いしなくてよい。
+
+──────────────────
+■ 3. 最後に出力するもの
+──────────────────
+
+作業完了後、`claudedocs/instruction-16-report.md` のようなファイルを新規作成し、その Markdown 内容を **最終レスポンスとして表示** してください。
+
+レポートには必ず次を含めてください：
+
+1. タスク一覧（自由に ID を振ってよいが、上記(1)〜(10)がカバーされていること）。
+2. 各タスクごとの：
+   - 調査内容（何を見て、何が原因だったか）
+   - 変更したファイル一覧
+   - 実行したコマンドと結果（npm run build / npm run dev など）
+   - ブラウザで確認した URL と、そのときのロール／挙動
+3. URL × ロール（未ログイン / user / instructor / admin）の挙動表（主要な URL だけでOK）。
+4. DOCS をどこをどう直したかの要約。
+5. まだ残っている懸念点や、今後やるべき TODO があればそれも。
+
+──────────────────
+
+以上です。  
+追加の質問や確認メッセージは不要なので、/mnt/Coordy のコード・DOCS を読み込み、
+実装 → 自己テスト → レポート作成 まで一気通貫で実施してください。

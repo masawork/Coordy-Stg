@@ -537,7 +537,48 @@ if (isAlreadySignedIn) {
 
 ---
 
-## 10. 不明点・要確認事項
+## 10. ロールごとのアクセス制御
+
+### 10-1. 保護ルートへのアクセス制御
+
+各保護ルート（`/user/*`, `/instructor/*`, `/manage/*`）へのアクセス時の挙動を定義します。
+
+| アクセス先 | 未ログイン | userログイン | instructorログイン | adminログイン |
+|-----------|-----------|-------------|-------------------|---------------|
+| `/user/*` | `/` へリダイレクト | ✅ アクセス可 | `/instructor` へリダイレクト | `/admin` へリダイレクト |
+| `/instructor/*` | `/` へリダイレクト | `/user` へリダイレクト | ✅ アクセス可 | `/admin` へリダイレクト |
+| `/manage/*` | `/manage/login` へリダイレクト | `/manage/login` へリダイレクト | `/manage/login` へリダイレクト | ✅ アクセス可 |
+
+### 10-2. 制御ロジックの概要
+
+保護されたルートへのアクセス制御は、各 `(protected)/layout.tsx` で実装されています。
+
+```typescript
+// /user/(protected)/layout.tsx の例
+const authUser = await getCurrentAuthUser();
+
+if (authUser.role !== 'user') {
+  if (authUser.role === 'instructor') {
+    router.push('/instructor');
+  } else if (authUser.role === 'admin') {
+    router.push('/admin');
+  } else {
+    router.push('/');  // 未ログイン時はトップへ
+  }
+  return;
+}
+```
+
+### 10-3. 設計方針
+
+1. **ロール分離**: 各ロールは自身のエリアにのみアクセス可能
+2. **管理者の特権なし**: 管理者でもユーザー/インストラクター画面には直接アクセス不可
+3. **シームレスなリダイレクト**: 誤ったエリアへのアクセスは適切なページへ自動リダイレクト
+4. **未ログイン時の導線**: ユーザー/インストラクターエリアはトップページへ、管理エリアは管理ログインへ
+
+---
+
+## 11. 不明点・要確認事項
 
 ### 実装済みだが詳細不明な点
 - [ ] MFA（2段階認証）の有効化タイミングと設定フロー

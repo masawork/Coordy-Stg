@@ -15,6 +15,7 @@ import {
   toJapanDomesticPhoneNumber,
 } from '@/lib/phone';
 import { Button } from '@/components/ui/button';
+import { validateDisplayName } from '@/lib/auth/displayName';
 
 export default function ProfileSetupPage() {
   const router = useRouter();
@@ -39,28 +40,23 @@ export default function ProfileSetupPage() {
       // Cognitoから最新のユーザー情報を取得
       const authUser = await getCurrentAuthUser();
       setUserId(authUser.userId);
-      const emailLocal = (authUser.email || '').split('@')[0];
-      const safeDisplayName =
-        authUser.displayName && authUser.displayName !== emailLocal
-          ? authUser.displayName
-          : '';
 
       // 既存のプロフィールがあれば取得
       const profile = await getClientProfile(authUser.userId);
 
       if (profile) {
         // 既存プロフィールがある場合、そのデータを使用
-        // displayNameはプロフィールから優先的に取得
         setFormData({
           name: profile.name || '',
-          displayName: profile.displayName || safeDisplayName || '',
+          displayName: profile.displayName || '',
           address: profile.address || '',
           phoneNumber: toJapanDomesticPhoneNumber(profile.phoneNumber),
           dateOfBirth: profile.dateOfBirth || '',
           gender: profile.gender || '',
         });
       } else {
-        // 既存プロフィールがない場合、Cognitoから初期値を取得
+        // 既存プロフィールがない場合（新規ユーザー）、空欄からスタート
+        // メールアドレスのローカル部は使用しない
         const session = await fetchAuthSession();
         const idToken = session.tokens?.idToken;
         const phoneNumber = toJapanDomesticPhoneNumber(
@@ -68,8 +64,8 @@ export default function ProfileSetupPage() {
         );
 
         setFormData({
-          name: '',
-          displayName: '',
+          name: '', // 新規ユーザーは空欄
+          displayName: '', // 新規ユーザーは空欄
           address: '',
           phoneNumber,
           dateOfBirth: '',
@@ -118,6 +114,16 @@ export default function ProfileSetupPage() {
       return;
     }
 
+    // 表示名の禁止ワードチェック（入力がある場合のみ）
+    if (trimmedDisplayName) {
+      const displayNameValidation = validateDisplayName(trimmedDisplayName);
+      if (!displayNameValidation.isValid) {
+        setError(displayNameValidation.errorMessage || '表示名が無効です。');
+        setLoading(false);
+        return;
+      }
+    }
+
     const phoneNumberForApi = toE164PhoneNumber(formData.phoneNumber);
     if (!phoneNumberForApi) {
       setError('電話番号の形式が正しくありません（例: 09012345678）');
@@ -125,10 +131,11 @@ export default function ProfileSetupPage() {
       return;
     }
 
+    // ClientProfile スキーマには displayName フィールドが存在するため、送信する
     const profileInput = {
       clientId: userId,
       name: trimmedName,
-      displayName: trimmedDisplayName || undefined,
+      displayName: trimmedDisplayName || undefined, // 空の場合は undefined にして送信しない
       address: trimmedAddress,
       phoneNumber: phoneNumberForApi,
       dateOfBirth: formData.dateOfBirth || undefined,

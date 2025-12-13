@@ -41,7 +41,7 @@ export default function SignupInstructorPage() {
         if (authUser.role === 'instructor') {
           window.location.href = '/instructor';
         } else if (authUser.role === 'admin') {
-          window.location.href = '/admin';
+          window.location.href = '/manage/admin';
         } else if (active) {
           // ユーザーログイン中でもフォームを表示（別ロールでの登録を許可）
           setChecking(false);

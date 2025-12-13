@@ -1,6 +1,6 @@
 # Coordy サイトマップ
 
-最終更新: 2025-12-04
+最終更新: 2025-12-11
 
 ## 概要
 
@@ -80,10 +80,15 @@ Coordyは、ユーザー（サービス利用者）、サービス出品者（in
 
 | URLパス | 画面名 | 説明 | 認証要否 | 備考 |
 |---------|--------|------|----------|------|
-| `/manage/admin` | 管理者ダッシュボード | 管理機能のメイン画面 | 要（admin） | |
-| `/admin` | 管理ホーム | 管理者ホーム（旧パス） | 要（admin） | `/manage/admin` と同等 |
-| `/admin/(protected)/identity-documents` | 本人確認書類管理 | ユーザーの身分証明書審査 | 要（admin） | |
-| `/admin/(protected)/pending-charges` | 保留中の課金 | 未処理の課金管理 | 要（admin） | |
+| `/manage/admin` | 管理者ダッシュボード | 管理機能のメイン画面 | 要（admin） | 正式な管理者ルート |
+| `/manage/admin/dashboard` | ダッシュボード | 統計情報の表示 | 要（admin） | |
+| `/manage/admin/users` | ユーザー管理 | ユーザー一覧・検索 | 要（admin） | |
+| `/manage/admin/services` | サービス管理 | サービス一覧・承認 | 要（admin） | |
+| `/manage/admin/pending-charges` | 銀行振込承認 | 未処理の課金管理 | 要（admin） | |
+| `/manage/admin/identity-documents` | 本人確認書類管理 | ユーザーの身分証明書審査 | 要（admin） | |
+| `/manage/admin/settings` | 設定 | システム全体の設定 | 要（admin） | |
+| `/admin` | リダイレクト | `/manage/admin` へ転送 | - | 旧パス（後方互換） |
+| `/admin/*` | リダイレクト | `/manage/admin/*` へ転送 | - | 旧パス（後方互換） |
 
 ---
 
@@ -116,7 +121,14 @@ app/
 ├── manage/
 │   ├── login/page.tsx                # 管理者ログイン
 │   └── (protected)/
-│       └── admin/page.tsx            # 管理者ダッシュボード
+│       └── admin/
+│           ├── page.tsx              # 管理者ダッシュボード
+│           ├── dashboard/page.tsx    # ダッシュボード
+│           ├── users/page.tsx        # ユーザー管理
+│           ├── services/page.tsx     # サービス管理
+│           ├── pending-charges/page.tsx # 銀行振込承認
+│           ├── identity-documents/page.tsx # 本人確認書類管理
+│           └── settings/page.tsx     # 設定
 ├── user/
 │   ├── (protected)/page.tsx          # ユーザーホーム
 │   ├── services/                     # サービス関連
@@ -131,10 +143,9 @@ app/
 │       ├── page.tsx                  # インストラクターホーム
 │       └── identity-document/page.tsx # 本人確認
 └── admin/
-    └── (protected)/
-        ├── page.tsx                  # 管理ホーム
-        ├── identity-documents/page.tsx # 本人確認管理
-        └── pending-charges/page.tsx  # 課金管理
+    ├── page.tsx                      # → /manage/admin へリダイレクト
+    ├── pending-charges/page.tsx      # → /manage/admin/pending-charges へリダイレクト
+    └── identity-documents/page.tsx   # → /manage/admin/identity-documents へリダイレクト
 ```
 
 ---
@@ -179,13 +190,12 @@ app/
 
 ### ミドルウェア保護
 
-| パス | 必要なロール |
-|------|------------|
-| `/user/*` | user |
-| `/instructor/*` | instructor |
-| `/admin/*` | admin |
-
-未認証時は `/{role}/login?next={requestedPath}` にリダイレクト
+| パス | 必要なロール | 備考 |
+|------|------------|------|
+| `/user/*` | user | 未認証時は `/` へリダイレクト |
+| `/instructor/*` | instructor | 未認証時は `/` へリダイレクト |
+| `/manage/admin/*` | admin | 未認証時は `/manage/login` へリダイレクト |
+| `/admin/*` | - | `/manage/admin/*` へリダイレクト |
 
 ---
 
