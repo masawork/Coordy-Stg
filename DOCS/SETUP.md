@@ -130,11 +130,21 @@ npm run db:seed
 
 ## 開発サーバーの起動
 
-### デフォルト（HTTPS）
+### デフォルト（HTTP）
 
 ```bash
-# HTTPS 開発サーバー起動（デフォルト）
+# HTTP 開発サーバー起動（デフォルト）
 npm run dev
+
+# ブラウザで確認
+# http://localhost:3000
+```
+
+### HTTPS モード（必要に応じて）
+
+```bash
+# HTTPS で起動したい場合
+npm run dev:https
 
 # ブラウザで確認
 # https://localhost:3000
@@ -144,16 +154,6 @@ npm run dev
 ブラウザで警告が出る場合は「詳細設定」→「localhost にアクセスする」で継続してください。
 リポジトリ同梱の `certs/localhost.pem` / `certs/localhost-key.pem` を利用するため、追加セットアップは不要です。
 （`scripts/dev-https.js` が mkcert ダウンロードをスキップし、自己署名証明書をコピーして起動します）
-
-### HTTP モード（互換・フォールバック用）
-
-```bash
-# HTTP で起動したい場合
-npm run dev:http
-
-# ブラウザで確認
-# http://localhost:3000
-```
 
 **HTTPS が必要なケースの例**:
 - セキュアクッキー（`Secure` 属性）のテスト

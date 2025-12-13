@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/dev-https.js",
+    "dev": "next dev --hostname localhost --port 3000",
     "dev:http": "next dev --hostname localhost --port 3000",
     "dev:https": "node scripts/dev-https.js",
     "build": "next build",

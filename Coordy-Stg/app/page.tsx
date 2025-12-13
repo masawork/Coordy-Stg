@@ -7,6 +7,7 @@ import "./../app/app.css";
 import { Amplify } from "aws-amplify";
 import outputs from "@/amplify_outputs.json";
 import "@aws-amplify/ui-react/styles.css";
+import { getCurrentUser } from "aws-amplify/auth";
 
 Amplify.configure(outputs);
 
@@ -14,6 +15,18 @@ const client = generateClient<Schema>();
 
 export default function App() {
   const [todos, setTodos] = useState<Array<Schema["Todo"]["type"]>>([]);
+  const [userId, setUserId] = useState<string>("");
+
+  useEffect(() => {
+    // 現在のユーザーIDを取得
+    getCurrentUser()
+      .then((user) => {
+        setUserId(user.userId);
+      })
+      .catch((err) => {
+        console.error("ユーザー取得エラー:", err);
+      });
+  }, []);
 
   function listTodos() {
     client.models.Todo.observeQuery().subscribe({
@@ -22,28 +35,51 @@ export default function App() {
   }
 
   useEffect(() => {
-    listTodos();
-  }, []);
+    if (userId) {
+      listTodos();
+    }
+  }, [userId]);
 
-  function createTodo() {
-    client.models.Todo.create({
-      content: window.prompt("Todo content"),
-    });
+  async function createTodo() {
+    if (!userId) {
+      alert("ログインが必要です");
+      return;
+    }
+
+    const title = window.prompt("Todo title");
+    if (!title) return;
+
+    const description = window.prompt("Todo description (optional)") || undefined;
+
+    try {
+      await client.models.Todo.create({
+        userId,
+        title,
+        description,
+      });
+    } catch (error) {
+      console.error("Todo作成エラー:", error);
+      alert("Todoの作成に失敗しました");
+    }
   }
     
   function deleteTodo(id: string) {
-    client.models.Todo.delete({ id })
+    client.models.Todo.delete({ id });
   }
 
   return (
     <main>
       <h1>My todos</h1>
-      <button onClick={createTodo}>+ new</button>
+      <button onClick={createTodo} disabled={!userId}>
+        + new
+      </button>
+      {!userId && <p>ログインが必要です</p>}
       <ul>
         {todos.map(todo => 
           <li onClick={() => deleteTodo(todo.id)} 
             key={todo.id}>
-            {todo.content}
+            {todo.title}
+            {todo.description && <span> - {todo.description}</span>}
           </li>)}
       </ul>
       <div>

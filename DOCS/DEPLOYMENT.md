@@ -520,7 +520,8 @@ aws acm request-certificate \
 
 AWS Amplify Hosting は、デプロイされたすべてのアプリケーションに対して **HTTPS をデフォルトで提供** します。
 
-ローカル開発では `npm run dev` で HTTPS（自己署名証明書）を起動し、HTTP が必要な場合は `npm run dev:http` を利用します。
+ローカル開発では `npm run dev` で HTTP を起動し、HTTPS が必要な場合は `npm run dev:https` を利用します。
+本番環境では Amplify Hosting が HTTPS を強制します。
 
 **デフォルトドメイン（自動 HTTPS）**:
 - `https://<branch>.<app-id>.amplifyapp.com`
