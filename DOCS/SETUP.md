@@ -59,7 +59,7 @@ cp .env.example .env.local
 
 ```bash
 # Next.js
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=https://localhost:3000
 
 # AWS Amplify
 NEXT_PUBLIC_AWS_REGION=ap-northeast-1
@@ -130,42 +130,40 @@ npm run db:seed
 
 ## 開発サーバーの起動
 
-### デフォルト（HTTP）
+### デフォルト（HTTPS）
 
 ```bash
-# HTTP 開発サーバー起動（デフォルト）
+# HTTPS 開発サーバー起動（デフォルト）
 npm run dev
-
-# ブラウザで確認
-# http://localhost:3000
-```
-
-### HTTPS モード（必要に応じて）
-
-```bash
-# HTTPS で起動したい場合
-npm run dev:https
 
 # ブラウザで確認
 # https://localhost:3000
 ```
 
-初回起動時に Next.js が自己署名証明書を自動生成します。
-ブラウザで警告が出る場合は「詳細設定」→「localhost にアクセスする」で継続してください。
 リポジトリ同梱の `certs/localhost.pem` / `certs/localhost-key.pem` を利用するため、追加セットアップは不要です。
 （`scripts/dev-https.js` が mkcert ダウンロードをスキップし、自己署名証明書をコピーして起動します）
 
-**HTTPS が必要なケースの例**:
-- セキュアクッキー（`Secure` 属性）のテスト
-- Service Worker のテスト
-- Geolocation API のテスト
-- その他、HTTPS 必須のブラウザ API 利用時
+**初回アクセス時のブラウザ警告**:
+自己署名証明書のため、ブラウザで警告が表示されます。
+「詳細設定」→「localhost にアクセスする（安全ではありません）」をクリックして続行してください。
+
+### HTTP モード（必要に応じて）
+
+```bash
+# HTTP で起動したい場合
+npm run dev:http
+
+# ブラウザで確認
+# http://localhost:3000
+```
+
+**注意**: HTTP モードでは一部のブラウザ API（Service Worker、Geolocation API、セキュアクッキーなど）が正常に動作しません。通常は HTTPS モードを使用してください。
 
 ### 起動確認
 
-- **ユーザーログイン**: http://localhost:3000/login/user（または https://localhost:3000/login/user）
-- **インストラクターログイン**: http://localhost:3000/login/instructor
-- **管理者ログイン**: http://localhost:3000/manage/login
+- **ユーザーログイン**: https://localhost:3000/login/user
+- **インストラクターログイン**: https://localhost:3000/login/instructor
+- **管理者ログイン**: https://localhost:3000/manage/login
 
 ### テストアカウント
 
