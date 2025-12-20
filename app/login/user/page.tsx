@@ -11,6 +11,7 @@ import {
   clearSession,
   checkAuth,
   getCurrentAuthUser,
+  getSessionForRole,
 } from '@/lib/auth';
 import { isProfileComplete } from '@/lib/api/profile';
 // Amplify初期化を確実に行う
@@ -29,22 +30,30 @@ export default function UserLoginPage() {
     let active = true;
     const checkSession = async () => {
       try {
+        const storedUser = getSessionForRole('user');
+        if (storedUser) {
+          console.log('[DEBUG] user login stored session', { role: storedUser.role });
+          try {
+            const profileComplete = await isProfileComplete(storedUser.userId);
+            window.location.href = profileComplete ? '/user' : '/user/profile/setup';
+          } catch (err) {
+            console.error('プロフィールチェックエラー:', err);
+            window.location.href = '/user';
+          }
+          return;
+        }
+
         const hasAuthSession = await checkAuth();
         if (!hasAuthSession) {
           clearSession();
-          if (active) {
-            console.log('✅ 未ログイン状態を確認、ログインフォームを表示');
-            setChecking(false);
-          }
+          if (active) setChecking(false);
           return;
         }
 
         const authUser = await getCurrentAuthUser();
         saveSession(authUser);
 
-        console.log('🔍 既にログイン済み:', { role: authUser.role });
-        // ユーザーとしてログイン済みの場合のみリダイレクト
-        // インストラクターログイン中は別途ユーザーアカウントを作成/ログインできるようにする
+        console.log('[DEBUG] user login auth user', { role: authUser.role });
         if (authUser.role === 'user') {
           try {
             const profileComplete = await isProfileComplete(authUser.userId);
@@ -53,11 +62,8 @@ export default function UserLoginPage() {
             console.error('プロフィールチェックエラー:', err);
             window.location.href = '/user';
           }
-        } else if (authUser.role === 'admin') {
-          window.location.href = '/manage/admin';
-        } else if (active) {
-          // インストラクターログイン中でもフォームを表示（別ロールでのログインを許可）
-          setChecking(false);
+        } else {
+          if (active) setChecking(false);
         }
       } catch (error) {
         clearSession();

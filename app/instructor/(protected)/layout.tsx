@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { getCurrentAuthUser, saveSession } from '@/lib/auth';
+import { getCurrentAuthUser, saveSession, getSessionForRole } from '@/lib/auth';
 import type { User } from '@/lib/auth';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -26,26 +26,41 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // Cognitoから最新のユーザー情報を取得
-        const authUser = await getCurrentAuthUser();
-
-        // ロールがinstructorであることを確認
-        if (authUser.role !== 'instructor') {
-          // ロールが異なる場合は適切なページへ
-          if (authUser.role === 'user') {
-            router.push('/user');
-          } else if (authUser.role === 'admin') {
-            router.push('/manage/admin');
+        // ローカル instructor セッションを優先
+        const storedUser = getSessionForRole('instructor');
+        if (storedUser) {
+          console.log('[DEBUG] instructor layout stored session', { role: storedUser.role, path: pathname });
+          if (!pathname.includes('/profile/setup')) {
+            try {
+              const instructor = await getInstructorByUserId(storedUser.userId);
+              if (!instructor) {
+                router.push('/instructor/profile/setup');
+                return;
+              }
+              setDisplayName(instructor.displayName || storedUser.displayName || storedUser.name);
+            } catch (err) {
+              console.error('インストラクタープロフィール取得エラー:', err);
+              setDisplayName(storedUser.displayName || storedUser.name);
+            }
           } else {
-            router.push('/');
+            setDisplayName(storedUser.displayName || storedUser.name);
           }
+          setUser(storedUser);
+          setLoading(false);
           return;
         }
 
-        // セッションを更新
+        // ローカルに無ければ Cognito を確認
+        const authUser = await getCurrentAuthUser();
+        console.log('[DEBUG] instructor layout cognito user', { role: authUser.role, path: pathname });
+
+        if (authUser.role !== 'instructor') {
+          router.push('/login/instructor'); // 未ログイン時もこちらへ
+          return;
+        }
+
         saveSession(authUser);
 
-        // プロフィール未作成ならセットアップへ
         if (!pathname.includes('/profile/setup')) {
           try {
             const instructor = await getInstructorByUserId(authUser.userId);
@@ -66,9 +81,8 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
         setLoading(false);
       } catch (error) {
         console.error('認証チェックエラー:', error);
-        // 認証エラーの場合はトップページへ（未ログイン状態）
         setLoading(false);
-        router.push('/');
+        router.push('/login/instructor');
       }
     };
 

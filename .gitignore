@@ -47,3 +47,11 @@ amplifyconfiguration*
 /.old
 
 certificates
+<<<<<<< Current (Your changes)
+# dev session version (generated on npm run dev)
+/public/session-version.json
+=======
+
+# dev session version (generated on npm run dev)
+/public/session-version.json
+>>>>>>> Incoming (Background Agent changes)
