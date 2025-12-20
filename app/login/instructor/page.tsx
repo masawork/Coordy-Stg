@@ -11,6 +11,7 @@ import {
   clearSession,
   checkAuth,
   getCurrentAuthUser,
+  getSessionForRole,
 } from '@/lib/auth';
 // Amplify初期化を確実に行う
 import '@/src/lib/amplifyClient';
@@ -29,29 +30,28 @@ export default function InstructorLoginPage() {
     let active = true;
     const checkSession = async () => {
       try {
+        const storedInstructor = getSessionForRole('instructor');
+        if (storedInstructor) {
+          console.log('[DEBUG] instructor login stored session');
+          window.location.href = '/instructor';
+          return;
+        }
+
         const hasAuthSession = await checkAuth();
         if (!hasAuthSession) {
           clearSession();
-          if (active) {
-            console.log('✅ 未ログイン状態を確認、ログインフォームを表示');
-            setChecking(false);
-          }
+          if (active) setChecking(false);
           return;
         }
 
         const authUser = await getCurrentAuthUser();
         saveSession(authUser);
 
-        console.log('🔍 既にログイン済み:', { role: authUser.role });
-        // インストラクターとしてログイン済みの場合のみリダイレクト
-        // ユーザーログイン中は別途インストラクターアカウントを作成/ログインできるようにする
+        console.log('[DEBUG] instructor login auth user', { role: authUser.role });
         if (authUser.role === 'instructor') {
           window.location.href = '/instructor';
-        } else if (authUser.role === 'admin') {
-          window.location.href = '/manage/admin';
-        } else if (active) {
-          // ユーザーログイン中でもフォームを表示（別ロールでのログインを許可）
-          setChecking(false);
+        } else {
+          if (active) setChecking(false);
         }
       } catch (error) {
         clearSession();

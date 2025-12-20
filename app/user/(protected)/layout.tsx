@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { getCurrentAuthUser, saveSession } from '@/lib/auth';
+import { getCurrentAuthUser, saveSession, getSessionForRole } from '@/lib/auth';
 import type { User } from '@/lib/auth';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -27,26 +27,41 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // Cognitoから最新のユーザー情報を取得
-        const authUser = await getCurrentAuthUser();
-
-        // ロールがuserであることを確認
-        if (authUser.role !== 'user') {
-          // ロールが異なる場合は適切なページへ
-          if (authUser.role === 'instructor') {
-            router.push('/instructor');
-          } else if (authUser.role === 'admin') {
-            router.push('/manage/admin');
+        // まずローカル user セッションを優先
+        const storedUser = getSessionForRole('user');
+        if (storedUser) {
+          console.log('[DEBUG] user layout stored session', { role: storedUser.role, path: pathname });
+          if (!pathname.includes('/profile/setup')) {
+            try {
+              const profile = await getClientProfile(storedUser.userId);
+              if (!profile || !profile.isProfileComplete) {
+                router.push('/user/profile/setup');
+                return;
+              }
+              setDisplayName(resolveDisplayName(storedUser, profile));
+            } catch (err) {
+              console.error('プロフィールチェックエラー:', err);
+              setDisplayName(resolveDisplayName(storedUser));
+            }
           } else {
-            router.push('/');
+            setDisplayName(resolveDisplayName(storedUser));
           }
+          setUser(storedUser);
+          setLoading(false);
           return;
         }
 
-        // セッションを更新
+        // ローカルに無い場合のみ Cognito を確認
+        const authUser = await getCurrentAuthUser();
+        console.log('[DEBUG] user layout cognito user', { role: authUser.role, path: pathname });
+
+        if (authUser.role !== 'user') {
+          router.push('/login/user');
+          return;
+        }
+
         saveSession(authUser);
 
-        // プロフィール情報を取得（プロフィール設定ページ以外）
         if (!pathname.includes('/profile/setup')) {
           try {
             const profile = await getClientProfile(authUser.userId);
@@ -60,7 +75,6 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
             setDisplayName(resolveDisplayName(authUser));
           }
         } else {
-          // プロフィール設定ページではCognitoの名前を使用
           setDisplayName(resolveDisplayName(authUser));
         }
 
@@ -68,9 +82,8 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
         setLoading(false);
       } catch (error) {
         console.error('認証チェックエラー:', error);
-        // 認証エラーの場合はトップページへ（未ログイン状態）
         setLoading(false);
-        router.push('/');
+        router.push('/login/user');
       }
     };
 

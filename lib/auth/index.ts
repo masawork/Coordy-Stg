@@ -24,7 +24,10 @@ export type { LoginResult } from './cognito';
 export {
   saveSession,
   getSession,
+  getSessionForRole,
   clearSession,
+  clearAllSessions,
+  checkSessionVersion,
   hasSession,
   getUserRole,
   hasRole,

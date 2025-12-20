@@ -1,18 +1,57 @@
 #!/usr/bin/env node
 /**
  * Local HTTPS dev starter.
- * Uses custom HTTPS server with pre-generated certificates.
+ * - Clears .next cache on startup
+ * - Generates new session version (forces re-login)
+ * - Uses custom HTTPS server with pre-generated certificates
  */
 const { spawn } = require('child_process');
 const https = require('https');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const CERT_DIR = path.join(PROJECT_ROOT, 'certs');
+const NEXT_DIR = path.join(PROJECT_ROOT, '.next');
+const SESSION_VERSION_FILE = path.join(PROJECT_ROOT, 'public', 'session-version.json');
 const HTTPS_PORT = 3000;
 const HTTP_PORT = 3001;
+
+/**
+ * .next キャッシュディレクトリを削除
+ */
+function clearNextCache() {
+  if (fs.existsSync(NEXT_DIR)) {
+    console.log(' ✓ .next キャッシュをクリア中...');
+    fs.rmSync(NEXT_DIR, { recursive: true, force: true });
+    console.log(' ✓ .next キャッシュをクリアしました');
+  }
+}
+
+/**
+ * 新しいセッションバージョンを生成
+ * これにより、全ユーザーが再ログインを要求される
+ */
+function generateSessionVersion() {
+  const version = crypto.randomUUID();
+  const data = {
+    version,
+    generatedAt: new Date().toISOString(),
+  };
+  
+  // public ディレクトリが存在することを確認
+  const publicDir = path.join(PROJECT_ROOT, 'public');
+  if (!fs.existsSync(publicDir)) {
+    fs.mkdirSync(publicDir, { recursive: true });
+  }
+  
+  fs.writeFileSync(SESSION_VERSION_FILE, JSON.stringify(data, null, 2));
+  console.log(' ✓ 新しいセッションバージョンを生成しました');
+  console.log(`   Version: ${version}`);
+  return version;
+}
 
 function ensureCerts() {
   const keyPath = path.join(CERT_DIR, 'localhost-key.pem');
@@ -103,9 +142,23 @@ function createHttpsProxy(keyPath, certPath) {
 }
 
 async function main() {
+  console.log('');
+  console.log('  ▲ Next.js 14 (HTTPS) - メンテナンスモード');
+  console.log('');
+  
+  // 1. .next キャッシュをクリア
+  clearNextCache();
+  
+  // 2. 新しいセッションバージョンを生成（全ユーザーを強制ログアウト）
+  generateSessionVersion();
+  
+  console.log('');
+  console.log('  ⚠ 全ユーザーは再ログインが必要です');
+  console.log('');
+  
+  // 3. 証明書を確認
   const { keyPath, certPath } = ensureCerts();
 
-  console.log('  ▲ Next.js 14 (HTTPS)');
   console.log(`  - Local:        https://localhost:${HTTPS_PORT}`);
   console.log('');
   console.log(' ✓ Starting...');

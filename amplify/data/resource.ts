@@ -68,6 +68,7 @@ const schema = a.schema({
     .authorization((allow) => [
       allow.owner(), // 自分のデータのみ編集可能
       allow.authenticated().to(['read']), // 認証済みユーザーは読み取り可能
+      allow.groups(['ADMINS']).to(['read', 'update', 'delete']), // 管理者による審査更新を許可
     ]),
 
   /**
