@@ -1,12 +1,16 @@
 'use client';
 
+// 動的レンダリングを強制（React 19 + Next.js 16）
+export const dynamic = 'force-dynamic';
+
+
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getSession } from '@/lib/auth';
-import { listReservations, updateReservation } from '@/lib/api/reservations';
-import { getService } from '@/lib/api/services';
+import { listReservations, cancelReservation } from '@/lib/api/reservations';
 import { Button } from '@/components/ui/button';
-import { Calendar, Clock, MapPin, User, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { ReservationStatus } from '@prisma/client';
 
 function ReservationsContent() {
   const router = useRouter();
@@ -16,45 +20,20 @@ function ReservationsContent() {
   const [cancelingId, setCancelingId] = useState<string | null>(null);
 
   useEffect(() => {
-    const session = getSession();
-    if (!session) {
-      router.push('/login/user');
-      return;
-    }
+    loadReservations();
+  }, []);
 
-    loadReservations(session.userId);
-  }, [router]);
-
-  const loadReservations = async (userId: string) => {
+  const loadReservations = async () => {
     try {
       setLoading(true);
+      const session = await getSession();
+      if (!session?.user) {
+        router.push('/login/user');
+        return;
+      }
 
-      const reservationData = await listReservations({ userId });
-
-      // サービス情報を追加
-      const reservationsWithService = await Promise.all(
-        (reservationData || []).map(async (reservation) => {
-          try {
-            const service = await getService(reservation.serviceId);
-            return {
-              ...reservation,
-              serviceName: service?.title || 'サービス',
-            };
-          } catch {
-            return {
-              ...reservation,
-              serviceName: 'サービス',
-            };
-          }
-        })
-      );
-
-      // 日時順にソート（新しい順）
-      const sorted = reservationsWithService.sort((a, b) =>
-        new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
-      );
-
-      setReservations(sorted);
+      const reservationData = await listReservations({ userId: session.user.id });
+      setReservations(reservationData || []);
     } catch (err) {
       console.error('予約一覧取得エラー:', err);
       setReservations([]);
@@ -71,13 +50,8 @@ function ReservationsContent() {
     setCancelingId(reservationId);
 
     try {
-      await updateReservation(reservationId, { status: 'cancelled' });
-
-      // リストを更新
-      const session = getSession();
-      if (session) {
-        await loadReservations(session.userId);
-      }
+      await cancelReservation(reservationId);
+      await loadReservations();
     } catch (err) {
       console.error('予約キャンセルエラー:', err);
       alert('キャンセルに失敗しました');
@@ -86,8 +60,9 @@ function ReservationsContent() {
     }
   };
 
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('ja-JP', {
+  const formatDateTime = (date: Date | string) => {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return dateObj.toLocaleString('ja-JP', {
       year: 'numeric',
       month: 'numeric',
       day: 'numeric',
@@ -96,15 +71,15 @@ function ReservationsContent() {
     });
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: ReservationStatus) => {
     const styles = {
-      pending: { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: AlertCircle, label: '確認待ち' },
-      confirmed: { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircle, label: '確認済み' },
-      cancelled: { bg: 'bg-red-100', text: 'text-red-800', icon: XCircle, label: 'キャンセル' },
-      completed: { bg: 'bg-blue-100', text: 'text-blue-800', icon: CheckCircle, label: '完了' },
+      PENDING: { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: AlertCircle, label: '確認待ち' },
+      CONFIRMED: { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircle, label: '確認済み' },
+      CANCELLED: { bg: 'bg-red-100', text: 'text-red-800', icon: XCircle, label: 'キャンセル' },
+      COMPLETED: { bg: 'bg-blue-100', text: 'text-blue-800', icon: CheckCircle, label: '完了' },
     };
 
-    const style = styles[status as keyof typeof styles] || styles.pending;
+    const style = styles[status] || styles.PENDING;
     const Icon = style.icon;
 
     return (
@@ -154,16 +129,16 @@ function ReservationsContent() {
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">
-                      {reservation.serviceName}
+                      {reservation.service?.title || 'サービス'}
                     </h3>
                     {getStatusBadge(reservation.status)}
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-bold text-purple-600">
-                      {reservation.price.toLocaleString()}pt
+                      ¥{reservation.service?.price?.toLocaleString() || '0'}
                     </p>
                     <p className="text-sm text-gray-500">
-                      {reservation.participants}名
+                      {reservation.service?.duration || 0}分
                     </p>
                   </div>
                 </div>
@@ -171,14 +146,21 @@ function ReservationsContent() {
                 <div className="space-y-2 mb-4">
                   <div className="flex items-center gap-2 text-gray-600">
                     <Calendar className="h-4 w-4" />
-                    <span className="text-sm">{formatDateTime(reservation.startTime)}</span>
+                    <span className="text-sm">{formatDateTime(reservation.scheduledAt)}</span>
                   </div>
                   <div className="flex items-center gap-2 text-gray-600">
                     <Clock className="h-4 w-4" />
                     <span className="text-sm">
-                      {formatDateTime(reservation.startTime)} 〜 {formatDateTime(reservation.endTime)}
+                      {reservation.service?.duration || 0}分のサービス
                     </span>
                   </div>
+                  {reservation.instructor?.user && (
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <span className="text-sm">
+                        インストラクター: {reservation.instructor.user.name}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {reservation.notes && (
@@ -191,7 +173,7 @@ function ReservationsContent() {
                 )}
 
                 {/* アクション */}
-                {(reservation.status === 'pending' || reservation.status === 'confirmed') && (
+                {(reservation.status === ReservationStatus.PENDING || reservation.status === ReservationStatus.CONFIRMED) && (
                   <div className="flex gap-2">
                     <Button
                       onClick={() => handleCancel(reservation.id)}
@@ -212,7 +194,7 @@ function ReservationsContent() {
             <Calendar className="h-16 w-16 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500 mb-4">予約がまだありません</p>
             <Button
-              onClick={() => router.push('/user/services')}
+              onClick={() => router.push('/services')}
               className="bg-purple-600 hover:bg-purple-700"
             >
               サービスを探す

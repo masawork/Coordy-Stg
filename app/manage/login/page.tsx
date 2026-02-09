@@ -1,78 +1,44 @@
 'use client';
 
+// 動的レンダリングを強制（React 19 + Next.js 16）
+export const dynamic = 'force-dynamic';
+
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import Button from '@/components/common/Button';
-import {
-  loginUser,
-  saveSession,
-  clearSession,
-  checkAuth,
-  getCurrentAuthUser,
-  completeNewPasswordChallenge,
-} from '@/lib/auth';
-// Amplify初期化を確実に行う
-import '@/src/lib/amplifyClient';
-
-type LoginStep = 'login' | 'new_password';
+import { signIn, getSession } from '@/lib/auth';
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmNewPassword, setConfirmNewPassword] = useState('');
-  const [loginStep, setLoginStep] = useState<LoginStep>('login');
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState('');
   const router = useRouter();
 
-  // マウント時に既にログイン済みかチェック（Cognitoから最新情報を取得）
+  // マウント時に既にログイン済みかチェック
   useEffect(() => {
     let active = true;
     const checkSession = async () => {
-      let redirected = false;
       try {
-        const hasAuthSession = await Promise.race([
-          checkAuth(),
-          // Cognitoセッション取得がハングするケースに備えてタイムアウトを設ける
-          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 4000)),
-        ]);
-
-        if (!hasAuthSession) {
-          clearSession();
-          if (active) {
-            console.log('✅ 未ログイン状態を確認、ログインフォームを表示');
-            setChecking(false);
+        const session = await getSession();
+        if (session?.user) {
+          const user = session.user;
+          // ロールがadminであることを確認
+          if (user.user_metadata?.role?.toLowerCase() === 'admin') {
+            if (active) {
+              window.location.href = '/manage/admin';
+            }
+            return;
           }
-          return;
         }
-
-        const authUser = await getCurrentAuthUser();
-        saveSession(authUser);
-
-        console.log('🔍 既にログイン済み:', { role: authUser.role });
-        if (authUser.role === 'admin') {
-          // 管理者として既にログイン済みの場合のみリダイレクト
-          redirected = true;
-          window.location.href = '/manage/admin';
-        } else if (active) {
-          // user/instructorでログイン中の場合はフォームを表示（管理者として別途ログイン可能）
-          console.log('📝 別ロールでログイン中、管理者ログインフォームを表示');
-          setChecking(false);
-        }
+        if (active) setChecking(false);
       } catch (error) {
-        clearSession();
-        if (active) {
-          console.log('✅ 未ログイン状態を確認、ログインフォームを表示');
-          setChecking(false);
-        }
-      } finally {
-        if (active && !redirected) {
-          setChecking(false);
-        }
+        console.error('Session check error:', error);
+        if (active) setChecking(false);
       }
     };
 
@@ -84,70 +50,41 @@ export default function AdminLoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     setError('');
 
     try {
-      // 古いセッションをクリア（別アカウントでのログインをサポート）
-      clearSession();
+      // Supabase Authでログイン
+      await signIn({ email, password });
 
-      // Cognitoでログイン
-      const loginResult = await loginUser({ email, password });
-
-      // NEW_PASSWORD_REQUIRED チャレンジの場合
-      if (loginResult.nextStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
-        console.log('🔐 パスワード変更が必要です');
-        setLoginStep('new_password');
-        setLoading(false);
-        return;
+      // セッションを取得してユーザー情報を確認
+      const session = await getSession();
+      if (!session?.user) {
+        throw new Error('ログインに失敗しました');
       }
 
-      const user = loginResult.user;
-      if (!user) {
-        throw new Error('ユーザー情報の取得に失敗しました');
-      }
+      const user = session.user;
 
       // ロールがadminであることを確認
-      if (user.role !== 'admin') {
+      if (user.user_metadata?.role?.toLowerCase() !== 'admin') {
         throw new Error('管理者アカウントでログインしてください');
       }
 
-      // セッションを保存
-      saveSession(user);
-
-      console.log('✅ 管理者ログイン成功、ダッシュボードへリダイレクト');
+      console.log('✅ 管理者ログイン成功');
       window.location.href = '/manage/admin';
     } catch (err: any) {
       console.error('Login error:', err);
 
-      // UserAlreadyAuthenticatedException の場合
-      if (err.name === 'UserAlreadyAuthenticatedException') {
-        try {
-          const authUser = await getCurrentAuthUser();
-          saveSession(authUser);
-
-          if (authUser.role === 'admin') {
-            router.push('/manage/admin');
-          } else {
-            // 別ロールでログイン中の場合、メッセージを表示
-            setError('別のアカウントで既にログイン済みです。管理者としてログインするには、一度ログアウトしてから再度お試しください。');
-          }
-        } catch {
-          setError('既にログイン済みです。ページをリロードしてください。');
-        }
-        setLoading(false);
-        return;
-      }
-
       // エラーメッセージを日本語化
-      let friendlyMessage = 'ログインに失敗しました';
+      let friendlyMessage = 'ログインに失敗しました。時間をおいて再度お試しください。';
 
-      if (err.name === 'UserNotConfirmedException') {
-        friendlyMessage = 'メール確認が完了していません';
-      } else if (err.name === 'NotAuthorizedException') {
+      if (err.message?.includes('email') || err.message?.includes('password')) {
         friendlyMessage = 'メールアドレスまたはパスワードが正しくありません';
-      } else if (err.name === 'UserNotFoundException') {
+      } else if (err.message?.includes('not found') || err.message?.includes('登録')) {
         friendlyMessage = 'このメールアドレスは登録されていません';
+      } else if (err.message?.includes('network') || err.message?.includes('Network')) {
+        friendlyMessage = 'ネットワークエラーが発生しました。インターネット接続を確認してください。';
       } else if (err.message) {
         friendlyMessage = err.message;
       }
@@ -158,50 +95,10 @@ export default function AdminLoginPage() {
     }
   };
 
-  const handleNewPasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    // パスワード確認チェック
-    if (newPassword !== confirmNewPassword) {
-      setError('新しいパスワードが一致しません');
-      setLoading(false);
-      return;
-    }
-
-    // パスワード強度チェック（最低8文字）
-    if (newPassword.length < 8) {
-      setError('パスワードは8文字以上で入力してください');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const { user } = await completeNewPasswordChallenge(newPassword);
-
-      // ロールがadminであることを確認
-      if (user.role !== 'admin') {
-        throw new Error('管理者アカウントでログインしてください');
-      }
-
-      // セッションを保存
-      saveSession(user);
-
-      console.log('✅ パスワード変更完了、ダッシュボードへリダイレクト');
-      window.location.href = '/manage/admin';
-    } catch (err: any) {
-      console.error('New password error:', err);
-      setError(err.message || 'パスワードの設定に失敗しました');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // セッションチェック中はローディング表示
   if (checking) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-orange-600 via-red-500 to-pink-400 flex items-center justify-center">
         <div className="text-white text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
           <p>読み込み中...</p>
@@ -211,18 +108,16 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-orange-600 via-red-500 to-pink-400 flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
         className="bg-white rounded-2xl shadow-2xl p-8 md:p-12 max-w-md w-full"
       >
-        {loginStep === 'login' ? (
-          <>
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold text-gray-800 mb-2">管理者ログイン</h1>
-              <p className="text-gray-600">システム管理者専用</p>
+          <p className="text-gray-600">システム管理者のログイン</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -236,7 +131,7 @@ export default function AdminLoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-gray-600 focus:outline-none transition-colors"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-orange-600 focus:outline-none transition-colors"
                   placeholder="admin@example.com"
                 />
               </div>
@@ -251,7 +146,7 @@ export default function AdminLoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-gray-600 focus:outline-none transition-colors"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-orange-600 focus:outline-none transition-colors"
                   placeholder="パスワードを入力"
                 />
               </div>
@@ -262,84 +157,16 @@ export default function AdminLoginPage() {
                 </div>
               )}
 
-              <Button type="submit" variant="primary" size="lg" className="w-full bg-gray-800 hover:bg-gray-900" disabled={loading}>
+          <Button type="submit" variant="primary" size="lg" className="w-full" disabled={loading}>
                 {loading ? 'ログイン中...' : 'ログイン'}
               </Button>
             </form>
 
-            <div className="mt-6 text-center">
+        <div className="mt-4 text-center">
               <Link href="/" className="text-gray-500 hover:text-gray-700">
                 トップページに戻る
               </Link>
             </div>
-          </>
-        ) : (
-          <>
-            <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">パスワード変更</h1>
-              <p className="text-gray-600">初回ログインのため、新しいパスワードを設定してください</p>
-            </div>
-
-            <form onSubmit={handleNewPasswordSubmit} className="space-y-6">
-              <div>
-                <label htmlFor="newPassword" className="block text-sm font-semibold text-gray-700 mb-2">
-                  新しいパスワード
-                </label>
-                <input
-                  type="password"
-                  id="newPassword"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-gray-600 focus:outline-none transition-colors"
-                  placeholder="8文字以上で入力"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="confirmNewPassword" className="block text-sm font-semibold text-gray-700 mb-2">
-                  新しいパスワード（確認）
-                </label>
-                <input
-                  type="password"
-                  id="confirmNewPassword"
-                  value={confirmNewPassword}
-                  onChange={(e) => setConfirmNewPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-gray-600 focus:outline-none transition-colors"
-                  placeholder="パスワードを再入力"
-                />
-              </div>
-
-              {error && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-red-600 text-sm">{error}</p>
-                </div>
-              )}
-
-              <Button type="submit" variant="primary" size="lg" className="w-full bg-gray-800 hover:bg-gray-900" disabled={loading}>
-                {loading ? '設定中...' : 'パスワードを設定'}
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setLoginStep('login');
-                  setNewPassword('');
-                  setConfirmNewPassword('');
-                  setError('');
-                }}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ログイン画面に戻る
-              </button>
-            </div>
-          </>
-        )}
       </motion.div>
     </div>
   );

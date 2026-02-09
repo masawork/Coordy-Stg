@@ -1,5 +1,9 @@
 'use client';
 
+// 動的レンダリングを強制（React 19 + Next.js 16）
+export const dynamic = 'force-dynamic';
+
+
 import { Settings, Bell, Shield, Database } from 'lucide-react';
 
 export default function AdminSettingsPage() {

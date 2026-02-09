@@ -1,35 +1,22 @@
 /**
  * 認証モジュールのエントリポイント
+ * Supabase Authベースの認証システム
+ * クライアントサイド専用
  */
 
-// 型定義
-export type { User, Role, SignUpParams, SignInParams, ConfirmSignUpParams, AuthSession } from './types';
-
-// Cognito操作
+// クライアントサイド認証関数のみエクスポート
 export {
-  registerUser,
-  confirmEmail,
-  loginUser,
-  logoutUser,
-  getCurrentAuthUser,
-  getAuthSession,
-  checkAuth,
-  completeNewPasswordChallenge,
-} from './cognito';
-
-// ログイン結果の型
-export type { LoginResult } from './cognito';
-
-// セッション管理
-export {
-  saveSession,
+  signIn,
+  signUp,
+  signOut,
   getSession,
-  getSessionForRole,
+  resetPassword,
+  forgotPassword,
+  signInWithGoogle,
   clearSession,
-  clearAllSessions,
-  checkSessionVersion,
-  hasSession,
-  getUserRole,
-  hasRole,
-  hasAnyRole,
-} from './session';
+  getCurrentAuthUser,
+} from './client';
+
+// 型定義
+export type { User, Session } from './helpers';
+export type { SignUpParams, SignInParams } from './client';

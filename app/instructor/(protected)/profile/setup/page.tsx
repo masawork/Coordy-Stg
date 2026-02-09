@@ -1,20 +1,21 @@
 'use client';
 
+// 動的レンダリングを強制（React 19 + Next.js 16）
+export const dynamic = 'force-dynamic';
+
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getCurrentAuthUser } from '@/lib/auth/cognito';
-import { updateUserAttributes } from 'aws-amplify/auth';
-import {
-  createInstructor,
-  getInstructorByUserId,
-  updateInstructor,
-} from '@/lib/api/instructors';
+import { getSession } from '@/lib/auth';
+import { fetchCurrentInstructor, saveInstructor } from '@/lib/api/instructors-client';
+import { updateClientProfile } from '@/lib/api/profile-client';
 import { Button } from '@/components/ui/button';
-import { validateDisplayName } from '@/lib/auth/displayName';
 
 type FormState = {
-  name: string; // 本名（管理者確認用）
   displayName: string;
+  fullName: string;
+  dateOfBirth: string;
+  address: string;
   bio: string;
   specialties: string;
 };
@@ -23,8 +24,10 @@ export default function InstructorProfileSetupPage() {
   const router = useRouter();
   const [userId, setUserId] = useState<string>('');
   const [formData, setFormData] = useState<FormState>({
-    name: '',
     displayName: '',
+    fullName: '',
+    dateOfBirth: '',
+    address: '',
     bio: '',
     specialties: '',
   });
@@ -39,28 +42,52 @@ export default function InstructorProfileSetupPage() {
   const loadUserAndProfile = async () => {
     try {
       setInitialLoading(true);
-      const authUser = await getCurrentAuthUser();
-      setUserId(authUser.userId);
 
-      const instructor = await getInstructorByUserId(authUser.userId);
+      // セッションを取得
+      const session = await getSession();
+      if (!session?.user) {
+        router.push('/login/instructor');
+        return;
+      }
+
+      // ロール別にユーザーを検索
+      const roleCheckRes = await fetch('/api/auth/check-role?role=instructor', {
+        credentials: 'include',
+      });
+
+      if (!roleCheckRes.ok) {
+        router.push('/login/instructor');
+        return;
+      }
+
+      const { user: dbUser, profile } = await roleCheckRes.json();
+      setUserId(dbUser.id);
+
+      // プロフィール情報を設定
+      if (profile) {
+        setFormData((prev) => ({
+          ...prev,
+          displayName: profile.displayName || prev.displayName || '',
+          fullName: profile.fullName || '',
+          dateOfBirth: profile.dateOfBirth
+            ? new Date(profile.dateOfBirth).toISOString().split('T')[0]
+            : '',
+          address: profile.address || '',
+        }));
+      }
+
+      // インストラクター情報を取得
+      const instructor = await fetchCurrentInstructor();
       if (instructor) {
-        // 既存プロフィールがある場合、そのデータを使用
-        setFormData({
-          name: authUser.name || '', // 本名はCognitoから取得
-          displayName: instructor.displayName || '',
+        setFormData((prev) => ({
+          ...prev,
+          displayName: prev.displayName || (instructor.user?.name as string) || '',
+          fullName: prev.fullName || (instructor.user?.name as string) || '',
           bio: instructor.bio || '',
           specialties: (instructor.specialties || []).join(', '),
-        });
-      } else {
-        // 新規ユーザーの場合、空欄からスタート（メールアドレスのローカル部は使用しない）
-        setFormData({
-          name: '', // 新規ユーザーは空欄
-          displayName: '', // 新規ユーザーは空欄
-          bio: '',
-          specialties: '',
-        });
+        }));
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('インストラクター情報の読み込みエラー:', err);
       router.push('/login/instructor');
     } finally {
@@ -79,65 +106,24 @@ export default function InstructorProfileSetupPage() {
     setLoading(true);
     setError(null);
 
-    if (!userId) {
-      setError('セッションが切れました。再ログインしてください。');
-      setLoading(false);
-      return;
-    }
-
-    if (!formData.name.trim()) {
-      setError('本名は必須です。');
-      setLoading(false);
-      return;
-    }
-
-    if (!formData.displayName.trim()) {
-      setError('表示名は必須です。');
-      setLoading(false);
-      return;
-    }
-
-    // 表示名の禁止ワードチェック
-    const displayNameValidation = validateDisplayName(formData.displayName.trim());
-    if (!displayNameValidation.isValid) {
-      setError(displayNameValidation.errorMessage || '表示名が無効です。');
-      setLoading(false);
-      return;
-    }
-
-    const specialtiesArray = formData.specialties
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    const payload = {
-      displayName: formData.displayName.trim(),
-      bio: formData.bio.trim(),
-      specialties: specialtiesArray,
-      status: 'active',
-    };
-
     try {
-      // 本名をCognito属性に保存（管理者が確認用）
-      try {
-        await updateUserAttributes({
-          userAttributes: {
-            name: formData.name.trim(),
-          },
-        });
-      } catch (attrError) {
-        console.warn('⚠️ Cognito属性の更新に失敗:', attrError);
-      }
+      const specialtiesArray = formData.specialties
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
 
-      const existing = await getInstructorByUserId(userId);
-      if (existing?.id) {
-        await updateInstructor(existing.id, payload);
-      } else {
-        await createInstructor({
-          userId,
-          ...payload,
-        });
-      }
+      const payload = {
+        bio: formData.bio,
+        specialties: specialtiesArray,
+      };
+
+      await saveInstructor(payload);
+      await updateClientProfile(userId, {
+        displayName: formData.displayName || undefined,
+        fullName: formData.fullName || undefined,
+        dateOfBirth: formData.dateOfBirth || undefined,
+        address: formData.address || undefined,
+      });
 
       router.push('/instructor');
     } catch (err: any) {
@@ -167,7 +153,7 @@ export default function InstructorProfileSetupPage() {
             プロフィール設定（サービス出品者）
           </h1>
           <p className="text-sm text-gray-600 mb-6">
-            サービス提供に必要な基本情報を入力してください。表示名はサービス画面やヘッダーに表示されます。
+            サービス提供に必要な基本情報を入力してください。
           </p>
 
           {error && (
@@ -177,30 +163,10 @@ export default function InstructorProfileSetupPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* 本名（管理者確認用） */}
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                本名（管理者のみ確認） <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="例) 山田 太郎"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                ※身分証明書の確認時に使用されます。一般ユーザーには公開されません。
-              </p>
-            </div>
-
             {/* 表示名 */}
             <div>
               <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 mb-1">
-                表示名（ニックネーム） <span className="text-red-500">*</span>
+                表示名 <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -210,33 +176,82 @@ export default function InstructorProfileSetupPage() {
                 onChange={handleChange}
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="例) Yamada Coaching"
+                placeholder="例) たろう先生"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                ※サービス画面やヘッダーに表示されます。
-              </p>
+              <p className="text-xs text-gray-500 mt-1">ユーザーに表示される名前です。</p>
+            </div>
+
+            {/* 氏名 */}
+            <div>
+              <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1">
+                氏名 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="fullName"
+                name="fullName"
+                value={formData.fullName}
+                onChange={handleChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="例) 山田 太郎"
+              />
+            </div>
+
+            {/* 生年月日 */}
+            <div>
+              <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700 mb-1">
+                生年月日 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                id="dateOfBirth"
+                name="dateOfBirth"
+                value={formData.dateOfBirth}
+                onChange={handleChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+
+            {/* 住所 */}
+            <div>
+              <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
+                住所 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="address"
+                name="address"
+                value={formData.address}
+                onChange={handleChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="例) 東京都渋谷区渋谷1-2-3"
+              />
             </div>
 
             {/* 自己紹介 */}
             <div>
               <label htmlFor="bio" className="block text-sm font-medium text-gray-700 mb-1">
-                自己紹介 / 経歴
+                自己紹介 <span className="text-red-500">*</span>
               </label>
               <textarea
                 id="bio"
                 name="bio"
                 value={formData.bio}
                 onChange={handleChange}
-                rows={4}
+                required
+                rows={5}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="得意分野や実績を記載してください"
+                placeholder="あなたの経歴や専門分野について紹介してください"
               />
             </div>
 
             {/* 専門分野 */}
             <div>
               <label htmlFor="specialties" className="block text-sm font-medium text-gray-700 mb-1">
-                専門分野（カンマ区切り）
+                専門分野 <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -244,15 +259,20 @@ export default function InstructorProfileSetupPage() {
                 name="specialties"
                 value={formData.specialties}
                 onChange={handleChange}
+                required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="ヨガ, ピラティス, 食事指導 など"
+                placeholder="例) プログラミング, デザイン, 語学"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                ※ カンマ区切りで複数入力できます
+              </p>
             </div>
 
             <Button
               type="submit"
+              variant="default"
+              className="w-full"
               disabled={loading}
-              className="w-full bg-green-600 hover:bg-green-700"
             >
               {loading ? '保存中...' : 'プロフィールを保存'}
             </Button>

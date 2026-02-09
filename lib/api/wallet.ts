@@ -1,55 +1,33 @@
 /**
- * ウォレット関連のAPI操作
+ * ウォレット関連のAPI操作（Prisma版）
  */
 
-import { getDataClient } from './data-client';
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
+import { TransactionType, TransactionStatus } from '@prisma/client';
 
 /**
  * ウォレット取得（残高確認）
  */
-export async function getClientWallet(clientId: string) {
+export async function getWallet(userId: string) {
   try {
-    const client = getDataClient();
-    const { data, errors } = await client.models.ClientWallet.list({
-      filter: { clientId: { eq: clientId } },
+    let wallet = await prisma.wallet.findUnique({
+      where: { userId },
     });
-
-    if (errors) {
-      console.error('Error getting wallet:', errors);
-      return null;
-    }
 
     // ウォレットが存在しない場合は作成
-    if (!data || data.length === 0) {
-      return await createClientWallet(clientId);
+    if (!wallet) {
+      wallet = await prisma.wallet.create({
+        data: {
+          userId,
+          balance: 0,
+        },
+      });
     }
 
-    return data[0];
+    return wallet;
   } catch (error) {
     console.error('Get wallet error:', error);
-    return null;
-  }
-}
-
-/**
- * ウォレット作成
- */
-export async function createClientWallet(clientId: string) {
-  try {
-    const client = getDataClient();
-    const { data, errors } = await client.models.ClientWallet.create({
-      clientId,
-      balance: 0,
-    });
-
-    if (errors) {
-      console.error('Error creating wallet:', errors);
-      throw new Error('ウォレットの作成に失敗しました');
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Create wallet error:', error);
     throw error;
   }
 }
@@ -58,133 +36,120 @@ export async function createClientWallet(clientId: string) {
  * ポイントチャージ
  */
 export async function chargePoints(
-  clientId: string,
+  userId: string,
   amount: number,
-  method: 'credit' | 'bankTransfer'
+  method: 'credit' | 'bank_transfer',
+  description?: string
 ) {
   try {
-    const client = getDataClient();
+    // トランザクション内で処理
+    const result = await prisma.$transaction(async (tx) => {
+      // ウォレットを取得または作成
+      let wallet = await tx.wallet.findUnique({
+        where: { userId },
+      });
 
-    // 現在の残高を取得
-    const wallet = await getClientWallet(clientId);
     if (!wallet) {
-      throw new Error('ウォレットが見つかりません');
+        wallet = await tx.wallet.create({
+          data: {
+            userId,
+            balance: 0,
+          },
+        });
     }
 
     // 残高を更新
-    const newBalance = (wallet.balance || 0) + amount;
-    const { data: updatedWallet, errors: walletErrors } =
-      await client.models.ClientWallet.update({
-        id: wallet.id,
-        balance: newBalance,
+      const newBalance = wallet.balance + amount;
+      const updatedWallet = await tx.wallet.update({
+        where: { userId },
+        data: { balance: newBalance },
       });
-
-    if (walletErrors) {
-      console.error('Error updating wallet:', walletErrors);
-      throw new Error('残高の更新に失敗しました');
-    }
 
     // 取引履歴を作成
-    const { data: transaction, errors: transactionErrors } =
-      await client.models.PointTransaction.create({
-        clientId,
-        type: 'charge',
+      await tx.pointTransaction.create({
+        data: {
+          userId,
+          type: TransactionType.CHARGE,
         amount,
         method,
-        status: method === 'credit' ? 'completed' : 'pending',
-        description: `${method === 'credit' ? 'クレジットカード' : '銀行振込'}でチャージ`,
+          status: method === 'credit' ? TransactionStatus.COMPLETED : TransactionStatus.PENDING,
+          description: description || `${method === 'credit' ? 'クレジットカード' : '銀行振込'}でチャージ`,
+        },
       });
 
-    if (transactionErrors) {
-      console.error('Error creating transaction:', transactionErrors);
-    }
-
     return updatedWallet;
-  } catch (error) {
+    });
+
+    return result;
+  } catch (error: any) {
     console.error('Charge points error:', error);
-    throw error;
+    throw new Error(`ポイントチャージに失敗しました: ${error.message}`);
   }
 }
 
 /**
  * ポイント使用
  */
-export async function usePoints(
-  clientId: string,
-  amount: number,
-  description: string
-) {
+export async function usePoints(userId: string, amount: number, description: string) {
   try {
-    const client = getDataClient();
+    const result = await prisma.$transaction(async (tx) => {
+      // ウォレットを取得
+      const wallet = await tx.wallet.findUnique({
+        where: { userId },
+      });
 
-    // 現在の残高を取得
-    const wallet = await getClientWallet(clientId);
     if (!wallet) {
       throw new Error('ウォレットが見つかりません');
     }
 
     // 残高チェック
-    if ((wallet.balance || 0) < amount) {
+      if (wallet.balance < amount) {
       throw new Error('残高が不足しています');
     }
 
     // 残高を更新
-    const newBalance = (wallet.balance || 0) - amount;
-    const { data: updatedWallet, errors: walletErrors } =
-      await client.models.ClientWallet.update({
-        id: wallet.id,
-        balance: newBalance,
+      const newBalance = wallet.balance - amount;
+      const updatedWallet = await tx.wallet.update({
+        where: { userId },
+        data: { balance: newBalance },
       });
-
-    if (walletErrors) {
-      console.error('Error updating wallet:', walletErrors);
-      throw new Error('残高の更新に失敗しました');
-    }
 
     // 取引履歴を作成
-    const { data: transaction, errors: transactionErrors } =
-      await client.models.PointTransaction.create({
-        clientId,
-        type: 'use',
+      await tx.pointTransaction.create({
+        data: {
+          userId,
+          type: TransactionType.USE,
         amount,
-        status: 'completed',
+          status: TransactionStatus.COMPLETED,
         description,
+        },
       });
 
-    if (transactionErrors) {
-      console.error('Error creating transaction:', transactionErrors);
-    }
-
     return updatedWallet;
-  } catch (error) {
+    });
+
+    return result;
+  } catch (error: any) {
     console.error('Use points error:', error);
-    throw error;
+    throw new Error(`ポイント使用に失敗しました: ${error.message}`);
   }
 }
 
 /**
  * 取引履歴取得
  */
-export async function getTransactionHistory(clientId: string) {
+export async function getTransactionHistory(userId: string) {
   try {
-    const client = getDataClient();
-    const { data, errors } = await client.models.PointTransaction.list({
-      filter: { clientId: { eq: clientId } },
+    const transactions = await prisma.pointTransaction.findMany({
+      where: { userId },
+      orderBy: {
+        createdAt: 'desc',
+      },
     });
 
-    if (errors) {
-      console.error('Error getting transactions:', errors);
-      return [];
-    }
-
-    // 日付で降順ソート
-    return (data || []).sort((a, b) => {
-      const dateA = new Date(a.createdAt || 0).getTime();
-      const dateB = new Date(b.createdAt || 0).getTime();
-      return dateB - dateA;
-    });
+    return transactions;
   } catch (error) {
     console.error('Get transaction history error:', error);
-    return [];
+    throw error;
   }
 }

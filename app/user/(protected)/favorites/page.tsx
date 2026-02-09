@@ -1,10 +1,13 @@
 'use client';
 
+// 動的レンダリングを強制（React 19 + Next.js 16）
+export const dynamic = 'force-dynamic';
+
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { getFavoriteCreators, removeFavoriteCreator } from '@/lib/api/favorites';
-import { getInstructor } from '@/lib/api/instructors';
 import { listServices } from '@/lib/api/services';
 import { ServiceCard } from '@/components/features/service/ServiceCard';
 import { Button } from '@/components/ui/button';
@@ -18,67 +21,31 @@ export default function FavoritesPage() {
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   useEffect(() => {
-    // 認証はレイアウトで実施済み、セッションからユーザーID取得
-    const session = getSession();
-    if (session) {
-      loadFavorites(session.userId);
-    }
+    loadFavorites();
   }, []);
 
-  const loadFavorites = async (userId: string) => {
+  const loadFavorites = async () => {
     try {
       setLoading(true);
+      const session = await getSession();
+      if (!session?.user) {
+        router.push('/login/user');
+        return;
+      }
 
-      // お気に入りクリエイター取得
-      const favoriteData = await getFavoriteCreators(userId);
-
-      // インストラクター情報を追加
-      const favoritesWithInstructor = await Promise.all(
-        (favoriteData || []).map(async (favorite) => {
-          try {
-            const instructor = await getInstructor(favorite.instructorId);
-            return {
-              ...favorite,
-              instructor,
-            };
-          } catch {
-            return {
-              ...favorite,
-              instructor: null,
-            };
-          }
-        })
-      );
-
-      setFavorites(favoritesWithInstructor.filter((f) => f.instructor));
+      // お気に入りクリエイター取得（インストラクター情報も含まれる）
+      const favoriteData = await getFavoriteCreators(session.user.id);
+      setFavorites(favoriteData || []);
 
       // お気に入りクリエイターのサービスを取得
       if (favoriteData.length > 0) {
         const instructorIds = favoriteData.map((f) => f.instructorId);
-        const allServices = await listServices({ status: 'active' });
+        const allServices = await listServices({ isActive: true });
         const favoriteServices = (allServices || [])
-          .filter((service) => instructorIds.includes(service.instructorId))
-          .sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
+          .filter((service: { instructorId: string }) => instructorIds.includes(service.instructorId))
+          .sort((a: { createdAt: string }, b: { createdAt: string }) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-        // インストラクター情報を追加
-        const servicesWithInstructor = await Promise.all(
-          favoriteServices.map(async (service) => {
-            try {
-              const instructor = await getInstructor(service.instructorId);
-              return {
-                ...service,
-                instructorName: instructor?.displayName || 'クリエイター',
-              };
-            } catch {
-              return {
-                ...service,
-                instructorName: 'クリエイター',
-              };
-            }
-          })
-        );
-
-        setServices(servicesWithInstructor);
+        setServices(favoriteServices);
       }
     } catch (err) {
       console.error('お気に入り取得エラー:', err);
@@ -89,20 +56,19 @@ export default function FavoritesPage() {
     }
   };
 
-  const handleRemove = async (favoriteId: string) => {
+  const handleRemove = async (instructorId: string) => {
     if (!confirm('このクリエイターをお気に入りから削除しますか？')) {
       return;
     }
 
-    setRemovingId(favoriteId);
+    setRemovingId(instructorId);
 
     try {
-      await removeFavoriteCreator(favoriteId);
+      const session = await getSession();
+      if (!session?.user) return;
 
-      const session = getSession();
-      if (session) {
-        await loadFavorites(session.userId);
-      }
+      await removeFavoriteCreator(session.user.id, instructorId);
+      await loadFavorites();
     } catch (err) {
       console.error('お気に入り削除エラー:', err);
       alert('削除に失敗しました');
@@ -143,32 +109,16 @@ export default function FavoritesPage() {
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex items-start gap-3 flex-1">
-                          {favorite.instructor.profileImage && (
-                            <img
-                              src={favorite.instructor.profileImage}
-                              alt={favorite.instructor.displayName}
-                              className="w-16 h-16 rounded-full object-cover"
-                            />
-                          )}
                           <div className="flex-1">
                             <h3 className="font-semibold text-lg text-gray-900">
-                              {favorite.instructor.displayName}
+                              {favorite.instructor?.user?.name || 'インストラクター'}
                             </h3>
-                            <p className="text-gray-600 text-sm mt-1 line-clamp-2">
-                              {favorite.instructor.bio}
-                            </p>
-                            {favorite.instructor.rating && (
-                              <div className="flex items-center gap-1 mt-2">
-                                <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                                <span className="text-sm font-medium">
-                                  {favorite.instructor.rating.toFixed(1)}
-                                </span>
-                                <span className="text-sm text-gray-500">
-                                  ({favorite.instructor.reviewCount}件)
-                                </span>
-                              </div>
+                            {favorite.instructor?.bio && (
+                              <p className="text-gray-600 text-sm mt-1 line-clamp-2">
+                                {favorite.instructor.bio}
+                              </p>
                             )}
-                            {favorite.instructor.specialties && favorite.instructor.specialties.length > 0 && (
+                            {favorite.instructor?.specialties && favorite.instructor.specialties.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-2">
                                 {favorite.instructor.specialties.slice(0, 3).map((specialty: string, index: number) => (
                                   <span
@@ -183,8 +133,8 @@ export default function FavoritesPage() {
                           </div>
                         </div>
                         <Button
-                          onClick={() => handleRemove(favorite.id)}
-                          disabled={removingId === favorite.id}
+                          onClick={() => handleRemove(favorite.instructorId)}
+                          disabled={removingId === favorite.instructorId}
                           variant="ghost"
                           size="icon"
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -202,7 +152,7 @@ export default function FavoritesPage() {
                     お気に入りのクリエイターがまだいません
                   </p>
                   <Button
-                    onClick={() => router.push('/user/services')}
+                    onClick={() => router.push('/services')}
                     className="bg-purple-600 hover:bg-purple-700"
                   >
                     サービスを探す

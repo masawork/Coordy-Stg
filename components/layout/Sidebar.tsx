@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Calendar,
+  CalendarDays,
   ShoppingBag,
   Heart,
   Activity,
@@ -16,9 +17,10 @@ import {
   Users,
   BarChart,
   Package,
+  ShieldCheck,
 } from 'lucide-react';
 import { cn, getRoleFromPath } from '@/lib/utils';
-import { signOut } from 'aws-amplify/auth';
+import { signOut as betterAuthSignOut } from '@/lib/auth';
 import { clearSession } from '@/lib/auth';
 
 interface SidebarProps {
@@ -46,6 +48,11 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           label: 'サービス検索',
           href: `/user/services`,
           icon: ShoppingBag,
+        },
+        {
+          label: 'スケジュール',
+          href: `/user/schedules`,
+          icon: CalendarDays,
         },
         {
           label: '自分の予定',
@@ -146,6 +153,11 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           icon: CreditCard,
         },
         {
+          label: '本人確認',
+          href: `/manage/admin/verification`,
+          icon: ShieldCheck,
+        },
+        {
           label: '設定',
           href: `/manage/admin/settings`,
           icon: Settings,
@@ -165,7 +177,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 
   const handleLogout = async () => {
     try {
-      await signOut();
+      await betterAuthSignOut();
       clearSession();
       onNavigate?.();
       router.push('/');

@@ -1,29 +1,44 @@
+/**
+ * プロフィール設定ページ（SMS認証付き）
+ */
+
 'use client';
+
+export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getCurrentAuthUser } from '@/lib/auth/cognito';
-import { fetchAuthSession, updateUserAttributes } from 'aws-amplify/auth';
+import { getSession } from '@/lib/auth';
 import {
   createClientProfile,
   getClientProfile,
   updateClientProfile,
-} from '@/lib/api/profile';
-import {
-  isValidJapanPhoneNumber,
-  toE164PhoneNumber,
-  toJapanDomesticPhoneNumber,
-} from '@/lib/phone';
+} from '@/lib/api/profile-client';
 import { Button } from '@/components/ui/button';
-import { validateDisplayName } from '@/lib/auth/displayName';
+import {
+  normalizePhoneNumber,
+  getPhoneNumberErrorMessage,
+} from '@/lib/utils/phone';
+
+// 全角数字を半角に揃えるユーティリティ（簡易対応）
+const toHalfWidthDigits = (value: string) =>
+  value.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0));
 
 export default function ProfileSetupPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [addressError, setAddressError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string>('');
+  const [email, setEmail] = useState<string>('');
+  
+  // ステップ管理
+  const [step, setStep] = useState<'profile' | 'phone-verify'>('profile');
+  
+  // フォームデータ
   const [formData, setFormData] = useState({
-    name: '',
+    fullName: '',
     displayName: '',
     address: '',
     phoneNumber: '',
@@ -31,51 +46,113 @@ export default function ProfileSetupPage() {
     gender: '',
   });
 
+  // SMS認証
+  const [otpCode, setOtpCode] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+
   useEffect(() => {
     loadUserAndProfile();
   }, [router]);
 
+  // 再送タイマー
+  useEffect(() => {
+    if (resendTimer > 0) {
+      const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendTimer]);
+
+  const validateAddress = (address: string) => {
+    const trimmed = address.trim();
+    if (!trimmed) return '住所は必須です';
+    if (trimmed.length < 5) return '住所を市区町村まで入力してください';
+
+    // 47都道府県のいずれかが含まれているか簡易チェック（日本前提）
+    const prefectures = [
+      '北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県',
+      '茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県',
+      '新潟県','富山県','石川県','福井県','山梨県','長野県',
+      '岐阜県','静岡県','愛知県','三重県',
+      '滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県',
+      '鳥取県','島根県','岡山県','広島県','山口県',
+      '徳島県','香川県','愛媛県','高知県',
+      '福岡県','佐賀県','長崎県','熊本県','大分県','宮崎県','鹿児島県','沖縄県',
+    ];
+    const hasPrefecture = prefectures.some((p) => trimmed.includes(p));
+    if (!hasPrefecture) {
+      return '日本国内の住所を都道府県から入力してください（例: 東京都渋谷区...）';
+    }
+    // 番地などの数字が含まれているか（全角数字も許容）
+    const hasNumber = /[0-9０-９]/.test(trimmed);
+    if (!hasNumber) {
+      return '番地など数字を含めて入力してください';
+    }
+    return null;
+  };
+
+  const validateBirthDate = (dateStr: string) => {
+    if (!dateStr) return '生年月日は必須です';
+    const date = new Date(dateStr);
+    if (Number.isNaN(date.getTime())) return '生年月日の形式が正しくありません';
+    const today = new Date();
+    if (date > today) return '未来の日付は指定できません';
+    return null;
+  };
+
   const loadUserAndProfile = async () => {
     try {
-      // Cognitoから最新のユーザー情報を取得
-      const authUser = await getCurrentAuthUser();
-      setUserId(authUser.userId);
-
-      // 既存のプロフィールがあれば取得
-      const profile = await getClientProfile(authUser.userId);
-
-      if (profile) {
-        // 既存プロフィールがある場合、そのデータを使用
-        setFormData({
-          name: profile.name || '',
-          displayName: profile.displayName || '',
-          address: profile.address || '',
-          phoneNumber: toJapanDomesticPhoneNumber(profile.phoneNumber),
-          dateOfBirth: profile.dateOfBirth || '',
-          gender: profile.gender || '',
-        });
-      } else {
-        // 既存プロフィールがない場合（新規ユーザー）、空欄からスタート
-        // メールアドレスのローカル部は使用しない
-        const session = await fetchAuthSession();
-        const idToken = session.tokens?.idToken;
-        const phoneNumber = toJapanDomesticPhoneNumber(
-          idToken?.payload.phone_number as string | undefined
-        );
-
-        setFormData({
-          name: '', // 新規ユーザーは空欄
-          displayName: '', // 新規ユーザーは空欄
-          address: '',
-          phoneNumber,
-          dateOfBirth: '',
-          gender: '',
-        });
+      const session = await getSession();
+      if (!session?.user) {
+        router.push('/login/user');
+        return;
       }
-    } catch (err) {
-      console.error('プロフィール読み込みエラー:', err);
-      // 認証エラーの場合はログインページへ
-      router.push('/login/user');
+
+      const authUser = session.user;
+      setEmail(authUser.email || '');
+
+      // ロール別にPrismaユーザーを取得（正しいuser IDを取得）
+      const roleCheckRes = await fetch('/api/auth/check-role?role=user', {
+        credentials: 'include',
+      });
+
+      if (roleCheckRes.ok) {
+        const { user: dbUser, profile } = await roleCheckRes.json();
+        // PrismaのユーザーIDを使用
+        setUserId(dbUser.id);
+
+        if (profile) {
+          setFormData({
+            fullName: profile.fullName || '',
+            displayName: profile.displayName || '',
+            address: profile.address || '',
+            phoneNumber: profile.phoneNumber || '',
+            dateOfBirth: profile.dateOfBirth
+              ? new Date(profile.dateOfBirth).toISOString().split('T')[0]
+              : '',
+            gender: profile.gender || '',
+          });
+
+          // 既に電話番号が認証済みの場合はステップをスキップ
+          if (profile.phoneVerified) {
+            // プロフィール編集モード
+            setStep('profile');
+          }
+        }
+      } else if (roleCheckRes.status === 404) {
+        // ユーザーがまだDBに存在しない場合（通常はcallbackで作成されるが念のため）
+        console.error('User not found in database');
+        setError('ユーザーがデータベースに登録されていません。ログインし直してください。');
+        // ログインページへリダイレクトせず、エラーメッセージを表示
+      } else {
+        // 500エラーなどの場合
+        console.error('Failed to load user profile:', roleCheckRes.status);
+        setError('プロフィール情報の読み込みに失敗しました。ページを再読み込みしてください。');
+        // 無限ループを防ぐため、リダイレクトしない
+      }
+    } catch (err: any) {
+      console.error('Load profile error:', err);
+      setError('プロフィール情報の読み込みに失敗しました');
     }
   };
 
@@ -83,106 +160,211 @@ export default function ProfileSetupPage() {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
+    if (name === 'address') setAddressError(null);
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // 電話番号フィールドから離れたときにバリデーション
+  const handlePhoneBlur = () => {
+    if (formData.phoneNumber) {
+      // 全角を半角に変換してからハイフンなしの数字のみに正規化
+      const digitsOnly = normalizePhoneNumber(formData.phoneNumber);
+      setFormData((prev) => ({ ...prev, phoneNumber: digitsOnly }));
+
+      const errorMsg = getPhoneNumberErrorMessage(digitsOnly);
+      setPhoneError(errorMsg);
+    }
+  };
+
+  // ステップ1: プロフィール情報を確認してSMS送信
+  const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+
     setLoading(true);
     setError(null);
+    setAddressError(null);
 
-    if (!userId) {
-      setError('セッションが切れました。再ログインしてください。');
-      setLoading(false);
-      return;
-    }
-
-    const trimmedName = formData.name.trim();
-    const trimmedAddress = formData.address.trim();
-    const trimmedDisplayName = formData.displayName.trim();
-
-    // バリデーション
-    if (!trimmedName || !trimmedAddress || !formData.phoneNumber) {
-      setError('必須項目を入力してください。');
-      setLoading(false);
-      return;
-    }
-
-    if (!isValidJapanPhoneNumber(formData.phoneNumber)) {
-      setError('電話番号の形式が正しくありません（例: 09012345678）');
-      setLoading(false);
-      return;
-    }
-
-    // 表示名の禁止ワードチェック（入力がある場合のみ）
-    if (trimmedDisplayName) {
-      const displayNameValidation = validateDisplayName(trimmedDisplayName);
-      if (!displayNameValidation.isValid) {
-        setError(displayNameValidation.errorMessage || '表示名が無効です。');
+    try {
+      // 必須項目のバリデーション
+      if (!formData.phoneNumber) {
+        setError('電話番号は必須です');
         setLoading(false);
         return;
       }
-    }
 
-    const phoneNumberForApi = toE164PhoneNumber(formData.phoneNumber);
-    if (!phoneNumberForApi) {
-      setError('電話番号の形式が正しくありません（例: 09012345678）');
+      const addressMsg = validateAddress(formData.address);
+      if (addressMsg) {
+        setError(addressMsg);
+        setAddressError(addressMsg);
+        setLoading(false);
+        return;
+      }
+
+      const dobMsg = validateBirthDate(formData.dateOfBirth);
+      if (dobMsg) {
+        setError(dobMsg);
+        setLoading(false);
+        return;
+      }
+
+      // 電話番号のバリデーション
+      const phoneErrorMsg = getPhoneNumberErrorMessage(formData.phoneNumber);
+      if (phoneErrorMsg) {
+        setError(phoneErrorMsg);
+        setPhoneError(phoneErrorMsg);
+        setLoading(false);
+        return;
+      }
+
+      // SMS送信
+      const response = await fetch('/api/verification/phone/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phoneNumber: normalizePhoneNumber(formData.phoneNumber),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'SMS送信に失敗しました');
+      }
+
+      setOtpSent(true);
+      setResendTimer(60); // 60秒間再送不可
+      setStep('phone-verify');
+    } catch (err: any) {
+      console.error('Send OTP error:', err);
+      setError(err.message || 'SMS送信に失敗しました');
+    } finally {
       setLoading(false);
+    }
+  };
+
+  // ステップ2: OTP検証 + プロフィール保存
+  const handleOtpVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loading) return;
+
+    if (!otpCode || otpCode.length !== 6) {
+      setError('6桁の認証コードを入力してください');
       return;
     }
 
-    // ClientProfile スキーマには displayName フィールドが存在するため、送信する
-    const profileInput = {
-      clientId: userId,
-      name: trimmedName,
-      displayName: trimmedDisplayName || undefined, // 空の場合は undefined にして送信しない
-      address: trimmedAddress,
-      phoneNumber: phoneNumberForApi,
-      dateOfBirth: formData.dateOfBirth || undefined,
-      gender: formData.gender || undefined,
-    };
+    setLoading(true);
+    setError(null);
+    setAddressError(null);
 
     try {
-      console.log('🔄 プロフィール保存開始:', { userId, formData });
+      const addressMsg = validateAddress(formData.address);
+      if (addressMsg) {
+        setError(addressMsg);
+        setAddressError(addressMsg);
+        setLoading(false);
+        return;
+      }
 
-      // 既存プロフィールの確認
+      const dobMsg = validateBirthDate(formData.dateOfBirth);
+      if (dobMsg) {
+        setError(dobMsg);
+        setLoading(false);
+        return;
+      }
+
+      // 電話番号を数字のみに正規化
+      const digitsOnly = normalizePhoneNumber(formData.phoneNumber);
+
+      console.log('📱 Verifying OTP for:', formData.phoneNumber);
+
+      // OTP検証API（独自実装 - セッションを維持したまま検証）
+      // 電話認証が成功してからプロフィールを保存する
+      console.log('📞 Calling phone verification API...');
+      const verifyResponse = await fetch('/api/verification/phone/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phoneNumber: formData.phoneNumber,
+          otpCode: otpCode,
+        }),
+      });
+
+      if (!verifyResponse.ok) {
+        const errorData = await verifyResponse.json();
+        throw new Error(errorData.error || '認証コードが正しくありません');
+      }
+
+      const verifyData = await verifyResponse.json();
+      console.log('✅ Phone verification response:', verifyData);
+
+      // 電話認証が成功した後にプロフィールを保存
       const existingProfile = await getClientProfile(userId);
 
       if (existingProfile) {
-        // 更新
-        console.log('📝 既存プロフィールを更新:', existingProfile.id);
-        const { clientId: _omit, ...updates } = profileInput;
-        await updateClientProfile(existingProfile.id, updates);
-      } else {
-        // 新規作成
-        console.log('✨ 新規プロフィール作成');
-        await createClientProfile(profileInput);
-      }
-
-      try {
-        await updateUserAttributes({
-          userAttributes: {
-            name: trimmedName,
-            'custom:displayName': trimmedDisplayName || trimmedName,
-          },
+        await updateClientProfile(userId, {
+          fullName: formData.fullName,
+          displayName: formData.displayName,
+          address: formData.address,
+          phoneNumber: digitsOnly,
+          dateOfBirth: formData.dateOfBirth
+            ? new Date(formData.dateOfBirth)
+            : undefined,
+          gender: formData.gender,
+          isProfileComplete: true,
         });
-      } catch (attrError) {
-        console.warn('⚠️ ユーザー属性更新に失敗:', attrError);
+      } else {
+        await createClientProfile({
+          userId,
+          fullName: formData.fullName,
+          displayName: formData.displayName,
+          address: formData.address,
+          phoneNumber: digitsOnly,
+          dateOfBirth: formData.dateOfBirth
+            ? new Date(formData.dateOfBirth)
+            : undefined,
+          gender: formData.gender,
+          isProfileComplete: true,
+        });
       }
 
-      console.log('✅ プロフィール保存成功');
-      // 完了後、ダッシュボードへ
+      // 完了後、ダッシュボードへリダイレクト
+      console.log('🎉 Profile setup complete! Redirecting to dashboard...');
       router.push('/user');
     } catch (err: any) {
-      console.error('❌ プロフィール保存エラー:', err);
-      console.error('エラー詳細:', {
-        name: err.name,
-        message: err.message,
-        errors: err.errors,
+      console.error('❌ OTP verify error:', err);
+      setError(err.message || '認証に失敗しました');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // SMS再送信
+  const handleResendOtp = async () => {
+    if (resendTimer > 0) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/verification/phone/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phoneNumber: normalizePhoneNumber(formData.phoneNumber),
+        }),
       });
-      setError(
-        `プロフィールの保存に失敗しました。${err.message || 'もう一度お試しください。'}`
-      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'SMS送信に失敗しました');
+      }
+
+      setResendTimer(60);
+      setOtpCode('');
+      alert('認証コードを再送信しました');
+    } catch (err: any) {
+      console.error('Resend OTP error:', err);
+      setError(err.message || 'SMS送信に失敗しました');
     } finally {
       setLoading(false);
     }
@@ -192,151 +374,226 @@ export default function ProfileSetupPage() {
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md mx-auto">
         <div className="bg-white rounded-lg shadow p-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            プロフィール設定
-          </h1>
-          <p className="text-sm text-gray-600 mb-6">
-            サービスをご利用いただくために、プロフィール情報を入力してください。
-          </p>
+          {/* ステップ1: プロフィール情報入力 */}
+          {step === 'profile' && (
+            <>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                プロフィール設定
+              </h1>
+              <p className="text-sm text-gray-600 mb-6">
+                サービスをご利用いただくために、プロフィール情報を入力してください。
+              </p>
 
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-600 text-sm">
-              {error}
-            </div>
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-600 text-sm">
+                  {error}
+                </div>
+              )}
+
+              <form onSubmit={handleProfileSubmit} className="space-y-4">
+                {/* メールアドレス */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    メールアドレス
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    readOnly
+                    disabled
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600 cursor-not-allowed"
+                  />
+                </div>
+
+                {/* 氏名 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    氏名（本名）
+                  </label>
+                  <input
+                    type="text"
+                    name="fullName"
+                    value={formData.fullName}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+                    placeholder="山田 太郎"
+                  />
+                </div>
+
+                {/* 表示名 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    表示名（ニックネーム）
+                  </label>
+                  <input
+                    type="text"
+                    name="displayName"
+                    value={formData.displayName}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+                    placeholder="やまちゃん"
+                  />
+                </div>
+
+                {/* 電話番号 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    電話番号 <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    name="phoneNumber"
+                    value={formData.phoneNumber}
+                    onChange={handleChange}
+                    onBlur={handlePhoneBlur}
+                    className={`w-full px-3 py-2 border ${
+                      phoneError ? 'border-red-500' : 'border-gray-300'
+                    } rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900`}
+                    placeholder="09012345678"
+                    required
+                  />
+                  {phoneError && (
+                    <p className="mt-1 text-sm text-red-600">{phoneError}</p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-500">
+                    この番号にSMS認証コードが送信されます
+                  </p>
+                </div>
+
+                {/* 住所（任意） */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    住所 <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+                    placeholder="東京都渋谷区..."
+                    required
+                  />
+                  {addressError && (
+                    <p className="mt-1 text-sm text-red-600">{addressError}</p>
+                  )}
+                </div>
+
+                {/* 生年月日 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    生年月日 <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    name="dateOfBirth"
+                    value={formData.dateOfBirth}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+                    required
+                  />
+                </div>
+
+                {/* 性別 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    性別
+                  </label>
+                  <select
+                    name="gender"
+                    value={formData.gender}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+                  >
+                    <option value="">選択してください</option>
+                    <option value="male">男性</option>
+                    <option value="female">女性</option>
+                    <option value="other">その他</option>
+                    <option value="prefer_not_to_say">回答しない</option>
+                  </select>
+                </div>
+
+                <Button type="submit" disabled={loading || !!phoneError} className="w-full">
+                  {loading ? '送信中...' : '次へ（SMS認証）'}
+                </Button>
+              </form>
+            </>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* 氏名 */}
-            <div>
-              <label
-                htmlFor="name"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                氏名 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
+          {/* ステップ2: SMS認証 */}
+          {step === 'phone-verify' && (
+            <>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                📱 SMS認証
+              </h1>
+              <p className="text-sm text-gray-600 mb-6">
+                <span className="font-semibold">{formData.phoneNumber}</span>{' '}
+                に送信された6桁の認証コードを入力してください。
+              </p>
 
-            {/* 表示名 */}
-            <div>
-              <label
-                htmlFor="displayName"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                表示名（ニックネーム）
-                <span className="text-xs text-gray-500 ml-2">
-                  ※ダッシュボードやヘッダーに表示されます
-                </span>
-              </label>
-              <input
-                type="text"
-                id="displayName"
-                name="displayName"
-                value={formData.displayName}
-                onChange={handleChange}
-                placeholder="未設定の場合は氏名が使用されます"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-600 text-sm">
+                  {error}
+                </div>
+              )}
 
-            {/* 住所 */}
-            <div>
-              <label
-                htmlFor="address"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                住所 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                id="address"
-                name="address"
-                value={formData.address}
-                onChange={handleChange}
-                required
-                placeholder="東京都渋谷区..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
+              <form onSubmit={handleOtpVerify} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    認証コード
+                  </label>
+                  <input
+                    type="text"
+                    value={otpCode}
+                    onChange={(e) => {
+                      const normalized = toHalfWidthDigits(e.target.value);
+                      setOtpCode(normalized.replace(/\D/g, '').slice(0, 6));
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-center text-2xl tracking-widest text-gray-900"
+                    placeholder="000000"
+                    maxLength={6}
+                    autoFocus
+                  />
+                  <p className="mt-1 text-xs text-gray-500 text-center">
+                    6桁の数字を入力してください
+                  </p>
+                </div>
 
-            {/* 電話番号 */}
-            <div>
-              <label
-                htmlFor="phoneNumber"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                電話番号 <span className="text-red-500">*</span>
-                <span className="text-xs text-gray-500 ml-2">（ハイフン無しで入力）</span>
-              </label>
-              <input
-                type="tel"
-                id="phoneNumber"
-                name="phoneNumber"
-                value={formData.phoneNumber}
-                onChange={handleChange}
-                required
-                placeholder="09012345678"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
+                <Button type="submit" disabled={loading || otpCode.length !== 6} className="w-full">
+                  {loading ? '認証中...' : '認証して完了'}
+                </Button>
 
-            {/* 生年月日（任意） */}
-            <div>
-              <label
-                htmlFor="dateOfBirth"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                生年月日（任意）
-              </label>
-              <input
-                type="date"
-                id="dateOfBirth"
-                name="dateOfBirth"
-                value={formData.dateOfBirth}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
+                <div className="text-center">
+                  {resendTimer > 0 ? (
+                    <p className="text-sm text-gray-500">
+                      認証コードを再送信できます（{resendTimer}秒後）
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResendOtp}
+                      disabled={loading}
+                      className="text-sm text-purple-600 hover:text-purple-800 font-semibold"
+                    >
+                      認証コードを再送信
+                    </button>
+                  )}
+                </div>
 
-            {/* 性別（任意） */}
-            <div>
-              <label
-                htmlFor="gender"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                性別（任意）
-              </label>
-              <select
-                id="gender"
-                name="gender"
-                value={formData.gender}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                <option value="">選択してください</option>
-                <option value="male">男性</option>
-                <option value="female">女性</option>
-                <option value="other">その他</option>
-                <option value="no-answer">回答しない</option>
-              </select>
-            </div>
-
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-purple-600 hover:bg-purple-700"
-            >
-              {loading ? '保存中...' : 'プロフィールを保存'}
-            </Button>
-          </form>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep('profile');
+                    setOtpCode('');
+                    setError(null);
+                  }}
+                  className="w-full text-sm text-gray-600 hover:text-gray-800"
+                >
+                  ← 電話番号を変更
+                </button>
+              </form>
+            </>
+          )}
         </div>
       </div>
     </div>

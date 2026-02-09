@@ -1,24 +1,27 @@
 /**
- * クリエイター保護ルートのレイアウト
+ * インストラクター保護ルートのレイアウト（Supabase Auth）
  * 認証チェックとレイアウトを提供
  */
 
 'use client';
 
+// 動的レンダリングを強制（React 19 + Next.js 16）
+export const dynamic = 'force-dynamic';
+
+
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { getCurrentAuthUser, saveSession, getSessionForRole } from '@/lib/auth';
-import type { User } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { useSidebar } from '@/components/layout/SidebarProvider';
 import { X } from 'lucide-react';
-import { getInstructorByUserId } from '@/lib/api/instructors';
 
 function ProtectedContent({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any | null>(null);
   const [displayName, setDisplayName] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [redirected, setRedirected] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const { open, close } = useSidebar();
@@ -26,68 +29,83 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // ローカル instructor セッションを優先
-        const storedUser = getSessionForRole('instructor');
-        if (storedUser) {
-          console.log('[DEBUG] instructor layout stored session', { role: storedUser.role, path: pathname });
-          if (!pathname.includes('/profile/setup')) {
-            try {
-              const instructor = await getInstructorByUserId(storedUser.userId);
-              if (!instructor) {
-                router.push('/instructor/profile/setup');
-                return;
-              }
-              setDisplayName(instructor.displayName || storedUser.displayName || storedUser.name);
-            } catch (err) {
-              console.error('インストラクタープロフィール取得エラー:', err);
-              setDisplayName(storedUser.displayName || storedUser.name);
-            }
-          } else {
-            setDisplayName(storedUser.displayName || storedUser.name);
+        const session = await getSession();
+
+        if (!session?.user) {
+          if (!redirected) {
+            setRedirected(true);
+            router.push('/login/instructor');
           }
-          setUser(storedUser);
-          setLoading(false);
           return;
         }
 
-        // ローカルに無ければ Cognito を確認
-        const authUser = await getCurrentAuthUser();
-        console.log('[DEBUG] instructor layout cognito user', { role: authUser.role, path: pathname });
+        const authUser = session.user;
 
-        if (authUser.role !== 'instructor') {
-          router.push('/login/instructor'); // 未ログイン時もこちらへ
-          return;
-        }
-
-        saveSession(authUser);
-
+        // インストラクタープロフィールチェック（セットアップページ以外）
         if (!pathname.includes('/profile/setup')) {
           try {
-            const instructor = await getInstructorByUserId(authUser.userId);
-            if (!instructor) {
-              router.push('/instructor/profile/setup');
+            // ロール別にユーザーを検索（INSTRUCTORロール）
+            const response = await fetch(`/api/auth/check-role?role=instructor`, {
+              credentials: 'include',
+            });
+
+            if (!response.ok) {
+              // このロールでユーザーが登録されていない
+              if (!redirected) {
+                setRedirected(true);
+                router.push('/login/instructor');
+              }
               return;
             }
-            setDisplayName(instructor.displayName || authUser.displayName || authUser.name);
+
+            const { user: dbUser, profile } = await response.json();
+
+            // インストラクターのセットアップが完了しているか確認（bioが設定されているか）
+            if (!dbUser.instructor || !dbUser.instructor.bio) {
+              if (!redirected) {
+                setRedirected(true);
+                router.push('/instructor/profile/setup');
+              }
+              return;
+            }
+
+            setDisplayName(
+              profile?.displayName
+                || authUser.user_metadata?.name
+                || authUser.email
+                || 'インストラクター'
+            );
+            setUser(authUser);
           } catch (err) {
             console.error('インストラクタープロフィール取得エラー:', err);
-            setDisplayName(authUser.displayName || authUser.name);
+            if (!redirected) {
+              setRedirected(true);
+              router.push('/instructor/profile/setup');
+            }
+            return;
           }
         } else {
-          setDisplayName(authUser.displayName || authUser.name);
+          setDisplayName(
+            authUser.user_metadata?.name
+              || authUser.email
+              || 'インストラクター'
+          );
+          setUser(authUser);
         }
 
-        setUser(authUser);
         setLoading(false);
       } catch (error) {
         console.error('認証チェックエラー:', error);
         setLoading(false);
-        router.push('/login/instructor');
+        if (!redirected) {
+          setRedirected(true);
+          router.push('/login/instructor');
+        }
       }
     };
 
     checkAuth();
-  }, [router, pathname]);
+  }, [router, pathname, redirected]);
 
   if (loading) {
     return (
@@ -107,26 +125,20 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ヘッダー */}
-      <AppHeader userName={displayName || user.name} />
+      <AppHeader userName={displayName} />
 
       <div className="flex">
-        {/* サイドバー - デスクトップ */}
-        <aside className="hidden lg:block fixed left-0 top-14 bottom-0 w-64 bg-white border-r border-gray-200 overflow-y-auto">
-          <Sidebar />
-        </aside>
-
-        {/* サイドバー - モバイル */}
+        {/* サイドバー */}
         {open && (
           <>
-            {/* Overlay - ヘッダー(z-50)より下 */}
+            {/* Overlay */}
             <div
-              className="fixed inset-x-0 top-14 bottom-0 bg-black/50 z-40 lg:hidden"
+              className="fixed inset-x-0 top-14 bottom-0 bg-black/50 z-40 md:hidden"
               onClick={close}
             />
 
-            {/* Sidebar - オーバーレイより上、ヘッダーより下 */}
-            <aside className="fixed left-0 top-14 bottom-0 w-64 bg-white z-[45] overflow-y-auto lg:hidden shadow-xl">
-              {/* Close button */}
+            {/* Sidebar */}
+            <aside className="fixed left-0 top-14 bottom-0 w-64 bg-white overflow-y-auto border-r border-gray-200 z-[45] shadow-xl md:z-30">
               <div className="flex items-center justify-between p-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-800">メニュー</h2>
                 <button
@@ -143,7 +155,7 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
         )}
 
         {/* メインコンテンツ */}
-        <main className="flex-1 lg:ml-64 pt-14 min-h-screen">
+        <main className="flex-1 pt-14 min-h-screen">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {children}
           </div>

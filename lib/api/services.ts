@@ -1,93 +1,83 @@
 /**
- * サービス関連のAPI操作
+ * サービス関連のAPI操作（API経由）
  */
 
-import { getDataClient } from './data-client';
-import type { Service, ServiceCategory, ServiceStatus } from './data-client';
+export interface ServiceInput {
+  instructorId?: string; // サーバー側で現在のインストラクターに紐付けるため省略可
+  title: string;
+  description?: string;
+  category: string;
+  deliveryType?: string;
+  location?: string;
+  price: number;
+  duration: number;
+  isActive?: boolean;
+  // スケジュール設定
+  recurrenceType?: 'ONCE' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'CUSTOM';
+  availableDays?: string[];
+  startTime?: string;
+  endTime?: string;
+  timezone?: string;
+  validFrom?: string;
+  validUntil?: string;
+  maxParticipants?: number;
+}
+
+const parseJson = async (res: Response) => {
+  try {
+    return await res.json();
+  } catch {
+    return {};
+  }
+};
 
 /**
  * サービス一覧取得
  */
 export async function listServices(filters?: {
-  category?: ServiceCategory;
-  status?: ServiceStatus;
+  category?: string;
   instructorId?: string;
+  isActive?: boolean;
 }) {
-  try {
-    const client = getDataClient();
-    const { data, errors } = await client.models.Service.list({
-      filter: filters
-        ? {
-            ...(filters.category && { category: { eq: filters.category } }),
-            ...(filters.status && { status: { eq: filters.status } }),
-            ...(filters.instructorId && { instructorId: { eq: filters.instructorId } }),
-          }
-        : undefined,
-    });
+  const params = new URLSearchParams();
+  if (filters?.category) params.append('category', filters.category);
+  if (filters?.instructorId) params.append('instructorId', filters.instructorId);
+  if (filters?.isActive !== undefined) params.append('isActive', String(filters.isActive));
 
-    if (errors) {
-      console.error('Error listing services:', errors);
-      throw new Error('サービス一覧の取得に失敗しました');
-    }
-
-    return data;
-  } catch (error) {
-    console.error('List services error:', error);
-    throw error;
+  const res = await fetch(`/api/services?${params.toString()}`, { cache: 'no-store' });
+  const data = await parseJson(res);
+  if (!res.ok) {
+    throw new Error(data.error || 'サービス一覧の取得に失敗しました');
   }
+  return data;
 }
 
 /**
  * サービス詳細取得
  */
 export async function getService(id: string) {
-  try {
-    const client = getDataClient();
-    const { data, errors } = await client.models.Service.get({ id });
-
-    if (errors) {
-      console.error('Error getting service:', errors);
-      throw new Error('サービスの取得に失敗しました');
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Get service error:', error);
-    throw error;
+  const res = await fetch(`/api/services/${id}`, { cache: 'no-store' });
+  const data = await parseJson(res);
+  if (!res.ok) {
+    throw new Error(data.error || 'サービスの取得に失敗しました');
   }
+  return data;
 }
 
 /**
  * サービス作成
  */
-export async function createService(input: {
-  title: string;
-  description?: string;
-  category: ServiceCategory;
-  duration: number;
-  basePrice: number;
-  maxParticipants?: number;
-  image?: string;
-  tags?: string[];
-}) {
-  try {
-    const client = getDataClient();
-    const { data, errors } = await client.models.Service.create({
-      ...input,
-      instructorId: '', // TODO: 現在のユーザーのinstructorIdを取得
-      status: 'draft',
-    });
-
-    if (errors) {
-      console.error('Error creating service:', errors);
-      throw new Error('サービスの作成に失敗しました');
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Create service error:', error);
-    throw error;
+export async function createService(input: ServiceInput) {
+  const res = await fetch('/api/services', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  const data = await parseJson(res);
+  if (!res.ok) {
+    throw new Error(data.error || 'サービスの作成に失敗しました');
   }
+  return data;
 }
 
 /**
@@ -95,52 +85,60 @@ export async function createService(input: {
  */
 export async function updateService(
   id: string,
-  updates: Partial<{
-    title: string;
-    description: string;
-    duration: number;
-    basePrice: number;
-    maxParticipants: number;
-    image: string;
-    tags: string[];
-    status: ServiceStatus;
-  }>
+  updates: Partial<ServiceInput>
 ) {
-  try {
-    const client = getDataClient();
-    const { data, errors } = await client.models.Service.update({
-      id,
-      ...updates,
-    });
-
-    if (errors) {
-      console.error('Error updating service:', errors);
-      throw new Error('サービスの更新に失敗しました');
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Update service error:', error);
-    throw error;
+  const res = await fetch(`/api/services/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  });
+  const data = await parseJson(res);
+  if (!res.ok) {
+    throw new Error(data.error || 'サービスの更新に失敗しました');
   }
+  return data;
 }
 
 /**
  * サービス削除
  */
 export async function deleteService(id: string) {
-  try {
-    const client = getDataClient();
-    const { data, errors } = await client.models.Service.delete({ id });
-
-    if (errors) {
-      console.error('Error deleting service:', errors);
-      throw new Error('サービスの削除に失敗しました');
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Delete service error:', error);
-    throw error;
+  const res = await fetch(`/api/services/${id}`, { method: 'DELETE' });
+  const data = await parseJson(res);
+  if (!res.ok) {
+    throw new Error(data.error || 'サービスの削除に失敗しました');
   }
+  return data;
+}
+
+/**
+ * サービス複製
+ * 既存のサービスをベースに新しいサービスを作成
+ */
+export interface CloneServiceInput {
+  title?: string;
+  description?: string;
+  recurrenceType?: 'ONCE' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'CUSTOM';
+  availableDays?: string[];
+  startTime?: string;
+  endTime?: string;
+  validFrom?: string;
+  validUntil?: string;
+  maxParticipants?: number;
+  price?: number;
+  duration?: number;
+  isActive?: boolean;
+}
+
+export async function cloneService(id: string, overrides?: CloneServiceInput) {
+  const res = await fetch(`/api/services/${id}/clone`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(overrides || {}),
+  });
+  const data = await parseJson(res);
+  if (!res.ok) {
+    throw new Error(data.error || 'サービスの複製に失敗しました');
+  }
+  return data;
 }

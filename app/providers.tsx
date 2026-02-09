@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import '../src/lib/amplifyClient';
 import { SidebarProvider, useSidebar } from '@/components/layout/SidebarProvider';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Sheet, SheetContent } from '@/components/ui/sheet';

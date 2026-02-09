@@ -1,25 +1,73 @@
-## AWS Amplify Next.js (App Router) Starter Template
+# Coordy
 
-This repository provides a starter template for creating applications using Next.js (App Router) and AWS Amplify, emphasizing easy setup for authentication, API, and database capabilities.
+インストラクターとユーザーをマッチングするサービスプラットフォーム
 
-## Overview
+## 技術スタック
 
-This template equips you with a foundational Next.js application integrated with AWS Amplify, streamlined for scalability and performance. It is ideal for developers looking to jumpstart their project with pre-configured AWS services like Cognito, AppSync, and DynamoDB.
+- **フレームワーク**: Next.js 14 (App Router)
+- **認証**: BetterAuth
+- **データベース**: Supabase (PostgreSQL)
+- **決済**: Stripe
+- **スタイリング**: Tailwind CSS
+- **言語**: TypeScript
 
-## Features
+## クイックスタート
 
-- **Authentication**: Setup with Amazon Cognito for secure user authentication.
-- **API**: Ready-to-use GraphQL endpoint with AWS AppSync.
-- **Database**: Real-time database powered by Amazon DynamoDB.
+### 1. 依存パッケージのインストール
 
-## Deploying to AWS
+```bash
+npm install
+```
 
-For detailed instructions on deploying your application, refer to the [deployment section](https://docs.amplify.aws/nextjs/start/quickstart/nextjs-app-router-client-components/#deploy-a-fullstack-app-to-aws) of our documentation.
+### 2. 環境変数の設定
 
-## Security
+`.env.local` ファイルを作成し、必要な環境変数を設定してください。
+詳細は [DOCS/SETUP.md](./DOCS/SETUP.md) を参照してください。
 
-See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
+### 3. Supabaseのセットアップ
 
-## License
+```bash
+# Supabaseローカル環境の起動
+supabase start
 
-This library is licensed under the MIT-0 License. See the LICENSE file.
+# データベースマイグレーションの実行
+supabase db reset
+```
+
+### 4. 開発サーバーの起動
+
+```bash
+npm run dev
+```
+
+ブラウザで http://localhost:3000 を開いてください。
+
+## ドキュメント
+
+- [セットアップガイド](./DOCS/SETUP.md)
+- [認証システム](./DOCS/AUTH.md)
+- [データベース設計](./DOCS/DATABASE.md)
+- [API仕様](./DOCS/API.md)
+
+## プロジェクト構造
+
+```
+/
+├── app/                    # Next.js App Router
+│   ├── (auth)/            # 認証関連ページ
+│   ├── (protected)/       # 保護されたページ
+│   └── api/               # API Routes
+├── components/            # Reactコンポーネント
+├── lib/                   # ライブラリ・ユーティリティ
+│   ├── auth/             # BetterAuth設定
+│   ├── supabase/         # Supabaseクライアント
+│   └── stripe/           # Stripe設定
+├── prisma/                # Prismaスキーマ
+├── supabase/              # Supabase設定
+│   └── migrations/       # データベースマイグレーション
+└── DOCS/                  # ドキュメント
+```
+
+## ライセンス
+
+MIT

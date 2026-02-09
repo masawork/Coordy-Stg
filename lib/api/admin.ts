@@ -1,105 +1,178 @@
 /**
- * 管理者機能API
+ * 管理者向けAPI操作（クライアント用）
  */
-
-import { getDataClient } from './data-client';
-import { getClientWallet } from './wallet';
 
 /**
- * 承認待ちのポイントチャージ一覧取得
+ * 期限切れ振込申請のクリーンアップ
+ * 30日以上経過した未処理の振込申請を自動的にキャンセル
  */
-export async function getPendingCharges() {
+export async function cleanupExpiredCharges() {
   try {
-    const client = getDataClient();
-    const { data, errors } = await client.models.PointTransaction.list({
-      filter: {
-        type: { eq: 'charge' },
-        method: { eq: 'bankTransfer' },
-        status: { eq: 'pending' },
-      },
+    const response = await fetch('/api/admin/pending-charges/cleanup', {
+      method: 'POST',
+      credentials: 'include',
     });
 
-    if (errors) {
-      console.error('Error listing pending charges:', errors);
-      throw new Error('承認待ちチャージの取得に失敗しました');
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'クリーンアップに失敗しました');
     }
 
-    // 日時順にソート（古い順）
-    const sorted = (data || []).sort((a, b) =>
-      new Date(a.createdAt || '').getTime() - new Date(b.createdAt || '').getTime()
-    );
+    return await response.json();
+  } catch (error: any) {
+    console.error('Cleanup expired charges error:', error);
+    // エラーは握りつぶす（バックグラウンド処理のため）
+    return { success: false, expiredCount: 0 };
+  }
+}
 
-    return sorted;
-  } catch (error) {
-    console.error('Get pending charges error:', error);
+/**
+ * 銀行振込申請一覧取得
+ */
+export async function listPendingCharges() {
+  try {
+    const response = await fetch('/api/admin/pending-charges', {
+      method: 'GET',
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || '承認待ちチャージの取得に失敗しました');
+    }
+
+    return await response.json();
+  } catch (error: any) {
+    console.error('List pending charges error:', error);
     throw error;
   }
 }
 
 /**
- * チャージを承認してポイントを追加
+ * 銀行振込承認
  */
-export async function approveCharge(
-  transactionId: string,
-  clientId: string,
-  amount: number
-) {
+export async function approveCharge(transactionId: string) {
   try {
-    const client = getDataClient();
-
-    // ウォレット取得
-    const wallet = await getClientWallet(clientId);
-    if (!wallet) {
-      throw new Error('ウォレットが見つかりません');
-    }
-
-    // ウォレット残高を更新
-    const newBalance = (wallet.balance || 0) + amount;
-    await client.models.ClientWallet.update({
-      id: wallet.id,
-      balance: newBalance,
+    const response = await fetch(`/api/admin/pending-charges/${transactionId}/approve`, {
+      method: 'POST',
+      credentials: 'include',
     });
 
-    // トランザクションのステータスを更新
-    const { data, errors } = await client.models.PointTransaction.update({
-      id: transactionId,
-      status: 'completed',
-      description: '銀行振込チャージ（承認済み）',
-    });
-
-    if (errors) {
-      console.error('Error approving charge:', errors);
-      throw new Error('チャージ承認に失敗しました');
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || '承認に失敗しました');
     }
 
-    return data;
-  } catch (error) {
+    return await response.json();
+  } catch (error: any) {
     console.error('Approve charge error:', error);
     throw error;
   }
 }
 
 /**
- * チャージを却下
+ * 銀行振込却下
  */
-export async function rejectCharge(transactionId: string) {
+export async function rejectCharge(transactionId: string, reason?: string) {
   try {
-    const client = getDataClient();
-
-    const { data, errors } = await client.models.PointTransaction.update({
-      id: transactionId,
-      status: 'failed',
-      description: '銀行振込チャージ（却下）',
+    const response = await fetch(`/api/admin/pending-charges/${transactionId}/reject`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ reason }),
     });
 
-    if (errors) {
-      console.error('Error rejecting charge:', errors);
-      throw new Error('チャージ却下に失敗しました');
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || '却下に失敗しました');
     }
 
-    return data;
-  } catch (error) {
+    return await response.json();
+  } catch (error: any) {
     console.error('Reject charge error:', error);
+    throw error;
+  }
+}
+
+/**
+ * 統計情報取得
+ */
+export async function getAdminStats() {
+  try {
+    const response = await fetch('/api/admin/stats', {
+      method: 'GET',
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || '統計情報の取得に失敗しました');
+    }
+
+    return await response.json();
+  } catch (error: any) {
+    console.error('Get admin stats error:', error);
+    throw error;
+  }
+}
+
+/**
+ * ユーザー一覧取得
+ */
+export async function listUsers(filters?: {
+  role?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  try {
+    const params = new URLSearchParams();
+    if (filters?.role) params.append('role', filters.role);
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.limit) params.append('limit', String(filters.limit));
+    if (filters?.offset) params.append('offset', String(filters.offset));
+
+    const response = await fetch(`/api/admin/users?${params.toString()}`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'ユーザー一覧の取得に失敗しました');
+    }
+
+    return await response.json();
+  } catch (error: any) {
+    console.error('List users error:', error);
+    throw error;
+  }
+}
+
+/**
+ * ユーザーロール更新
+ */
+export async function updateUserRole(userId: string, role: string) {
+  try {
+    const response = await fetch(`/api/admin/users/${userId}/role`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ role }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'ロールの更新に失敗しました');
+    }
+
+    return await response.json();
+  } catch (error: any) {
+    console.error('Update user role error:', error);
     throw error;
   }
 }

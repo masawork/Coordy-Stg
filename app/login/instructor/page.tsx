@@ -1,20 +1,15 @@
 'use client';
 
+// 動的レンダリングを強制（React 19 + Next.js 16）
+export const dynamic = 'force-dynamic';
+
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import Button from '@/components/common/Button';
-import {
-  loginUser,
-  saveSession,
-  clearSession,
-  checkAuth,
-  getCurrentAuthUser,
-  getSessionForRole,
-} from '@/lib/auth';
-// Amplify初期化を確実に行う
-import '@/src/lib/amplifyClient';
+import { signIn, getSession, signInWithGoogle } from '@/lib/auth';
 
 export default function InstructorLoginPage() {
   const [email, setEmail] = useState('');
@@ -24,41 +19,26 @@ export default function InstructorLoginPage() {
   const [error, setError] = useState('');
   const router = useRouter();
 
-
-  // マウント時に既にログイン済みかチェック（Cognitoから最新情報を取得）
+  // マウント時に既にログイン済みかチェック
   useEffect(() => {
     let active = true;
     const checkSession = async () => {
       try {
-        const storedInstructor = getSessionForRole('instructor');
-        if (storedInstructor) {
-          console.log('[DEBUG] instructor login stored session');
-          window.location.href = '/instructor';
-          return;
+        const session = await getSession();
+        if (session?.user) {
+          const user = session.user;
+          // ロールがinstructorであることを確認
+          if (!user.user_metadata?.role || user.user_metadata.role.toLowerCase() === 'instructor') {
+            if (active) {
+              window.location.href = '/instructor';
+            }
+            return;
+          }
         }
-
-        const hasAuthSession = await checkAuth();
-        if (!hasAuthSession) {
-          clearSession();
-          if (active) setChecking(false);
-          return;
-        }
-
-        const authUser = await getCurrentAuthUser();
-        saveSession(authUser);
-
-        console.log('[DEBUG] instructor login auth user', { role: authUser.role });
-        if (authUser.role === 'instructor') {
-          window.location.href = '/instructor';
-        } else {
-          if (active) setChecking(false);
-        }
+        if (active) setChecking(false);
       } catch (error) {
-        clearSession();
-        if (active) {
-          console.log('✅ 未ログイン状態を確認、ログインフォームを表示');
-          setChecking(false);
-        }
+        console.error('Session check error:', error);
+        if (active) setChecking(false);
       }
     };
 
@@ -73,64 +53,41 @@ export default function InstructorLoginPage() {
     if (loading) return;
     setLoading(true);
     setError('');
-    console.log('instructor login submit', { email });
 
     try {
-      // 古いセッションをクリア（別アカウントでのログインをサポート）
-      clearSession();
+      // Supabase Authでログイン
+      await signIn({ email, password });
 
-      // Cognitoでログイン
-      const { user, nextStep } = await loginUser({ email, password });
-
-      // パスワード変更が必要な場合
-      if (nextStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
-        // パスワードリセットページへリダイレクト
-        window.location.href = '/login/instructor/reset';
-        return;
-      }
-
-      // userが存在しない場合はエラー
-      if (!user) {
+      // セッションを取得してユーザー情報を確認
+      const session = await getSession();
+      if (!session?.user) {
         throw new Error('ログインに失敗しました');
       }
 
-      // ロールがinstructorであることを確認
-      if (user.role !== 'instructor') {
+      const user = session.user;
+
+      // ロールが未設定の場合もインストラクター扱いで進める
+      if (user.user_metadata?.role && user.user_metadata.role.toLowerCase() !== 'instructor') {
         throw new Error('インストラクターアカウントでログインしてください');
       }
 
-      // セッションを保存
-      saveSession(user);
-
-      console.log('✅ インストラクターログイン成功、/instructor にリダイレクト');
-      // ダッシュボードへリダイレクト（window.location.hrefを使用してサーバーサイドで読み込む）
+      console.log('✅ インストラクターログイン成功');
       window.location.href = '/instructor';
     } catch (err: any) {
       console.error('Login error:', err);
-
+      
       // エラーメッセージを日本語化
-      // 認証エラーとその他のエラーを分離
       let friendlyMessage = 'ログインに失敗しました。時間をおいて再度お試しください。';
-
-      if (err.name === 'UserNotConfirmedException') {
-        // 未確認ユーザーの場合
-        setError('メール確認が完了していません。確認コード入力画面へ移動します...');
-        setTimeout(() => {
-          router.push(`/verify?email=${encodeURIComponent(email)}`);
-        }, 2000);
-        setLoading(false);
-        return;
-      } else if (err.name === 'NotAuthorizedException') {
-        // パスワード間違いなどの認証エラー
+      
+      if (err.message?.includes('email') || err.message?.includes('password')) {
         friendlyMessage = 'メールアドレスまたはパスワードが正しくありません';
-      } else if (err.name === 'UserNotFoundException') {
-        // 登録されていないユーザー
+      } else if (err.message?.includes('not found') || err.message?.includes('登録')) {
         friendlyMessage = 'このメールアドレスは登録されていません';
-      } else if (err.name === 'NetworkError' || err.message?.includes('network')) {
-        // ネットワークエラー
+      } else if (err.message?.includes('network') || err.message?.includes('Network')) {
         friendlyMessage = 'ネットワークエラーが発生しました。インターネット接続を確認してください。';
+      } else if (err.message) {
+        friendlyMessage = err.message;
       }
-      // その他のエラーは汎用メッセージを表示（詳細はコンソールに出力済み）
 
       setError(friendlyMessage);
     } finally {
@@ -159,7 +116,7 @@ export default function InstructorLoginPage() {
         className="bg-white rounded-2xl shadow-2xl p-8 md:p-12 max-w-md w-full"
       >
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">サービス出品者ログイン</h1>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">インストラクターログイン</h1>
           <p className="text-gray-600">サービスを提供する方のログイン</p>
         </div>
 
@@ -197,24 +154,10 @@ export default function InstructorLoginPage() {
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-red-600 text-sm">{error}</p>
-              {error.includes('メール確認が完了していません') && (
-                <Link
-                  href={`/verify?email=${encodeURIComponent(email)}`}
-                  className="text-green-600 hover:text-green-700 font-semibold text-sm mt-2 inline-block"
-                >
-                  → 確認コード入力画面へ
-                </Link>
-              )}
             </div>
           )}
 
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            className="w-full bg-green-600 hover:bg-green-700"
-            disabled={loading}
-          >
+          <Button type="submit" variant="primary" size="lg" className="w-full" disabled={loading}>
             {loading ? 'ログイン中...' : 'ログイン'}
           </Button>
         </form>
@@ -232,6 +175,16 @@ export default function InstructorLoginPage() {
               新規登録
             </Link>
           </p>
+        </div>
+
+        <div className="mt-6">
+          <button
+            onClick={() => signInWithGoogle('instructor')}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-gray-200 rounded-lg text-gray-700 hover:border-green-600 transition-colors"
+          >
+            <span className="text-lg">G</span>
+            <span className="font-semibold">Googleでログイン</span>
+          </button>
         </div>
 
         <div className="mt-4 text-center">
