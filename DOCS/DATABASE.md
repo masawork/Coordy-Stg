@@ -1,568 +1,306 @@
-# データベース設計詳細
+# データベース定義書
 
-## 概要
+最終更新: 2025-02-08
 
-Coordy（コーディ）プラットフォームのデータベース設計詳細です。
-Amazon DynamoDBを使用したNoSQLデータベース設計を採用します。
+## 1. ER図
 
----
-
-## DynamoDB設計方針
-
-### 設計原則
-
-1. **アクセスパターン駆動設計**: クエリパターンを先に定義し、テーブル設計を最適化
-2. **Single Table Design**: 可能な限り単一テーブルで複数エンティティを管理
-3. **GSI活用**: Global Secondary Indexで柔軟なクエリを実現
-4. **効率的なキー設計**: Partition KeyとSort Keyで効率的なデータアクセス
-
-### パフォーマンス目標
-
-- 読み取りレイテンシ: < 10ms
-- 書き込みレイテンシ: < 20ms
-- スループット: オンデマンド課金（自動スケール）
-
----
-
-## テーブル設計
-
-### 1. Users テーブル
-
-**テーブル名**: `coordy-users-{env}`
-
-**主キー**:
-- Partition Key: `userId` (String)
-
-**属性**:
-```typescript
-{
-  userId: string;           // ユーザーID (UUID)
-  email: string;            // メールアドレス (Unique)
-  name: string;             // ユーザー名
-  role: string;             // ロール (user|instructor|admin)
-  point: number;            // 残高ポイント
-  membership: string;       // メンバーシップ (free|gold|platinum)
-  createdAt: string;        // 作成日時 (ISO 8601)
-  updatedAt: string;        // 更新日時 (ISO 8601)
-}
 ```
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│    User      │────▶│  Instructor  │────▶│   Service    │
+│  (users)     │     │ (instructors)│     │  (services)  │
+├─────────────┤     ├──────────────┤     ├─────────────┤
+│ id (PK)      │     │ id (PK)      │     │ id (PK)      │
+│ authId       │     │ userId (FK)  │     │ instructorId │
+│ email        │     │ bio          │     │ title        │
+│ name         │     │ specialties  │     │ price        │
+│ role         │     │ hourlyRate   │     │ duration     │
+│ image        │     │ isVerified   │     │ maxParticip. │
+└──────┬───────┘     │ googleTokens │     │ recurrence   │
+       │             └──────────────┘     └──────┬───────┘
+       │                                         │
+       │  ┌──────────────────────────────────────┘
+       │  │
+       ▼  ▼
+┌──────────────────┐     ┌──────────────────┐
+│   Reservation    │     │ ServiceSchedule  │
+│  (reservations)  │     │(service_schedules)│
+├──────────────────┤     ├──────────────────┤
+│ id (PK)          │     │ id (PK)          │
+│ userId? (FK)     │     │ serviceId (FK)   │
+│ guestUserId?(FK) │     │ date             │
+│ serviceId (FK)   │     │ startTime        │
+│ instructorId(FK) │     │ endTime          │
+│ scheduledAt      │     │ isCancelled      │
+│ status           │     └──────────────────┘
+│ participants     │
+│ meetUrl          │     ┌──────────────────┐
+└──────┬───────────┘     │  ServiceImage    │
+       │                 │ (service_images) │
+       │                 ├──────────────────┤
+       ▼                 │ id (PK)          │
+┌──────────────────┐     │ serviceId (FK)   │
+│ExternalReservation│     │ url              │
+│(external_reserv.) │     │ sortOrder        │
+├──────────────────┤     └──────────────────┘
+│ id (PK)          │
+│ partnerId (FK)   │
+│ reservationId(FK)│     ┌──────────────────┐
+│ externalRef      │     │   GuestUser      │
+│ paymentMode      │     │  (guest_users)   │
+│ commissionRate   │     ├──────────────────┤
+│ commissionAmount │     │ id (PK)          │
+└──────┬───────────┘     │ email            │
+       │                 │ name             │
+       ▼                 │ phoneNumber      │
+┌──────────────────┐     └──────────────────┘
+│    Partner       │
+│   (partners)     │
+├──────────────────┤     ┌──────────────────┐
+│ id (PK)          │     │  ClientProfile   │
+│ name             │     │(client_profiles) │
+│ code (UNIQUE)    │     ├──────────────────┤
+│ apiKey (UNIQUE)  │     │ id (PK)          │
+│ secretKey        │     │ userId (FK,UNQ)  │
+│ webhookUrl       │     │ fullName         │
+│ paymentMode      │     │ phoneNumber      │
+│ allowGuest       │     │ verificationLvl  │
+│ commissionRate   │     │ phoneVerified    │
+│ isActive         │     │ identityVerified │
+└──────────────────┘     └──────────────────┘
 
-**GSI (Global Secondary Index)**:
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│     Wallet       │     │PointTransaction  │     │  PaymentMethod   │
+│   (wallets)      │     │(point_transact.) │     │(payment_methods) │
+├──────────────────┤     ├──────────────────┤     ├──────────────────┤
+│ id (PK)          │     │ id (PK)          │     │ id (PK)          │
+│ userId (FK,UNQ)  │     │ userId (FK)      │     │ userId (FK)      │
+│ balance          │     │ type             │     │ stripeCustomerId │
+└──────────────────┘     │ amount           │     │ cardBrand        │
+                         │ method           │     │ cardLast4        │
+                         │ status           │     │ isDefault        │
+                         └──────────────────┘     └──────────────────┘
 
-1. **EmailIndex**
-   - Partition Key: `email` (String)
-   - 用途: メールアドレスでのユーザー検索
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│   BankAccount    │     │WithdrawalRequest │     │    Campaign      │
+│ (bank_accounts)  │     │(withdrawal_req.) │     │  (campaigns)     │
+├──────────────────┤     ├──────────────────┤     ├──────────────────┤
+│ id (PK)          │     │ id (PK)          │     │ id (PK)          │
+│ userId (FK)      │     │ instructorId(FK) │     │ serviceId? (FK)  │
+│ bankName         │     │ amount           │     │ instructorId(FK) │
+│ accountNumber    │     │ fee              │     │ type             │
+│ isVerified       │     │ bankAccountId(FK)│     │ discountPercent  │
+│ isDefault        │     │ status           │     │ validFrom/Until  │
+└──────────────────┘     └──────────────────┘     │ isActive         │
+                                                  └──────────────────┘
 
-2. **RoleIndex**
-   - Partition Key: `role` (String)
-   - Sort Key: `createdAt` (String)
-   - 用途: ロール別ユーザー一覧取得
-
-**アクセスパターン**:
-- ユーザーIDで取得: `GetItem` (PK: userId)
-- メールアドレスで検索: `Query` (GSI: EmailIndex)
-- ロール別一覧: `Query` (GSI: RoleIndex)
-
----
-
-### 2. Services テーブル
-
-**テーブル名**: `coordy-services-{env}`
-
-**主キー**:
-- Partition Key: `serviceId` (String)
-
-**属性**:
-```typescript
-{
-  serviceId: string;        // サービスID (UUID)
-  title: string;            // サービス名
-  category: string;         // カテゴリ
-  description: string;      // 説明
-  duration: number;         // 所要時間（分）
-  basePrice: number;        // 基本価格
-  instructorSlots: {        // インストラクター別スロット
-    instructorId: string;
-    instructorName: string;
-    price: number;
-    schedule: {
-      date: string;         // YYYY-MM-DD
-      timeSlot: string;     // morning|afternoon|evening
-      capacity: number;
-      reserved: number;     // 予約数
-    }[];
-  }[];
-  status: string;           // active|inactive
-  createdAt: string;
-  updatedAt: string;
-}
-```
-
-**GSI**:
-
-1. **CategoryIndex**
-   - Partition Key: `category` (String)
-   - Sort Key: `createdAt` (String)
-   - 用途: カテゴリ別サービス一覧
-
-2. **StatusIndex**
-   - Partition Key: `status` (String)
-   - Sort Key: `title` (String)
-   - 用途: アクティブなサービス一覧
-
-**アクセスパターン**:
-- サービスIDで取得: `GetItem` (PK: serviceId)
-- カテゴリ別一覧: `Query` (GSI: CategoryIndex)
-- アクティブなサービス: `Query` (GSI: StatusIndex)
-
----
-
-### 3. Reservations テーブル
-
-**テーブル名**: `coordy-reservations-{env}`
-
-**主キー**:
-- Partition Key: `userId` (String)
-- Sort Key: `reservationId` (String)
-
-**属性**:
-```typescript
-{
-  userId: string;           // ユーザーID
-  reservationId: string;    // 予約ID (UUID)
-  serviceId: string;        // サービスID
-  instructorId: string;     // インストラクターID
-  date: string;             // 予約日 (YYYY-MM-DD)
-  timeSlot: string;         // 時間帯 (morning|afternoon|evening)
-  status: string;           // reserved|completed|cancelled
-  price: number;            // 支払い金額
-  createdAt: string;
-  updatedAt: string;
-}
-```
-
-**GSI**:
-
-1. **DateIndex**
-   - Partition Key: `date` (String)
-   - Sort Key: `timeSlot` (String)
-   - 用途: 日付別予約一覧
-
-2. **InstructorIndex**
-   - Partition Key: `instructorId` (String)
-   - Sort Key: `date` (String)
-   - 用途: インストラクター別予約一覧
-
-3. **ServiceIndex**
-   - Partition Key: `serviceId` (String)
-   - Sort Key: `date` (String)
-   - 用途: サービス別予約一覧
-
-**アクセスパターン**:
-- ユーザー別予約一覧: `Query` (PK: userId)
-- 日付別予約: `Query` (GSI: DateIndex)
-- インストラクター別: `Query` (GSI: InstructorIndex)
-- サービス別: `Query` (GSI: ServiceIndex)
-
----
-
-### 4. Todos テーブル
-
-**テーブル名**: `coordy-todos-{env}`
-
-**主キー**:
-- Partition Key: `userId` (String)
-- Sort Key: `todoId` (String)
-
-**属性**:
-```typescript
-{
-  userId: string;           // ユーザーID
-  todoId: string;           // ToDoID (UUID)
-  title: string;            // タイトル
-  date: string;             // 日付 (YYYY-MM-DD)
-  priority: string;         // 優先度 (high|medium|low)
-  category: string;         // カテゴリ
-  isCompleted: boolean;     // 完了フラグ
-  createdAt: string;
-  updatedAt: string;
-}
-```
-
-**GSI**:
-
-1. **DateIndex**
-   - Partition Key: `userId` (String)
-   - Sort Key: `date` (String)
-   - 用途: ユーザーの日付別ToDo一覧
-
-2. **PriorityIndex**
-   - Partition Key: `userId` (String)
-   - Sort Key: `priority` (String)
-   - 用途: ユーザーの優先度別ToDo一覧
-
-**アクセスパターン**:
-- ユーザー別ToDo一覧: `Query` (PK: userId)
-- 日付別ToDo: `Query` (GSI: DateIndex)
-- 優先度別ToDo: `Query` (GSI: PriorityIndex)
-
----
-
-### 5. Payments テーブル
-
-**テーブル名**: `coordy-payments-{env}`
-
-**主キー**:
-- Partition Key: `userId` (String)
-- Sort Key: `paymentId` (String)
-
-**属性**:
-```typescript
-{
-  userId: string;           // ユーザーID
-  paymentId: string;        // 支払いID (UUID)
-  amount: number;           // 金額
-  method: string;           // 決済方法 (stripe|charge)
-  type: string;             // 種別 (deposit|usage)
-  status: string;           // pending|completed|failed
-  stripePaymentId?: string; // Stripe決済ID
-  description: string;      // 説明
-  createdAt: string;
-  updatedAt: string;
-}
-```
-
-**GSI**:
-
-1. **TypeIndex**
-   - Partition Key: `userId` (String)
-   - Sort Key: `type` (String)
-   - 用途: ユーザーの種別別支払い履歴
-
-2. **DateIndex**
-   - Partition Key: `userId` (String)
-   - Sort Key: `createdAt` (String)
-   - 用途: ユーザーの日付別支払い履歴
-
-**アクセスパターン**:
-- ユーザー別支払い履歴: `Query` (PK: userId)
-- 種別別履歴: `Query` (GSI: TypeIndex)
-- 日付別履歴: `Query` (GSI: DateIndex)
-
----
-
-### 6. Instructors テーブル
-
-**テーブル名**: `coordy-instructors-{env}`
-
-**主キー**:
-- Partition Key: `instructorId` (String)
-
-**属性**:
-```typescript
-{
-  instructorId: string;     // インストラクターID (UUID)
-  userId: string;           // 関連ユーザーID
-  name: string;             // 名前
-  bio: string;              // 自己紹介
-  specialties: string[];    // 専門分野
-  image: string;            // プロフィール画像URL (S3)
-  services: string[];       // 提供サービスID一覧
-  rating: number;           // 評価 (0-5)
-  reviewCount: number;      // レビュー数
-  status: string;           // active|inactive
-  createdAt: string;
-  updatedAt: string;
-}
-```
-
-**GSI**:
-
-1. **UserIdIndex**
-   - Partition Key: `userId` (String)
-   - 用途: ユーザーIDからインストラクター情報取得
-
-2. **StatusIndex**
-   - Partition Key: `status` (String)
-   - Sort Key: `rating` (Number)
-   - 用途: アクティブなインストラクター一覧（評価順）
-
-**アクセスパターン**:
-- インストラクターID で取得: `GetItem` (PK: instructorId)
-- ユーザーIDから取得: `Query` (GSI: UserIdIndex)
-- アクティブ一覧: `Query` (GSI: StatusIndex)
-
----
-
-## データモデル関連図
-
-```mermaid
-erDiagram
-    USERS ||--o{ RESERVATIONS : "makes"
-    USERS ||--o{ TODOS : "has"
-    USERS ||--o{ PAYMENTS : "owns"
-    USERS ||--o| INSTRUCTORS : "can be"
-
-    INSTRUCTORS ||--o{ SERVICES : "provides"
-    SERVICES ||--o{ RESERVATIONS : "includes"
-
-    USERS {
-        string userId PK
-        string email UK
-        string name
-        string role
-        number point
-        string membership
-    }
-
-    INSTRUCTORS {
-        string instructorId PK
-        string userId FK
-        string name
-        string bio
-        array specialties
-    }
-
-    SERVICES {
-        string serviceId PK
-        string title
-        string category
-        number duration
-        number basePrice
-    }
-
-    RESERVATIONS {
-        string userId PK
-        string reservationId SK
-        string serviceId FK
-        string instructorId FK
-        string date
-        string status
-    }
-
-    TODOS {
-        string userId PK
-        string todoId SK
-        string title
-        string date
-        boolean isCompleted
-    }
-
-    PAYMENTS {
-        string userId PK
-        string paymentId SK
-        number amount
-        string type
-        string status
-    }
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│  Notification    │     │AdminAnnouncement │     │ IdentityVerif.   │
+│ (notifications)  │     │(admin_announce.) │     │    Request       │
+├──────────────────┤     ├──────────────────┤     ├──────────────────┤
+│ id (PK)          │     │ id (PK)          │     │ id (PK)          │
+│ userId? (FK)     │     │ authorId (FK)    │     │ userId (FK)      │
+│ type             │     │ target           │     │ documentType     │
+│ category         │     │ title            │     │ documentFrontUrl │
+│ message          │     │ content          │     │ status           │
+│ isRead           │     │ isPublished      │     │ reviewedBy (FK)  │
+└──────────────────┘     └──────────────────┘     └──────────────────┘
 ```
 
 ---
 
-## キャパシティ設計
+## 2. Enum定義
 
-### オンデマンドモード設定
-
-すべてのテーブルはオンデマンド課金モードを使用します。
-
-**利点**:
-- 自動スケーリング
-- 予測不要
-- トラフィック変動に対応
-
-**想定スループット**:
-- 読み取り: ~1,000 RCU/秒
-- 書き込み: ~500 WCU/秒
+| Enum名 | 値 | 説明 |
+|--------|-----|------|
+| **UserRole** | USER, INSTRUCTOR, ADMIN | ユーザーロール |
+| **RecurrenceType** | ONCE, WEEKLY, BIWEEKLY, MONTHLY, CUSTOM | 繰り返しタイプ |
+| **ReservationStatus** | PENDING, CONFIRMED, CANCELLED, COMPLETED | 予約ステータス |
+| **TransactionType** | CHARGE, USE, EXPIRED | 取引種別 |
+| **TransactionStatus** | PENDING, TRANSFERRED, COMPLETED, FAILED | 取引ステータス |
+| **WithdrawalStatus** | PENDING, APPROVED, REJECTED, COMPLETED | 出金ステータス |
+| **CampaignType** | PERCENT_OFF, FIXED_DISCOUNT, TRIAL, EARLY_BIRD, BULK, FIRST_TIME, REFERRAL, SEASONAL | キャンペーン種別 |
+| **PaymentMode** | COORDY, EXTERNAL, BOTH | 外部連携決済モード |
 
 ---
 
-## バックアップ戦略
+## 3. テーブル定義
 
-### Point-in-Time Recovery (PITR)
+### 3.1 User (users)
 
-- **有効化**: 全テーブルで有効
-- **保持期間**: 35日間
-- **復旧時間**: < 1時間
+| カラム | 型 | NULL | 制約 | 説明 |
+|--------|-----|------|------|------|
+| id | UUID | NO | PK | |
+| auth_id | String | YES | INDEX | Supabase auth.users.id |
+| name | String | NO | | 表示名 |
+| email | String | NO | | |
+| email_verified | DateTime | YES | | |
+| image | String | YES | | プロフィール画像URL |
+| role | UserRole | NO | DEFAULT(USER) | |
+| created_at | DateTime | NO | DEFAULT(now()) | |
+| updated_at | DateTime | NO | @updatedAt | |
 
-### オンデマンドバックアップ
+**制約**: UNIQUE(email, role)
 
-- **頻度**: 毎日自動実行
-- **保持**: 30日間
-- **リージョン間複製**: 有効（東京→大阪）
+### 3.2 Instructor (instructors)
+
+| カラム | 型 | NULL | 制約 | 説明 |
+|--------|-----|------|------|------|
+| id | UUID | NO | PK | |
+| user_id | String | NO | FK(users), UNIQUE | |
+| bio | Text | YES | | 自己紹介 |
+| specialties | String[] | NO | | 専門分野 |
+| hourly_rate | Int | YES | | 時給（円） |
+| is_verified | Boolean | NO | DEFAULT(false) | |
+| google_access_token | Text | YES | | Google OAuth |
+| google_refresh_token | Text | YES | | |
+| google_token_expiry | DateTime | YES | | |
+
+### 3.3 Service (services)
+
+| カラム | 型 | NULL | 制約 | 説明 |
+|--------|-----|------|------|------|
+| id | UUID | NO | PK | |
+| instructor_id | String | NO | FK(instructors), INDEX | |
+| title | String | NO | | |
+| description | Text | YES | | |
+| category | String | NO | | |
+| delivery_type | String | NO | DEFAULT("remote") | remote/onsite/hybrid |
+| location | String | YES | | 都道府県 |
+| price | Int | NO | | 料金（円） |
+| duration | Int | NO | | 所要時間（分） |
+| is_active | Boolean | NO | DEFAULT(true) | |
+| recurrence_type | RecurrenceType | NO | DEFAULT(ONCE) | |
+| available_days | String[] | NO | DEFAULT([]) | 曜日配列 |
+| start_time | String | YES | | "HH:MM" |
+| end_time | String | YES | | "HH:MM" |
+| timezone | String | NO | DEFAULT("Asia/Tokyo") | |
+| valid_from | DateTime | YES | | |
+| valid_until | DateTime | YES | | |
+| max_participants | Int | NO | DEFAULT(1) | 最大定員 |
+
+### 3.4 ServiceSchedule (service_schedules)
+
+| カラム | 型 | NULL | 制約 | 説明 |
+|--------|-----|------|------|------|
+| id | UUID | NO | PK | |
+| service_id | String | NO | FK(services), INDEX | |
+| date | Date | NO | INDEX | 開催日 |
+| start_time | String | NO | | "HH:MM" |
+| end_time | String | NO | | "HH:MM" |
+| is_cancelled | Boolean | NO | DEFAULT(false) | |
+
+### 3.5 Reservation (reservations)
+
+| カラム | 型 | NULL | 制約 | 説明 |
+|--------|-----|------|------|------|
+| id | UUID | NO | PK | |
+| user_id | String | YES | FK(users), INDEX | null=ゲスト |
+| guest_user_id | String | YES | FK(guest_users), INDEX | |
+| service_id | String | NO | FK(services), INDEX | |
+| instructor_id | String | NO | FK(instructors), INDEX | |
+| scheduled_at | DateTime | NO | INDEX | 予約日時 |
+| status | ReservationStatus | NO | DEFAULT(PENDING) | |
+| notes | Text | YES | | 備考 |
+| meet_url | String | YES | | Google MeetリンクURL |
+| participants | Int | NO | DEFAULT(1) | 予約人数 |
+
+### 3.6 Partner (partners)
+
+| カラム | 型 | NULL | 制約 | 説明 |
+|--------|-----|------|------|------|
+| id | UUID | NO | PK | |
+| name | String | NO | | パートナー名 |
+| code | String | NO | UNIQUE, INDEX | URLコード |
+| description | Text | YES | | |
+| website_url | String | YES | | |
+| logo_url | String | YES | | |
+| api_key | String | NO | UNIQUE, INDEX | ptr_xxx形式 |
+| secret_key | String | NO | | HMAC署名用 |
+| webhook_url | String | YES | | 通知先URL |
+| webhook_secret | String | YES | | Webhook署名用 |
+| allowed_origins | String[] | NO | DEFAULT([]) | CORS用 |
+| payment_mode | PaymentMode | NO | DEFAULT(COORDY) | |
+| allow_guest | Boolean | NO | DEFAULT(true) | |
+| require_phone | Boolean | NO | DEFAULT(false) | |
+| instructor_ids | String[] | NO | DEFAULT([]) | 許可インストラクター |
+| service_ids | String[] | NO | DEFAULT([]) | 許可サービス |
+| commission_rate | Float | NO | DEFAULT(0.0) | 手数料率 |
+| is_active | Boolean | NO | DEFAULT(true) | |
+
+### 3.7 ExternalReservation (external_reservations)
+
+| カラム | 型 | NULL | 制約 | 説明 |
+|--------|-----|------|------|------|
+| id | UUID | NO | PK | |
+| partner_id | String | NO | FK(partners), INDEX | |
+| reservation_id | String | NO | FK(reservations), UNIQUE | |
+| external_ref | String | YES | INDEX | パートナー側参照ID |
+| payment_mode | PaymentMode | NO | | 実際の決済モード |
+| external_payment_ref | String | YES | | 外部決済参照 |
+| commission_rate | Float | NO | | 適用手数料率 |
+| commission_amount | Int | NO | DEFAULT(0) | 手数料額（円） |
+
+### 3.8 GuestUser (guest_users)
+
+| カラム | 型 | NULL | 制約 | 説明 |
+|--------|-----|------|------|------|
+| id | UUID | NO | PK | |
+| email | String | NO | INDEX | |
+| name | String | NO | | |
+| phone_number | String | YES | | |
+
+### 3.9 その他テーブル
+
+| テーブル | 説明 |
+|---------|------|
+| **ClientProfile** (client_profiles) | ユーザー詳細プロフィール・本人確認情報 |
+| **PhoneVerification** (phone_verifications) | SMS認証コード管理 |
+| **Wallet** (wallets) | ポイント残高（1 User : 1 Wallet） |
+| **PointTransaction** (point_transactions) | チャージ/使用/期限切れの取引履歴 |
+| **PaymentMethod** (payment_methods) | Stripeクレジットカード情報 |
+| **BankAccount** (bank_accounts) | インストラクター受取口座（暗号化） |
+| **WithdrawalRequest** (withdrawal_requests) | 出金申請 |
+| **FavoriteCreator** (favorite_creators) | お気に入りインストラクター |
+| **Notification** (notifications) | システム/管理者通知 |
+| **AdminAnnouncement** (admin_announcements) | 管理者お知らせ |
+| **IdentityVerificationRequest** (identity_verification_requests) | 身分証確認申請 |
+| **Campaign** (campaigns) | キャンペーン/割引設定 |
+| **CampaignUsage** (campaign_usages) | キャンペーン利用履歴 |
+| **ServiceImage** (service_images) | サービス画像 |
 
 ---
 
-## セキュリティ設定
+## 4. 主要リレーション
 
-### 暗号化
+```
+User 1──1 Instructor
+User 1──1 ClientProfile
+User 1──1 Wallet
+User 1──* Reservation
+User 1──* PointTransaction
+User 1──* PaymentMethod
+User 1──* BankAccount
+User 1──* Notification
 
-- **保存時暗号化**: AWS管理キー (AES-256)
-- **転送時暗号化**: TLS 1.2+
+Instructor 1──* Service
+Instructor 1──* Reservation
+Instructor 1──* Campaign
 
-### アクセス制御
+Service 1──* ServiceSchedule
+Service 1──* ServiceImage
+Service 1──* Reservation
+Service 1──* Campaign
 
-```json
-{
-  "Effect": "Allow",
-  "Action": [
-    "dynamodb:GetItem",
-    "dynamodb:PutItem",
-    "dynamodb:UpdateItem",
-    "dynamodb:Query"
-  ],
-  "Resource": "arn:aws:dynamodb:ap-northeast-1:*:table/coordy-*",
-  "Condition": {
-    "ForAllValues:StringEquals": {
-      "dynamodb:LeadingKeys": ["${cognito-identity.amazonaws.com:sub}"]
-    }
-  }
-}
+Reservation *──1 User? (ゲスト時null)
+Reservation *──1 GuestUser? (ゲスト時)
+Reservation 1──1 ExternalReservation? (外部予約時)
+
+Partner 1──* ExternalReservation
+GuestUser 1──* Reservation
 ```
 
-### 監査ログ
-
-- **CloudTrail**: すべてのDynamoDB APIコールを記録
-- **CloudWatch Logs**: パフォーマンスメトリクス監視
-
 ---
 
-## インデックス戦略
+## 5. スキーマファイル
 
-### GSI設計ガイドライン
-
-1. **頻繁なクエリパターン**: GSI作成
-2. **低頻度クエリ**: Scan（フィルタ付き）
-3. **複合条件**: 複数GSIの組み合わせ
-
-### LSI vs GSI
-
-| 項目 | LSI | GSI |
-|------|-----|-----|
-| 作成タイミング | テーブル作成時のみ | いつでも |
-| キー要件 | 同じPK必要 | 異なるPK可 |
-| スループット | テーブルと共有 | 独立 |
-| 使用場面 | 同一PKでの別ソート | 異なるPKでのクエリ |
-
-**Coordyでの選択**: 柔軟性を優先し、GSIを主に使用
-
----
-
-## データマイグレーション
-
-### 初期データ投入
-
-```typescript
-// mock-data.ts
-export const seedData = {
-  users: [
-    {
-      userId: 'user-001',
-      email: 'user01@example.com',
-      name: '山田太郎',
-      role: 'user',
-      point: 5000,
-      membership: 'gold'
-    }
-  ],
-  instructors: [
-    {
-      instructorId: 'inst-001',
-      userId: 'user-002',
-      name: '田中先生',
-      bio: 'ヨガインストラクター歴10年',
-      specialties: ['ヨガ', 'ピラティス']
-    }
-  ]
-};
-```
-
-### マイグレーションスクリプト
-
-```bash
-# スクリプト実行
-npm run db:seed
-npm run db:migrate
-```
-
----
-
-## モニタリング
-
-### CloudWatch メトリクス
-
-- **ConsumedReadCapacityUnits**: 読み取りキャパシティ消費
-- **ConsumedWriteCapacityUnits**: 書き込みキャパシティ消費
-- **UserErrors**: ユーザーエラー数
-- **SystemErrors**: システムエラー数
-
-### アラート設定
-
-```yaml
-alarms:
-  - name: HighThrottleRate
-    metric: UserErrors
-    threshold: 10
-    period: 300
-    action: sns-topic-arn
-
-  - name: HighLatency
-    metric: SuccessfulRequestLatency
-    threshold: 100ms
-    period: 60
-    action: sns-topic-arn
-```
-
----
-
-## パフォーマンス最適化
-
-### ベストプラクティス
-
-1. **バッチ操作**: `BatchGetItem`, `BatchWriteItem`を活用
-2. **Projection Expression**: 必要な属性のみ取得
-3. **Consistent Read**: 整合性が必要な場合のみ使用
-4. **キャッシュ**: DynamoDB Accelerator (DAX) 検討（フェーズ2）
-
-### クエリ最適化
-
-```typescript
-// 良い例: 必要な属性のみ取得
-const params = {
-  TableName: 'coordy-users-prod',
-  Key: { userId: 'user-001' },
-  ProjectionExpression: 'userId, name, email'
-};
-
-// 悪い例: すべての属性を取得
-const params = {
-  TableName: 'coordy-users-prod',
-  Key: { userId: 'user-001' }
-};
-```
-
----
-
-## 開発環境
-
-### ローカル開発
-
-```bash
-# DynamoDB Local起動
-docker run -p 8000:8000 amazon/dynamodb-local
-
-# テーブル作成
-aws dynamodb create-table \
-  --table-name coordy-users-dev \
-  --endpoint-url http://localhost:8000 \
-  ...
-```
-
-### 環境別テーブル
-
-- **開発**: `coordy-*-dev`
-- **ステージング**: `coordy-*-staging`
-- **本番**: `coordy-*-prod`
-
----
-
-*最終更新日: 2025-10-11*
+`prisma/schema.prisma` を正とする。

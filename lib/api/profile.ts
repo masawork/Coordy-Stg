@@ -1,190 +1,107 @@
 /**
- * プロフィール関連のAPI操作
- *
- * ClientProfileスキーマには displayName フィールドが存在します。
- * displayName は ClientProfile と Cognito の custom:displayName 属性の両方で管理されます。
+ * プロフィール関連のAPI操作（Supabase/Prisma版）
  */
 
-import { getDataClient } from './data-client';
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
 
 export interface ClientProfileInput {
-  clientId: string;
-  name: string;
-  displayName?: string; // ClientProfile スキーマに存在する（ニックネーム）
+  userId: string;
+  displayName?: string;
   address?: string;
   phoneNumber?: string;
-  dateOfBirth?: string;
+  dateOfBirth?: Date | string;
   gender?: string;
-  themeColor?: string;
   isProfileComplete?: boolean;
 }
 
 /**
  * プロフィール取得
  */
-export async function getClientProfile(clientId: string) {
+export async function getClientProfile(userId: string) {
   try {
-    console.log('🔍 getClientProfile 開始:', clientId);
-    const client = getDataClient();
-    const { data, errors } = await client.models.ClientProfile.list({
-      filter: { clientId: { eq: clientId } },
+    const profile = await prisma.clientProfile.findUnique({
+      where: { userId },
     });
-
-    if (errors) {
-      console.error('❌ ClientProfile取得エラー:', errors);
-      console.error('エラー詳細:', JSON.stringify(errors, null, 2));
-      return null;
-    }
-
-    console.log('✅ ClientProfile取得結果:', data);
-    return data && data.length > 0 ? data[0] : null;
-  } catch (error: any) {
-    console.error('❌ Get profile error:', error);
-    console.error('エラー詳細:', {
-      name: error?.name,
-      message: error?.message,
-      errors: error?.errors,
-    });
+    return profile;
+  } catch (error) {
+    console.error('Get client profile error:', error);
     return null;
   }
 }
 
 /**
  * プロフィール作成
- *
- * 注意: ClientProfile スキーマに存在するフィールドのみを送信すること。
  */
 export async function createClientProfile(input: ClientProfileInput) {
   try {
-    console.log('📝 createClientProfile 開始:', input);
-    const client = getDataClient();
-
-    // CreateClientProfileInputに定義されているフィールドのみを送信
-    const createInput: Record<string, unknown> = {
-      clientId: input.clientId,
-      name: input.name,
-    };
-
-    // オプショナルフィールドは値がある場合のみ追加
-    // displayName は ClientProfile スキーマに存在するため、値がある場合のみ送信
-    if (input.displayName !== undefined && input.displayName !== '') {
-      createInput.displayName = input.displayName;
-    }
-    if (input.address !== undefined && input.address !== '') {
-      createInput.address = input.address;
-    }
-    if (input.phoneNumber !== undefined && input.phoneNumber !== '') {
-      createInput.phoneNumber = input.phoneNumber;
-    }
-    if (input.dateOfBirth !== undefined && input.dateOfBirth !== '') {
-      createInput.dateOfBirth = input.dateOfBirth;
-    }
-    if (input.gender !== undefined && input.gender !== '') {
-      createInput.gender = input.gender;
-    }
-    if (input.themeColor !== undefined && input.themeColor !== '') {
-      createInput.themeColor = input.themeColor;
-    }
-
-    console.log('📝 実際に送信するデータ:', createInput);
-
-    const { data, errors } = await client.models.ClientProfile.create(createInput as any);
-
-    if (errors) {
-      console.error('❌ ClientProfile作成エラー:', errors);
-      console.error('エラー詳細:', JSON.stringify(errors, null, 2));
-      throw new Error(`プロフィールの作成に失敗しました: ${JSON.stringify(errors)}`);
-    }
-
-    // プロフィール完了フラグを明示的に更新（Create入力で受け付けない場合の保険）
-    if (data?.id) {
-      await client.models.ClientProfile.update({
-        id: data.id,
-        isProfileComplete: true,
-      });
-    }
-
-    console.log('✅ ClientProfile作成成功:', data);
-    return data;
-  } catch (error: any) {
-    console.error('❌ Create profile error:', error);
-    console.error('エラー詳細:', {
-      name: error?.name,
-      message: error?.message,
-      errors: error?.errors,
-      stack: error?.stack,
+    const profile = await prisma.clientProfile.create({
+      data: {
+        userId: input.userId,
+        displayName: input.displayName,
+        address: input.address,
+        phoneNumber: input.phoneNumber,
+        dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : null,
+        gender: input.gender,
+        isProfileComplete: input.isProfileComplete ?? false,
+      },
     });
-    throw error;
+    return profile;
+  } catch (error: any) {
+    console.error('Create client profile error:', error);
+    throw new Error(`プロフィールの作成に失敗しました: ${error.message}`);
   }
 }
 
 /**
  * プロフィール更新
- *
- * 注意: ClientProfile スキーマに存在するフィールドのみを送信すること。
  */
 export async function updateClientProfile(
-  id: string,
+  userId: string,
   updates: Partial<ClientProfileInput>
 ) {
   try {
-    console.log('📝 updateClientProfile 開始:', { id, updates });
-    const client = getDataClient();
-
-    // ClientProfile スキーマに存在するフィールドのみを更新
-    const updateInput: Record<string, unknown> = { id };
-
-    if (updates.name !== undefined) {
-      updateInput.name = updates.name;
-    }
+    const updateData: any = {};
+    
     if (updates.displayName !== undefined) {
-      updateInput.displayName = updates.displayName;
+      updateData.displayName = updates.displayName;
     }
     if (updates.address !== undefined) {
-      updateInput.address = updates.address;
+      updateData.address = updates.address;
     }
     if (updates.phoneNumber !== undefined) {
-      updateInput.phoneNumber = updates.phoneNumber;
+      updateData.phoneNumber = updates.phoneNumber;
     }
     if (updates.dateOfBirth !== undefined) {
-      updateInput.dateOfBirth = updates.dateOfBirth;
+      updateData.dateOfBirth = updates.dateOfBirth ? new Date(updates.dateOfBirth) : null;
     }
     if (updates.gender !== undefined) {
-      updateInput.gender = updates.gender;
+      updateData.gender = updates.gender;
     }
-    if (updates.themeColor !== undefined) {
-      updateInput.themeColor = updates.themeColor;
-    }
-    updateInput.isProfileComplete = updates.isProfileComplete ?? true;
-
-    const { data, errors } = await client.models.ClientProfile.update(updateInput as any);
-
-    if (errors) {
-      console.error('❌ ClientProfile更新エラー:', errors);
-      console.error('エラー詳細:', JSON.stringify(errors, null, 2));
-      throw new Error(`プロフィールの更新に失敗しました: ${JSON.stringify(errors)}`);
+    if (updates.isProfileComplete !== undefined) {
+      updateData.isProfileComplete = updates.isProfileComplete;
     }
 
-    console.log('✅ ClientProfile更新成功:', data);
-    return data;
-  } catch (error: any) {
-    console.error('❌ Update profile error:', error);
-    console.error('エラー詳細:', {
-      name: error?.name,
-      message: error?.message,
-      errors: error?.errors,
-      stack: error?.stack,
+    const profile = await prisma.clientProfile.update({
+      where: { userId },
+      data: updateData,
     });
-    throw error;
+    return profile;
+  } catch (error: any) {
+    console.error('Update client profile error:', error);
+    throw new Error(`プロフィールの更新に失敗しました: ${error.message}`);
   }
 }
 
 /**
  * プロフィール完了チェック
  */
-export async function isProfileComplete(clientId: string): Promise<boolean> {
-  const profile = await getClientProfile(clientId);
-  const result = profile?.isProfileComplete === true;
-  console.log('🔍 isProfileComplete 結果:', { clientId, result, profile });
-  return result;
+export async function isProfileComplete(userId: string): Promise<boolean> {
+  try {
+    const profile = await getClientProfile(userId);
+    return profile?.isProfileComplete === true;
+  } catch (error) {
+    console.error('isProfileComplete error:', error);
+    return false;
+  }
 }

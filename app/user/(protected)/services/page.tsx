@@ -1,10 +1,14 @@
 'use client';
 
+// 動的レンダリングを強制（React 19 + Next.js 16）
+export const dynamic = 'force-dynamic';
+
+
 import { useState, useEffect } from 'react';
 import { listServices } from '@/lib/api/services';
 import { ServiceCard } from '@/components/features/service/ServiceCard';
-import { getInstructor } from '@/lib/api/instructors';
-import type { ServiceCategory } from '@/lib/api/data-client';
+// ServiceCategory型を定義
+type ServiceCategory = string;
 
 export default function ServicesPage() {
   const [services, setServices] = useState<any[]>([]);
@@ -23,26 +27,14 @@ export default function ServicesPage() {
     try {
       setLoading(true);
 
-      const filters = selectedCategory ? { status: 'active' as const, category: selectedCategory } : { status: 'active' as const };
+      const filters = selectedCategory ? { category: selectedCategory, isActive: true } : { isActive: true };
       const allServices = await listServices(filters);
 
-      // インストラクター情報を追加
-      const servicesWithInstructor = await Promise.all(
-        (allServices || []).map(async (service) => {
-          try {
-            const instructor = await getInstructor(service.instructorId);
-            return {
-              ...service,
-              instructorName: instructor?.displayName || 'クリエイター',
-            };
-          } catch {
-            return {
-              ...service,
-              instructorName: 'クリエイター',
-            };
-          }
-        })
-      );
+      // インストラクター情報はAPIレスポンスに含まれている（instructor.user）
+      const servicesWithInstructor = (allServices || []).map((service: any) => ({
+        ...service,
+        instructorName: service.instructor?.user?.name || service.instructor?.bio || 'クリエイター',
+      }));
 
       setServices(servicesWithInstructor);
       setFilteredServices(servicesWithInstructor);

@@ -1,5 +1,9 @@
 'use client';
 
+// 動的レンダリングを強制（React 19 + Next.js 16）
+export const dynamic = 'force-dynamic';
+
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSession } from '@/lib/auth';
@@ -12,13 +16,16 @@ export default function ActivityPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const session = getSession();
-    if (!session) {
-      router.push('/login/user');
-      return;
-    }
+    const loadSessionAndActivity = async () => {
+      const session = await getSession();
+      if (!session) {
+        router.push('/login/user');
+        return;
+      }
 
-    loadActivity(session.userId);
+      loadActivity(session.user.id);
+    };
+    loadSessionAndActivity();
   }, [router]);
 
   const loadActivity = async (userId: string) => {

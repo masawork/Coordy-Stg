@@ -1,5 +1,9 @@
 'use client';
 
+// 動的レンダリングを強制（React 19 + Next.js 16）
+export const dynamic = 'force-dynamic';
+
+
 import { useState } from 'react';
 import { Calendar, Clock, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';

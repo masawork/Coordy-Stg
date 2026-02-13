@@ -4,30 +4,32 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import Button from '../common/Button';
-import { getSession } from '@/lib/auth/session';
-import type { User } from '@/lib/auth/types';
+import { getSession } from '@/lib/auth';
 
 export default function CTASection() {
-  const [session, setSession] = useState<User | null>(null);
+  const [session, setSession] = useState<any | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    const currentSession = getSession();
-    setSession(currentSession);
+    const checkSession = async () => {
+      const currentSession = await getSession();
+      setSession(currentSession?.user || null);
+    };
+    checkSession();
   }, []);
 
   // ユーザーボタンの遷移先を決定
   const getUserButtonHref = () => {
     if (!mounted || !session) return '/signup/user';
-    if (session.role === 'user') return '/user';
+    if (session.user_metadata?.role?.toLowerCase() === 'user') return '/user';
     return '/signup/user';
   };
 
   // サービス出品者ボタンの遷移先を決定
   const getInstructorButtonHref = () => {
     if (!mounted || !session) return '/signup/instructor';
-    if (session.role === 'instructor') return '/instructor';
+    if (session.user_metadata?.role?.toLowerCase() === 'instructor') return '/instructor';
     // ユーザーとしてログイン中でも /signup/instructor へ（別ロールのアカウント作成を許可）
     return '/signup/instructor';
   };

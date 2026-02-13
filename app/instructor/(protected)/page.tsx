@@ -5,18 +5,27 @@
 
 'use client';
 
+// 動的レンダリングを強制（React 19 + Next.js 16）
+export const dynamic = 'force-dynamic';
+
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getCurrentAuthUser } from '@/lib/auth/cognito';
-import { getInstructorByUserId } from '@/lib/api/instructors';
-import type { User } from '@/lib/auth';
+import { getCurrentAuthUser } from '@/lib/auth';
+import { fetchCurrentInstructor } from '@/lib/api/instructors-client';
+import { getBankAccounts, BankAccount } from '@/lib/api/bank-client';
+import type { User } from '@/lib/auth/types';
 
 export default function InstructorDashboardPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any | null>(null);
   const [instructor, setInstructor] = useState<any>(null);
-  const [showIdentityWarning, setShowIdentityWarning] = useState(false);
+  const [identityStatus, setIdentityStatus] = useState<'approved' | 'pending' | 'rejected' | 'notSubmitted'>('notSubmitted');
+  const [identityRejectedReason, setIdentityRejectedReason] = useState<string | null>(null);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showRejectedModal, setShowRejectedModal] = useState(false);
+  const ACK_KEY = 'instructor_rejected_ack';
 
   useEffect(() => {
     loadUserAndInstructor();
@@ -26,17 +35,57 @@ export default function InstructorDashboardPage() {
     try {
       const authUser = await getCurrentAuthUser();
       if (authUser) {
-        setUser(authUser as User);
+        setUser(authUser);
 
         // インストラクター情報を取得
-        const instructorData = await getInstructorByUserId(authUser.userId);
+        const instructorData = await fetchCurrentInstructor();
         if (instructorData) {
           setInstructor(instructorData);
+        }
 
-          // 身分証明書が未承認の場合は警告を表示
-          if (instructorData.identityDocumentStatus !== 'approved') {
-            setShowIdentityWarning(true);
+        // 本人確認ステータス取得
+        try {
+          const res = await fetch('/api/verification/identity/status');
+          if (res.ok) {
+            const data = await res.json();
+            const reqStatus = data?.request?.status;
+            if (reqStatus === 'approved' || data?.identityVerified) {
+              setIdentityStatus('approved');
+            } else if (reqStatus === 'pending') {
+              setIdentityStatus('pending');
+            } else if (reqStatus === 'rejected') {
+              setIdentityStatus('rejected');
+              setIdentityRejectedReason(data?.request?.rejectedReason || null);
+            } else {
+              setIdentityStatus('notSubmitted');
+            }
+
+            // 却下モーダル表示（ログインセッション中に1回のみ）
+            if (
+              (reqStatus && reqStatus.toLowerCase() === 'rejected') ||
+              data?.request?.rejectedReason ||
+              data?.identityRejectedReason
+            ) {
+              const acknowledged = typeof window !== 'undefined' ? sessionStorage.getItem(ACK_KEY) : null;
+              if (!acknowledged) {
+                setShowRejectedModal(true);
+              }
+            }
+          } else {
+            setIdentityStatus('notSubmitted');
           }
+        } catch (err) {
+          console.error('本人確認ステータス取得エラー:', err);
+          setIdentityStatus('notSubmitted');
+        }
+
+        // 銀行口座取得
+        try {
+          const accounts = await getBankAccounts();
+          setBankAccounts(accounts);
+        } catch (err) {
+          console.error('銀行口座取得エラー:', err);
+          setBankAccounts([]);
         }
       }
     } catch (error) {
@@ -59,6 +108,48 @@ export default function InstructorDashboardPage() {
 
   return (
     <div className="space-y-8">
+      {/* 却下モーダル（セッション中一度） */}
+      {showRejectedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6">
+            <h3 className="text-xl font-bold text-red-700 mb-2">本人確認が却下されました</h3>
+            <p className="text-sm text-gray-700 mb-3">
+              再提出が必要です。以下の理由を確認のうえ、正しい書類を再度アップロードしてください。
+            </p>
+            {identityRejectedReason && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-800 text-sm">
+                却下理由: {identityRejectedReason}
+              </div>
+            )}
+            <div className="flex justify-end gap-3">
+              <button
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    sessionStorage.setItem(ACK_KEY, '1');
+                  }
+                  setShowRejectedModal(false);
+                }}
+              >
+                OK
+              </button>
+              <button
+                className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    sessionStorage.setItem(ACK_KEY, '1');
+                  }
+                  setShowRejectedModal(false);
+                  router.push('/instructor/verification/identity');
+                }}
+              >
+                再提出ページへ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ウェルカムセクション */}
       <div className="bg-gradient-to-r from-green-600 to-teal-600 rounded-lg shadow-lg p-8 text-white">
         <h1 className="text-3xl font-bold mb-2">
@@ -69,32 +160,55 @@ export default function InstructorDashboardPage() {
         </p>
       </div>
 
-      {/* 身分証明書警告バナー */}
-      {showIdentityWarning && (
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
+      {/* 必須アクションカード（×で消せない） */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {identityStatus !== 'approved' && (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-6 shadow">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-2xl">✅</span>
+              <div>
+                <p className="text-sm font-semibold text-green-800">本人確認が必要です</p>
+                <p className="text-lg font-bold text-green-900">
+                  {identityStatus === 'pending' ? '審査中' : identityStatus === 'rejected' ? '再提出が必要です' : '未提出'}
+                </p>
+              </div>
             </div>
-            <div className="ml-3 flex-1">
-              <p className="text-sm text-yellow-700">
-                <strong>身分証明書の提出が必要です。</strong>
-                {instructor?.identityDocumentStatus === 'notSubmitted' && '承認されるまで、サービス作成と予約受付ができません。'}
-                {instructor?.identityDocumentStatus === 'pending' && '現在審査中です。承認されるまでお待ちください。'}
-                {instructor?.identityDocumentStatus === 'rejected' && '身分証明書が却下されました。再度提出してください。'}
-              </p>
-            </div>
+            {identityStatus === 'rejected' && identityRejectedReason && (
+              <p className="text-sm text-red-700 mb-3">却下理由: {identityRejectedReason}</p>
+            )}
+            <p className="text-sm text-green-700 mb-4">
+              サービスを作成するには本人確認の承認が必要です。書類を提出してください。
+            </p>
             <button
-              onClick={() => router.push('/instructor/identity-document')}
-              className="ml-4 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 text-sm font-medium transition-colors"
+              onClick={() => router.push('/instructor/verification/identity')}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
             >
-              {instructor?.identityDocumentStatus === 'notSubmitted' ? '提出する' : '確認する'}
+              本人確認書類を提出 →
             </button>
           </div>
-        </div>
-      )}
+        )}
+
+        {bankAccounts.length === 0 && (
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-6 shadow">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-2xl">🏦</span>
+              <div>
+                <p className="text-sm font-semibold text-orange-800">銀行口座が未登録です</p>
+                <p className="text-lg font-bold text-orange-900">出金先を登録してください</p>
+              </div>
+            </div>
+            <p className="text-sm text-orange-700 mb-4">
+              銀行口座を登録すると収益の引き出しとサービス作成が可能になります。
+            </p>
+            <button
+              onClick={() => router.push('/instructor/bank-accounts')}
+              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+            >
+              銀行口座を登録 →
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* ダッシュボードグリッド */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -126,8 +240,11 @@ export default function InstructorDashboardPage() {
             クイックアクション
           </h2>
           <div className="space-y-2">
-            {instructor?.identityDocumentStatus === 'approved' ? (
-              <button className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+            {identityStatus === 'approved' && bankAccounts.length > 0 ? (
+              <button
+                className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                onClick={() => router.push('/instructor/services/new')}
+              >
                 新規サービス作成
               </button>
             ) : (
@@ -139,7 +256,7 @@ export default function InstructorDashboardPage() {
                   新規サービス作成
                 </button>
                 <p className="text-xs text-gray-500 mt-1">
-                  ※サービス作成には管理者の承認が必要です
+                  ※サービス作成には本人確認の承認と銀行口座登録が必要です
                 </p>
               </div>
             )}

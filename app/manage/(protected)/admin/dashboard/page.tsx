@@ -1,8 +1,43 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { BarChart, TrendingUp, Users, Calendar } from 'lucide-react';
+import { getAdminStats } from '@/lib/api/admin';
+
+// 動的レンダリングを強制（React 19 + Next.js 16）
+export const dynamic = 'force-dynamic';
 
 export default function AdminDashboardPage() {
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  const loadStats = async () => {
+    try {
+      setLoading(true);
+      const data = await getAdminStats();
+      setStats(data);
+    } catch (error) {
+      console.error('Failed to load stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">読み込み中...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -18,7 +53,9 @@ export default function AdminDashboardPage() {
             </div>
             <div>
               <p className="text-sm text-gray-600">総ユーザー数</p>
-              <p className="text-2xl font-bold text-gray-900">-</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {stats?.totalUsers?.toLocaleString() || '0'}
+              </p>
             </div>
           </div>
         </div>
@@ -30,7 +67,9 @@ export default function AdminDashboardPage() {
             </div>
             <div>
               <p className="text-sm text-gray-600">月間売上</p>
-              <p className="text-2xl font-bold text-gray-900">-</p>
+              <p className="text-2xl font-bold text-gray-900">
+                ¥{stats?.monthlyRevenue?.toLocaleString() || '0'}
+              </p>
             </div>
           </div>
         </div>
@@ -42,7 +81,9 @@ export default function AdminDashboardPage() {
             </div>
             <div>
               <p className="text-sm text-gray-600">予約数</p>
-              <p className="text-2xl font-bold text-gray-900">-</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {stats?.totalReservations?.toLocaleString() || '0'}
+              </p>
             </div>
           </div>
         </div>
@@ -54,7 +95,9 @@ export default function AdminDashboardPage() {
             </div>
             <div>
               <p className="text-sm text-gray-600">アクティブサービス</p>
-              <p className="text-2xl font-bold text-gray-900">-</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {stats?.totalServices?.toLocaleString() || '0'}
+              </p>
             </div>
           </div>
         </div>

@@ -1,21 +1,16 @@
 'use client';
 
+// 動的レンダリングを強制（React 19 + Next.js 16）
+export const dynamic = 'force-dynamic';
+
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import Button from '@/components/common/Button';
-import {
-  loginUser,
-  saveSession,
-  clearSession,
-  checkAuth,
-  getCurrentAuthUser,
-  getSessionForRole,
-} from '@/lib/auth';
-import { isProfileComplete } from '@/lib/api/profile';
-// Amplify初期化を確実に行う
-import '@/src/lib/amplifyClient';
+import { signIn, getSession, signInWithGoogle } from '@/lib/auth';
+import { isProfileComplete } from '@/lib/api/profile-client';
 
 export default function UserLoginPage() {
   const [email, setEmail] = useState('');
@@ -25,52 +20,35 @@ export default function UserLoginPage() {
   const [error, setError] = useState('');
   const router = useRouter();
 
-  // マウント時に既にログイン済みかチェック（Cognitoから最新情報を取得）
+  // マウント時に既にログイン済みかチェック
   useEffect(() => {
     let active = true;
     const checkSession = async () => {
       try {
-        const storedUser = getSessionForRole('user');
-        if (storedUser) {
-          console.log('[DEBUG] user login stored session', { role: storedUser.role });
-          try {
-            const profileComplete = await isProfileComplete(storedUser.userId);
-            window.location.href = profileComplete ? '/user' : '/user/profile/setup';
-          } catch (err) {
-            console.error('プロフィールチェックエラー:', err);
-            window.location.href = '/user';
+        const session = await getSession();
+        if (session?.user) {
+          const user = session.user;
+          // ロールがuserであることを確認
+          if (!user.user_metadata?.role || user.user_metadata.role.toLowerCase() === 'user') {
+            try {
+              const profileComplete = await isProfileComplete(user.id);
+              if (active) {
+                window.location.href = profileComplete ? '/user' : '/user/profile/setup';
+              }
+              return;
+            } catch (err) {
+              console.error('プロフィールチェックエラー:', err);
+              if (active) {
+                window.location.href = '/user/profile/setup';
+              }
+              return;
+            }
           }
-          return;
         }
-
-        const hasAuthSession = await checkAuth();
-        if (!hasAuthSession) {
-          clearSession();
-          if (active) setChecking(false);
-          return;
-        }
-
-        const authUser = await getCurrentAuthUser();
-        saveSession(authUser);
-
-        console.log('[DEBUG] user login auth user', { role: authUser.role });
-        if (authUser.role === 'user') {
-          try {
-            const profileComplete = await isProfileComplete(authUser.userId);
-            window.location.href = profileComplete ? '/user' : '/user/profile/setup';
-          } catch (err) {
-            console.error('プロフィールチェックエラー:', err);
-            window.location.href = '/user';
-          }
-        } else {
-          if (active) setChecking(false);
-        }
+        if (active) setChecking(false);
       } catch (error) {
-        clearSession();
-        if (active) {
-          console.log('✅ 未ログイン状態を確認、ログインフォームを表示');
-          setChecking(false);
-        }
+        console.error('Session check error:', error);
+        if (active) setChecking(false);
       }
     };
 
@@ -85,39 +63,29 @@ export default function UserLoginPage() {
     if (loading) return;
     setLoading(true);
     setError('');
-    console.log('login submit', { email });
 
     try {
-      // 古いセッションをクリア（別アカウントでのログインをサポート）
-      clearSession();
+      // Supabase Authでログイン
+      await signIn({ email, password });
 
-      // Cognitoでログイン
-      const { user, nextStep } = await loginUser({ email, password });
-
-      // パスワード変更が必要な場合
-      if (nextStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
-        // パスワードリセットページへリダイレクト
-        window.location.href = '/login/user/reset';
-        return;
-      }
-
-      // userが存在しない場合はエラー
-      if (!user) {
+      // セッションを取得してユーザー情報を確認
+      const session = await getSession();
+      if (!session?.user) {
         throw new Error('ログインに失敗しました');
       }
 
-      // ロールがuserであることを確認
-      if (user.role !== 'user') {
+      const user = session.user;
+
+      // ロールが未設定の場合もユーザー扱いで進める
+      if (user.user_metadata?.role && user.user_metadata.role.toLowerCase() !== 'user') {
         throw new Error('ユーザーアカウントでログインしてください');
       }
 
-      // セッションを保存
-      saveSession(user);
-
       console.log('✅ ユーザーログイン成功、プロフィールチェック中...');
+      
       // プロフィール完了状態をチェックしてリダイレクト
       try {
-        const profileComplete = await isProfileComplete(user.userId);
+        const profileComplete = await isProfileComplete(user.id);
         console.log('🔍 プロフィール完了チェック結果:', profileComplete);
         if (profileComplete) {
           console.log('✅ プロフィール完了、/user にリダイレクト');
@@ -128,35 +96,23 @@ export default function UserLoginPage() {
         }
       } catch (err) {
         console.error('❌ プロフィールチェックエラー:', err);
-        // エラー時はダッシュボードへ（保護レイアウトで再チェックされる）
-        window.location.href = '/user';
+        window.location.href = '/user/profile/setup';
       }
     } catch (err: any) {
       console.error('Login error:', err);
-
+      
       // エラーメッセージを日本語化
-      // 認証エラーとその他のエラーを分離
       let friendlyMessage = 'ログインに失敗しました。時間をおいて再度お試しください。';
-
-      if (err.name === 'UserNotConfirmedException') {
-        // 未確認ユーザーの場合
-        setError('メール確認が完了していません。確認コード入力画面へ移動します...');
-        setTimeout(() => {
-          router.push(`/verify?email=${encodeURIComponent(email)}`);
-        }, 2000);
-        setLoading(false);
-        return;
-      } else if (err.name === 'NotAuthorizedException') {
-        // パスワード間違いなどの認証エラー
+      
+      if (err.message?.includes('email') || err.message?.includes('password')) {
         friendlyMessage = 'メールアドレスまたはパスワードが正しくありません';
-      } else if (err.name === 'UserNotFoundException') {
-        // 登録されていないユーザー
+      } else if (err.message?.includes('not found') || err.message?.includes('登録')) {
         friendlyMessage = 'このメールアドレスは登録されていません';
-      } else if (err.name === 'NetworkError' || err.message?.includes('network')) {
-        // ネットワークエラー
+      } else if (err.message?.includes('network') || err.message?.includes('Network')) {
         friendlyMessage = 'ネットワークエラーが発生しました。インターネット接続を確認してください。';
+      } else if (err.message) {
+        friendlyMessage = err.message;
       }
-      // その他のエラーは汎用メッセージを表示（詳細はコンソールに出力済み）
 
       setError(friendlyMessage);
     } finally {
@@ -223,14 +179,6 @@ export default function UserLoginPage() {
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-red-600 text-sm">{error}</p>
-              {error.includes('メール確認が完了していません') && (
-                <Link
-                  href={`/verify?email=${encodeURIComponent(email)}`}
-                  className="text-purple-600 hover:text-purple-700 font-semibold text-sm mt-2 inline-block"
-                >
-                  → 確認コード入力画面へ
-                </Link>
-              )}
             </div>
           )}
 
@@ -252,6 +200,16 @@ export default function UserLoginPage() {
               新規登録
             </Link>
           </p>
+        </div>
+
+        <div className="mt-6">
+          <button
+            onClick={() => signInWithGoogle('user')}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-gray-200 rounded-lg text-gray-700 hover:border-purple-600 transition-colors"
+          >
+            <span className="text-lg">G</span>
+            <span className="font-semibold">Googleでログイン</span>
+          </button>
         </div>
 
         <div className="mt-4 text-center">

@@ -1,12 +1,17 @@
 'use client';
 
+// 動的レンダリングを強制（React 19 + Next.js 16）
+export const dynamic = 'force-dynamic';
+
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getCurrentAuthUser } from '@/lib/auth/cognito';
-import { getInstructorByUserId } from '@/lib/api/instructors';
+import { getCurrentAuthUser } from '@/lib/auth';
+import { fetchCurrentInstructor } from '@/lib/api/instructors-client';
+import { getProfile } from '@/lib/api/profile-client';
 import { Button } from '@/components/ui/button';
-import { User, Edit2, Mail, Award } from 'lucide-react';
+import { User, Edit2, Mail, Award, MapPin, Calendar } from 'lucide-react';
 
 type InstructorProfile = {
   id: string;
@@ -15,6 +20,9 @@ type InstructorProfile = {
   specialties: string[];
   profileImage?: string;
   status: string;
+  fullName?: string;
+  dateOfBirth?: string;
+  address?: string;
 };
 
 export default function InstructorProfilePage() {
@@ -31,23 +39,59 @@ export default function InstructorProfilePage() {
   const loadProfile = async () => {
     try {
       const authUser = await getCurrentAuthUser();
-      setUserName(authUser.name || '');
+      setUserName(authUser.user_metadata?.name || authUser.email || '');
       setUserEmail(authUser.email || '');
 
-      const instructor = await getInstructorByUserId(authUser.userId);
+      // プロフィール（氏名・住所・生年月日）
+      let fullName = '';
+      let dateOfBirth = '';
+      let address = '';
+      let displayName = '';
+      let profileComplete = false;
+      try {
+        const profile = await getProfile();
+        if (profile) {
+          fullName = profile.fullName || '';
+          displayName = profile.displayName || '';
+          address = profile.address || '';
+          if (profile.dateOfBirth) {
+            const dob = typeof profile.dateOfBirth === 'string'
+              ? new Date(profile.dateOfBirth)
+              : profile.dateOfBirth;
+            if (!isNaN(new Date(dob as any).getTime())) {
+              dateOfBirth = new Date(dob as any).toISOString().split('T')[0];
+            }
+          }
+          // isProfileComplete がある場合はそれを優先、なければ必須項目有無で判定
+          profileComplete = profile.isProfileComplete === true
+            || (!!fullName && !!address && !!dateOfBirth);
+        }
+      } catch (e) {
+        console.error('クライアントプロフィール取得エラー:', e);
+      }
+
+      const instructor = await fetchCurrentInstructor();
       if (instructor) {
         // specialties は Nullable<string>[] の可能性があるため、フィルタリング
         const specialtiesArray = (instructor.specialties || []).filter(
-          (s): s is string => s !== null && s !== undefined
+          (s: string | null | undefined): s is string => s !== null && s !== undefined
         );
         setProfile({
           id: instructor.id,
-          displayName: instructor.displayName || '',
+          displayName: displayName || instructor.user?.name || userName || '',
           bio: instructor.bio || '',
           specialties: specialtiesArray,
-          profileImage: instructor.profileImage || undefined,
-          status: instructor.status || 'active',
+          profileImage: undefined, // TODO: profileImageはPrismaスキーマに未実装
+          status: 'active', // TODO: statusはPrismaスキーマに未実装
+          fullName,
+          dateOfBirth,
+          address,
         });
+        // 必須項目が欠けていればセットアップへ誘導
+        if (!profileComplete || !fullName || !address || !dateOfBirth) {
+          router.push('/instructor/profile/setup');
+          return;
+        }
       }
     } catch (err) {
       console.error('プロフィール読み込みエラー:', err);
@@ -122,6 +166,30 @@ export default function InstructorProfilePage() {
               <div>
                 <h3 className="text-sm font-medium text-gray-700 mb-2">自己紹介</h3>
                 <p className="text-gray-600 whitespace-pre-wrap">{profile.bio}</p>
+              </div>
+            )}
+
+            {/* 氏名・生年月日・住所 */}
+            {(profile?.fullName || profile?.dateOfBirth || profile?.address) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {profile.fullName && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700 mb-1">氏名</h3>
+                    <p className="text-gray-800">{profile.fullName}</p>
+                  </div>
+                )}
+                {profile.dateOfBirth && (
+                  <div className="flex items-center gap-2 text-gray-800">
+                    <Calendar className="h-4 w-4 text-gray-500" />
+                    <span>{profile.dateOfBirth}</span>
+                  </div>
+                )}
+                {profile.address && (
+                  <div className="flex items-center gap-2 text-gray-800">
+                    <MapPin className="h-4 w-4 text-gray-500" />
+                    <span>{profile.address}</span>
+                  </div>
+                )}
               </div>
             )}
 

@@ -1,621 +1,667 @@
 # API仕様書
 
-## 概要
+最終更新: 2025-02-08
 
-Coordy（コーディ）プラットフォームのREST API仕様書です。
-本APIはNext.js App RouterのRoute Handlersで実装され、AWS Amplify Gen2を通じてAWSサービスと連携します。
+## 1. 概要
+
+- ベースURL: `/api`
+- 認証: Supabase Auth JWT（Cookieベース）
+- レスポンス形式: JSON
+- エラー形式: `{ error: string }`
+
+### 認証パターン
+
+| パターン | 説明 | 使用箇所 |
+|----------|------|----------|
+| **Supabase JWT** | Cookie内のJWTでユーザー特定 | ユーザー/インストラクター/管理者API |
+| **HMAC署名** | partner_id + timestamp + signature | 外部パートナーAPI |
+| **なし** | 認証不要 | Stripe Webhook |
 
 ---
 
-## 基本情報
+## 2. 認証・ユーザー管理
 
-| 項目 | 詳細 |
-|------|------|
-| **ベースURL** | `https://api.coordy.app` |
-| **プロトコル** | HTTPS only (TLS 1.2+) |
-| **認証方式** | JWT Bearer Token (Cognito) |
-| **レスポンス形式** | JSON |
-| **文字エンコーディング** | UTF-8 |
-| **タイムゾーン** | UTC |
+### 2.1 ロール確認
+```
+GET /api/auth/check-role?role={USER|INSTRUCTOR|ADMIN}
+```
+- **認証**: Supabase JWT
+- **レスポンス**: `{ registered: boolean, user?: User }`
+
+### 2.2 ロール更新
+```
+POST /api/auth/update-role
+```
+- **認証**: Supabase JWT
+- **ボディ**: `{ role: "USER" | "INSTRUCTOR" | "ADMIN" }`
+- **レスポンス**: `{ success: boolean }`
+
+### 2.3 ユーザー同期
+```
+POST /api/users/sync
+```
+- **認証**: Supabase JWT
+- **ボディ**: `{ role: string }`
+- **説明**: Supabase Authユーザーを Prisma users テーブルに同期
+
+### 2.4 プロフィール取得（自分）
+```
+GET /api/profile/me?role={USER|INSTRUCTOR}
+```
+- **認証**: Supabase JWT
+- **レスポンス**: `{ user: User, clientProfile?: ClientProfile }`
+
+### 2.5 プロフィール取得（指定ユーザー）
+```
+GET /api/profile/[userId]
+```
+- **認証**: Supabase JWT
+- **パラメータ**: userId（Prisma User ID）
+- **レスポンス**: `User`
+
+### 2.6 プロフィール作成・更新
+```
+POST /api/profile
+```
+- **認証**: Supabase JWT
+- **ボディ**:
+```json
+{
+  "fullName": "string",
+  "phoneNumber": "string?",
+  "address": "string?",
+  "dateOfBirth": "string?",
+  "gender": "string?"
+}
+```
+
+### 2.7 インストラクタープロフィール
+```
+GET /api/instructor/profile
+POST /api/instructor/profile
+```
+- **認証**: Supabase JWT（INSTRUCTOR ロール）
+- **POST ボディ**: `{ bio?: string, specialties?: string[], hourlyRate?: number }`
 
 ---
 
-## 認証
+## 3. 本人確認
+
+### 3.1 電話番号認証
+
+```
+POST /api/verification/phone/send
+```
+- **ボディ**: `{ phoneNumber: string }`
+- **説明**: OTPコードをSMS送信
+
+```
+POST /api/verification/phone/verify
+```
+- **ボディ**: `{ phoneNumber: string, code: string }`
+
+```
+POST /api/verification/phone/complete
+```
+- **説明**: 電話認証完了 → ClientProfile更新（verificationLevel: 1）
+
+### 3.2 身分証確認
+
+```
+GET /api/verification/identity/status?role={USER|INSTRUCTOR}
+```
+- **レスポンス**: `{ request?: IdentityVerificationRequest }`
+
+```
+POST /api/verification/identity/submit
+```
+- **ボディ**:
+```json
+{
+  "documentType": "DRIVERS_LICENSE | MY_NUMBER | PASSPORT",
+  "documentFrontUrl": "string",
+  "documentBackUrl": "string?"
+}
+```
+
+### 3.3 身分証審査（管理者）
+
+```
+GET /api/admin/verification/requests?status={PENDING|APPROVED|REJECTED}
+```
+- **認証**: ADMIN
+- **レスポンス**: `IdentityVerificationRequest[]`
+
+```
+GET /api/admin/verification/requests/[id]
+```
+- **認証**: ADMIN
+
+```
+POST /api/admin/verification/requests/[id]/approve
+```
+- **認証**: ADMIN
+- **説明**: 承認 → verificationLevel: 2 に更新、通知送信
+
+```
+POST /api/admin/verification/requests/[id]/reject
+```
+- **認証**: ADMIN
+- **ボディ**: `{ reason: string }`
+
+---
+
+## 4. サービス管理
+
+### 4.1 サービス一覧
+```
+GET /api/services?instructorId={id}&category={string}&isActive={boolean}
+```
+- **認証**: 不要（公開）
+- **レスポンス**: `Service[]`（schedules, images含む）
+
+### 4.2 サービス詳細
+```
+GET /api/services/[id]
+```
+- **認証**: 不要（公開）
+- **レスポンス**: `Service`（instructor, schedules, campaigns, images含む）
+
+### 4.3 サービス画像アップロード
+```
+POST /api/services/[id]/images
+```
+- **認証**: INSTRUCTOR（所有者のみ）
+- **ボディ**: FormData（最大5枚）
+- **レスポンス**: `ServiceImage[]`
+
+### 4.4 サービスクローン
+```
+POST /api/services/[id]/clone
+```
+- **認証**: INSTRUCTOR（所有者のみ）
+- **ボディ**: `{ title?: string, price?: number, ... }`
+- **レスポンス**: `Service`
+
+---
+
+## 5. スケジュール管理
+
+### 5.1 スケジュール一覧
+```
+GET /api/schedules?serviceId={id}&instructorId={id}&from={date}&to={date}
+```
+- **認証**: Supabase JWT
+- **デフォルト**: from=今日, to=+30日
+
+```
+POST /api/schedules
+```
+- **認証**: INSTRUCTOR
+- **ボディ**:
+```json
+{
+  "serviceId": "string",
+  "date": "YYYY-MM-DD",
+  "startTime": "HH:MM",
+  "endTime": "HH:MM"
+}
+```
+
+### 5.2 サービス別スケジュール
+```
+GET /api/schedules/service/[serviceId]?from={date}&to={date}
+```
+- **認証**: 不要
+- **デフォルト**: from=今日, to=+14日
+
+---
+
+## 6. 予約管理
+
+### 6.1 予約一覧・作成
+```
+GET /api/reservations?status={PENDING|CONFIRMED|CANCELLED|COMPLETED}
+```
+- **認証**: Supabase JWT
+- **レスポンス**: 自分の予約一覧
+
+```
+POST /api/reservations
+```
+- **認証**: Supabase JWT
+- **ボディ**:
+```json
+{
+  "serviceId": "string",
+  "scheduledAt": "ISO8601",
+  "participants": 1,
+  "paymentMethod": "POINTS | CREDIT",
+  "paymentMethodId": "string?",
+  "notes": "string?"
+}
+```
+- **処理**: ポイント決済 or Stripe決済 → Google Meet生成（remote時）→ 通知
+
+---
+
+## 7. ウォレット・決済
+
+### 7.1 残高取得
+```
+GET /api/wallet/me?role={USER|INSTRUCTOR}
+```
+- **認証**: Supabase JWT
+- **レスポンス**: `{ wallet: { balance: number } }`
+
+### 7.2 ポイント使用
+```
+POST /api/wallet/[userId]/use
+```
+- **ボディ**: `{ amount: number }`
+
+### 7.3 取引履歴
+```
+GET /api/wallet/[userId]/transactions
+```
+- **レスポンス**: `PointTransaction[]`（直近50件）
+
+### 7.4 クレジットチャージ
+```
+POST /api/wallet/charge
+```
+- **ボディ**: `{ amount: number, paymentMethodId: string }`
+- **説明**: Stripe PaymentIntentを作成 → ポイント追加
+
+### 7.5 銀行振込チャージ
+
+```
+POST /api/wallet/charge/bank-transfer
+```
+- **ボディ**: `{ amount: number }`
+- **レスポンス**: `{ transaction: PointTransaction }`（振込番号含む）
+
+```
+PATCH /api/wallet/charge/bank-transfer/[transactionId]
+```
+- **説明**: 振込完了報告 → ステータスをTRANSFERREDに
+
+### 7.6 チャージ承認（管理者）
+
+```
+GET /api/admin/pending-charges
+```
+- **認証**: ADMIN
+- **レスポンス**: PENDING/TRANSFERRED状態の取引一覧
+
+```
+POST /api/admin/pending-charges/[id]/approve
+```
+- **認証**: ADMIN
+- **説明**: 承認 → ポイント残高に反映
+
+```
+POST /api/admin/pending-charges/[id]/reject
+```
+- **認証**: ADMIN
+- **ボディ**: `{ reason: string }`
+
+---
+
+## 8. カード管理
+
+```
+GET /api/payment-methods
+```
+- **認証**: Supabase JWT
+- **レスポンス**: `PaymentMethod[]`
+
+```
+DELETE /api/payment-methods/[id]
+```
+- **認証**: Supabase JWT（所有者のみ）
+
+```
+PUT /api/payment-methods/[id]/default
+```
+- **認証**: Supabase JWT
+- **説明**: デフォルトカードに設定
+
+```
+POST /api/stripe/webhook
+```
+- **認証**: Stripe署名検証
+- **説明**: payment_intent, payment_method, customerイベント処理
+
+---
+
+## 9. 銀行口座・出金
+
+### 9.1 銀行口座
+```
+GET /api/bank-accounts
+```
+- **認証**: Supabase JWT
+- **レスポンス**: `BankAccount[]`（口座番号は復号化済み）
+
+```
+PUT /api/bank-accounts/[id]
+```
+- **認証**: Supabase JWT
+- **説明**: 口座情報更新（口座番号はAES-256暗号化保存）
+
+```
+DELETE /api/bank-accounts/[id]
+```
+- **認証**: Supabase JWT
+
+### 9.2 出金
+
+```
+GET /api/withdrawals
+```
+- **認証**: INSTRUCTOR
+- **レスポンス**: 自分の出金申請一覧
+
+```
+GET /api/admin/withdrawals?status={PENDING|APPROVED|REJECTED|COMPLETED}
+```
+- **認証**: ADMIN
+
+```
+PATCH /api/admin/withdrawals/[id]
+```
+- **認証**: ADMIN
+- **ボディ**: `{ action: "approve" | "reject", reason?: string }`
+
+---
+
+## 10. 通知・お知らせ
+
+### 10.1 通知
+```
+GET /api/notifications?unreadOnly={boolean}
+```
+- **認証**: Supabase JWT
+- **レスポンス**: `Notification[]`
+
+```
+PATCH /api/notifications/[id]
+```
+- **説明**: 既読にする
+
+```
+POST /api/notifications/read-all
+```
+- **説明**: 全件既読
+
+### 10.2 お知らせ
+```
+GET /api/announcements?target={all|users|instructors}
+```
+- **レスポンス**: `AdminAnnouncement[]`
+
+```
+GET /api/announcements/[id]
+```
+
+```
+POST /api/announcements/[id]/publish
+```
+- **認証**: ADMIN
+
+---
+
+## 11. キャンペーン
+
+```
+GET /api/campaigns?instructorId={id}&serviceId={id}&isActive={boolean}
+```
+- **レスポンス**: `Campaign[]`
+
+```
+GET /api/campaigns/[id]
+PUT /api/campaigns/[id]
+```
+- **PUT 認証**: INSTRUCTOR（所有者のみ）
+
+---
+
+## 12. お気に入り
+
+```
+GET /api/favorites
+```
+- **認証**: Supabase JWT
+- **レスポンス**: `FavoriteCreator[]`
+
+```
+DELETE /api/favorites/[id]
+```
+- **認証**: Supabase JWT
+
+---
+
+## 13. Google連携
+
+```
+GET /api/google/auth
+```
+- **認証**: INSTRUCTOR
+- **レスポンス**: `{ url: string }`（OAuth認可URL）
+
+```
+GET /api/google/callback?code={string}
+```
+- **説明**: OAuthコールバック → トークン保存
+
+```
+GET /api/google/status
+DELETE /api/google/status
+```
+- **認証**: INSTRUCTOR
+- **説明**: Google連携状態確認 / 連携解除
+
+---
+
+## 14. 管理者機能
+
+### 14.1 ユーザー管理
+```
+GET /api/manage/users?role={string}&search={string}&page={number}
+```
+- **認証**: ADMIN
+
+```
+POST /api/admin/users/set-role
+```
+- **認証**: ADMIN
+- **ボディ**: `{ userId: string, role: string }`
+
+### 14.2 身分証一覧
+```
+GET /api/manage/identity-requests?role={USER|INSTRUCTOR}
+```
+- **認証**: ADMIN
+
+---
+
+## 15. 外部パートナーAPI
+
+### 15.1 認証方式
+
+HMAC-SHA256署名による認証。クエリパラメータで送信。
+
+| パラメータ | 説明 |
+|-----------|------|
+| `partner_id` | パートナーID |
+| `ts` | UNIXタイムスタンプ（秒） |
+| `sig` | HMAC-SHA256(`{partner_id}:{ts}`, secretKey) |
+
+- タイムスタンプ有効期限: **5分**
+- 比較: timing-safe comparison
+
+### 15.2 パートナー認証確認
+```
+GET /api/external/partner/verify?partner_id={id}&ts={ts}&sig={sig}
+```
+- **レスポンス**:
+```json
+{
+  "partner": {
+    "id": "string",
+    "name": "string",
+    "allowGuest": true,
+    "requirePhone": false,
+    "paymentMode": "COORDY",
+    "instructorIds": [],
+    "serviceIds": []
+  }
+}
+```
+
+### 15.3 サービス一覧（パートナー用）
+```
+GET /api/external/services?partner_id={id}&ts={ts}&sig={sig}&instructor_id={id?}
+```
+- **説明**: パートナーの許可範囲内のサービスを返却
+- **レスポンス**: `Service[]`（instructor, images含む）
+
+### 15.4 空き状況確認
+```
+GET /api/external/availability?partner_id={id}&ts={ts}&sig={sig}&service_id={id}&from={date}&to={date}
+```
+- **レスポンス**:
+```json
+{
+  "schedules": [
+    {
+      "id": "string",
+      "date": "YYYY-MM-DD",
+      "startTime": "HH:MM",
+      "endTime": "HH:MM",
+      "availableSlots": 3,
+      "maxParticipants": 5
+    }
+  ]
+}
+```
+- `availableSlots` = maxParticipants - 既存予約のparticipants合計
+
+### 15.5 予約作成
+```
+POST /api/external/reservations
+```
+- **認証**: HMAC署名（ボディ内）
+- **ボディ**:
+```json
+{
+  "partner_id": "string",
+  "ts": "number",
+  "sig": "string",
+  "service_id": "string",
+  "schedule_id": "string",
+  "participants": 1,
+  "guest": {
+    "name": "string",
+    "email": "string",
+    "phoneNumber": "string?"
+  },
+  "external_ref": "string?",
+  "payment_completed": false
+}
+```
+- **処理**: ゲストユーザー作成 → 予約作成 → ExternalReservation作成 → Webhook通知
+- **レスポンス**:
+```json
+{
+  "reservation": {
+    "id": "string",
+    "status": "CONFIRMED",
+    "scheduledAt": "ISO8601",
+    "participants": 1,
+    "service": { "title": "string", "price": 1000 },
+    "guestUser": { "name": "string", "email": "string" }
+  },
+  "externalReservation": {
+    "id": "string",
+    "externalRef": "string",
+    "commissionAmount": 0
+  }
+}
+```
+
+---
+
+## 16. パートナー管理API（管理者）
+
+```
+GET /api/admin/partners
+```
+- **認証**: ADMIN
+- **レスポンス**: `Partner[]`（予約数含む）
+
+```
+POST /api/admin/partners
+```
+- **認証**: ADMIN
+- **ボディ**: `{ name, code, description?, websiteUrl?, webhookUrl?, paymentMode?, allowGuest?, commissionRate? }`
+- **レスポンス**: `{ partner: Partner, credentials: { apiKey, secretKey, webhookSecret? } }`
+
+```
+GET /api/admin/partners/[id]
+PUT /api/admin/partners/[id]
+DELETE /api/admin/partners/[id]
+```
+- **認証**: ADMIN
+
+```
+POST /api/admin/partners/[id]/regenerate-keys
+```
+- **認証**: ADMIN
+- **ボディ**: `{ includeWebhookSecret?: boolean }`
+- **レスポンス**: `{ credentials: { apiKey, secretKey, webhookSecret? } }`
+
+---
+
+## 17. Webhook通知
+
+パートナーのwebhookUrlに対してHTTP POSTで通知。
 
 ### ヘッダー
-
-```http
-Authorization: Bearer <JWT_TOKEN>
+```
 Content-Type: application/json
+X-Webhook-Signature: HMAC-SHA256(body, webhookSecret)
+X-Webhook-Timestamp: UNIXタイムスタンプ
 ```
 
-### エラーレスポンス
-
-```json
-{
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "Invalid or expired token"
-  }
-}
-```
-
----
-
-## エンドポイント一覧
-
-### 認証 (Auth)
-
-#### POST /api/auth/login
-ユーザーログイン
-
-**リクエスト:**
-```json
-{
-  "email": "user@example.com",
-  "password": "password123"
-}
-```
-
-**レスポンス (200):**
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "user-123",
-    "name": "山田太郎",
-    "email": "user@example.com",
-    "role": "user",
-    "point": 5000,
-    "membership": "gold"
-  }
-}
-```
-
-#### POST /api/auth/register
-ユーザー登録
-
-**リクエスト:**
-```json
-{
-  "name": "山田太郎",
-  "email": "user@example.com",
-  "password": "password123",
-  "role": "user"
-}
-```
-
-**レスポンス (201):**
-```json
-{
-  "user": {
-    "id": "user-123",
-    "name": "山田太郎",
-    "email": "user@example.com",
-    "role": "user",
-    "point": 0,
-    "membership": "free"
-  }
-}
-```
-
-#### POST /api/auth/logout
-ログアウト
-
-**レスポンス (200):**
-```json
-{
-  "message": "Logged out successfully"
-}
-```
-
----
-
-### ユーザー (Users)
-
-#### GET /api/users/me
-現在のユーザー情報取得
-
-**レスポンス (200):**
-```json
-{
-  "id": "user-123",
-  "name": "山田太郎",
-  "email": "user@example.com",
-  "role": "user",
-  "point": 5000,
-  "membership": "gold",
-  "createdAt": "2025-01-15T10:30:00Z"
-}
-```
-
-#### PATCH /api/users/me
-ユーザー情報更新
-
-**リクエスト:**
-```json
-{
-  "name": "山田次郎"
-}
-```
-
-**レスポンス (200):**
-```json
-{
-  "id": "user-123",
-  "name": "山田次郎",
-  "email": "user@example.com"
-}
-```
-
----
-
-### サービス (Services)
-
-#### GET /api/services
-サービス一覧取得
-
-**クエリパラメータ:**
-- `category` (optional): カテゴリフィルタ
-- `date` (optional): 日付フィルタ (YYYY-MM-DD)
-- `timeSlot` (optional): 時間帯フィルタ (morning|afternoon|evening)
-- `page` (optional): ページ番号 (default: 1)
-- `limit` (optional): 取得件数 (default: 20)
-
-**レスポンス (200):**
-```json
-{
-  "services": [
-    {
-      "id": "service-001",
-      "title": "ヨガ初級クラス",
-      "category": "フィットネス",
-      "description": "初心者向けヨガクラス",
-      "duration": 60,
-      "basePrice": 3000,
-      "instructorSlots": [
-        {
-          "instructorId": "inst-001",
-          "instructorName": "田中先生",
-          "price": 3000,
-          "schedule": [
-            {
-              "date": "2025-10-15",
-              "timeSlot": "morning",
-              "capacity": 10
-            }
-          ]
-        }
-      ]
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 50
-  }
-}
-```
-
-#### GET /api/services/:id
-サービス詳細取得
-
-**レスポンス (200):**
-```json
-{
-  "id": "service-001",
-  "title": "ヨガ初級クラス",
-  "category": "フィットネス",
-  "description": "初心者向けヨガクラス",
-  "duration": 60,
-  "basePrice": 3000,
-  "instructorSlots": [
-    {
-      "instructorId": "inst-001",
-      "instructorName": "田中先生",
-      "price": 3000,
-      "schedule": [
-        {
-          "date": "2025-10-15",
-          "timeSlot": "morning",
-          "capacity": 10
-        }
-      ]
-    }
-  ]
-}
-```
-
-#### POST /api/services (インストラクター/管理者)
-サービス作成
-
-**リクエスト:**
-```json
-{
-  "title": "ヨガ初級クラス",
-  "category": "フィットネス",
-  "description": "初心者向けヨガクラス",
-  "duration": 60,
-  "basePrice": 3000
-}
-```
-
-**レスポンス (201):**
-```json
-{
-  "id": "service-001",
-  "title": "ヨガ初級クラス",
-  "category": "フィットネス",
-  "description": "初心者向けヨガクラス",
-  "duration": 60,
-  "basePrice": 3000
-}
-```
-
----
-
-### 予約 (Reservations)
-
-#### GET /api/reservations
-予約一覧取得
-
-**クエリパラメータ:**
-- `status` (optional): ステータスフィルタ (reserved|completed|cancelled)
-- `from` (optional): 開始日 (YYYY-MM-DD)
-- `to` (optional): 終了日 (YYYY-MM-DD)
-
-**レスポンス (200):**
-```json
-{
-  "reservations": [
-    {
-      "id": "res-001",
-      "userId": "user-123",
-      "serviceId": "service-001",
-      "instructorId": "inst-001",
-      "date": "2025-10-15",
-      "timeSlot": "morning",
-      "status": "reserved",
-      "createdAt": "2025-10-10T10:00:00Z"
-    }
-  ]
-}
-```
-
-#### POST /api/reservations
-予約作成
-
-**リクエスト:**
-```json
-{
-  "serviceId": "service-001",
-  "instructorId": "inst-001",
-  "date": "2025-10-15",
-  "timeSlot": "morning"
-}
-```
-
-**レスポンス (201):**
-```json
-{
-  "id": "res-001",
-  "userId": "user-123",
-  "serviceId": "service-001",
-  "instructorId": "inst-001",
-  "date": "2025-10-15",
-  "timeSlot": "morning",
-  "status": "reserved",
-  "createdAt": "2025-10-10T10:00:00Z"
-}
-```
-
-#### PATCH /api/reservations/:id
-予約キャンセル
-
-**リクエスト:**
-```json
-{
-  "status": "cancelled"
-}
-```
-
-**レスポンス (200):**
-```json
-{
-  "id": "res-001",
-  "status": "cancelled",
-  "updatedAt": "2025-10-11T10:00:00Z"
-}
-```
-
----
-
-### ToDo (Todos)
-
-#### GET /api/todos
-ToDo一覧取得
-
-**クエリパラメータ:**
-- `date` (optional): 日付フィルタ (YYYY-MM-DD)
-- `priority` (optional): 優先度フィルタ (high|medium|low)
-- `isCompleted` (optional): 完了フィルタ (true|false)
-
-**レスポンス (200):**
-```json
-{
-  "todos": [
-    {
-      "id": "todo-001",
-      "userId": "user-123",
-      "title": "レポート作成",
-      "date": "2025-10-15",
-      "priority": "high",
-      "category": "仕事",
-      "isCompleted": false,
-      "createdAt": "2025-10-10T10:00:00Z"
-    }
-  ]
-}
-```
-
-#### POST /api/todos
-ToDo作成
-
-**リクエスト:**
-```json
-{
-  "title": "レポート作成",
-  "date": "2025-10-15",
-  "priority": "high",
-  "category": "仕事"
-}
-```
-
-**レスポンス (201):**
-```json
-{
-  "id": "todo-001",
-  "userId": "user-123",
-  "title": "レポート作成",
-  "date": "2025-10-15",
-  "priority": "high",
-  "category": "仕事",
-  "isCompleted": false
-}
-```
-
-#### PATCH /api/todos/:id
-ToDo更新
-
-**リクエスト:**
-```json
-{
-  "isCompleted": true
-}
-```
-
-**レスポンス (200):**
-```json
-{
-  "id": "todo-001",
-  "isCompleted": true,
-  "updatedAt": "2025-10-11T10:00:00Z"
-}
-```
-
-#### DELETE /api/todos/:id
-ToDo削除
-
-**レスポンス (204):**
-(No Content)
-
----
-
-### 支払い (Payments)
-
-#### GET /api/payments
-支払い履歴取得
-
-**クエリパラメータ:**
-- `type` (optional): 種別フィルタ (deposit|usage)
-- `from` (optional): 開始日 (YYYY-MM-DD)
-- `to` (optional): 終了日 (YYYY-MM-DD)
-
-**レスポンス (200):**
-```json
-{
-  "payments": [
-    {
-      "id": "pay-001",
-      "userId": "user-123",
-      "amount": 10000,
-      "method": "stripe",
-      "type": "deposit",
-      "createdAt": "2025-10-10T10:00:00Z"
-    }
-  ],
-  "balance": 5000
-}
-```
-
-#### POST /api/payments/charge
-チャージ（Stripe連携）
-
-**リクエスト:**
-```json
-{
-  "amount": 10000
-}
-```
-
-**レスポンス (200):**
-```json
-{
-  "checkoutUrl": "https://checkout.stripe.com/pay/cs_test_..."
-}
-```
-
-#### POST /api/payments/webhook
-Stripe Webhookエンドポイント
-
-**ヘッダー:**
-```http
-Stripe-Signature: t=1234567890,v1=abc...
-```
-
-**レスポンス (200):**
-```json
-{
-  "received": true
-}
-```
-
----
-
-### インストラクター (Instructors)
-
-#### GET /api/instructors
-インストラクター一覧取得
-
-**レスポンス (200):**
-```json
-{
-  "instructors": [
-    {
-      "id": "inst-001",
-      "name": "田中先生",
-      "bio": "ヨガインストラクター歴10年",
-      "specialties": ["ヨガ", "ピラティス"],
-      "image": "https://s3.amazonaws.com/...",
-      "services": ["service-001", "service-002"]
-    }
-  ]
-}
-```
-
-#### GET /api/instructors/:id
-インストラクター詳細取得
-
-**レスポンス (200):**
-```json
-{
-  "id": "inst-001",
-  "name": "田中先生",
-  "bio": "ヨガインストラクター歴10年",
-  "specialties": ["ヨガ", "ピラティス"],
-  "image": "https://s3.amazonaws.com/...",
-  "services": ["service-001", "service-002"]
-}
-```
-
----
-
-## エラーコード一覧
-
-| コード | HTTPステータス | 説明 |
-|--------|---------------|------|
-| `UNAUTHORIZED` | 401 | 認証エラー |
-| `FORBIDDEN` | 403 | 権限不足 |
-| `NOT_FOUND` | 404 | リソースが見つからない |
-| `VALIDATION_ERROR` | 400 | バリデーションエラー |
-| `CONFLICT` | 409 | 競合エラー（例：すでに予約済み） |
-| `INSUFFICIENT_BALANCE` | 400 | 残高不足 |
-| `INTERNAL_ERROR` | 500 | サーバー内部エラー |
-
-### エラーレスポンス形式
-
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Invalid input",
-    "details": {
-      "field": "email",
-      "issue": "Invalid email format"
-    }
-  }
-}
-```
-
----
-
-## レート制限
-
-| ユーザータイプ | 制限 |
-|--------------|------|
-| 未認証 | 10リクエスト/分 |
-| 一般ユーザー | 100リクエスト/分 |
-| インストラクター | 200リクエスト/分 |
-| 管理者 | 制限なし |
-
-### レート制限ヘッダー
-
-```http
-X-RateLimit-Limit: 100
-X-RateLimit-Remaining: 95
-X-RateLimit-Reset: 1634567890
-```
-
----
-
-## ページネーション
-
-### リクエスト
-
-```
-GET /api/services?page=2&limit=20
-```
-
-### レスポンス
-
-```json
-{
-  "data": [...],
-  "pagination": {
-    "page": 2,
-    "limit": 20,
-    "total": 100,
-    "totalPages": 5,
-    "hasNext": true,
-    "hasPrev": true
-  }
-}
-```
-
----
-
-## バージョニング
-
-APIバージョンはURLパスで管理します。
-
-```
-/api/v1/services  (現在)
-/api/v2/services  (将来)
-```
-
----
-
-## Webhook
-
-### イベントタイプ
+### イベント
 
 | イベント | 説明 |
 |---------|------|
-| `payment.succeeded` | 支払い成功 |
-| `payment.failed` | 支払い失敗 |
-| `reservation.created` | 予約作成 |
-| `reservation.cancelled` | 予約キャンセル |
+| `reservation.created` | 予約作成時 |
+| `reservation.cancelled` | 予約キャンセル時 |
+| `reservation.completed` | 予約完了時 |
 
-### Webhook設定
-
+### ペイロード
 ```json
 {
-  "url": "https://your-app.com/api/webhooks",
-  "events": ["payment.succeeded", "reservation.created"],
-  "secret": "whsec_..."
+  "event": "reservation.created",
+  "timestamp": "ISO8601",
+  "data": {
+    "reservationId": "string",
+    "externalRef": "string",
+    "serviceTitle": "string",
+    "scheduledAt": "ISO8601",
+    "participants": 1,
+    "guestName": "string",
+    "guestEmail": "string",
+    "status": "CONFIRMED",
+    "totalAmount": 1000,
+    "commissionAmount": 0
+  }
 }
 ```
 
----
-
-*最終更新日: 2025-10-11*
+- タイムアウト: 10秒
+- リトライ: なし（将来対応予定）

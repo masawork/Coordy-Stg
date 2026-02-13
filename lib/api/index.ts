@@ -2,25 +2,6 @@
  * API操作のエントリポイント
  */
 
-// Data Client (遅延初期化関数をエクスポート)
-export { getDataClient } from './data-client';
-
-// 型エクスポート
-export type {
-  User,
-  Instructor,
-  Service,
-  Reservation,
-  Todo,
-  Role,
-  Membership,
-  ServiceCategory,
-  ServiceStatus,
-  ReservationStatus,
-  TodoPriority,
-  InstructorStatus,
-} from './data-client';
-
 // Services API
 export {
   listServices,
@@ -39,13 +20,47 @@ export {
   cancelReservation,
   deleteReservation,
 } from './reservations';
+export type { Reservation } from './reservations';
 
-// Todos API
+// Profile API
 export {
-  listTodos,
-  getTodo,
-  createTodo,
-  updateTodo,
-  toggleTodoComplete,
-  deleteTodo,
-} from './todos';
+  getClientProfile,
+  createClientProfile,
+  updateClientProfile,
+  isProfileComplete,
+} from './profile';
+
+// Wallet API
+export {
+  getWallet,
+  chargePoints,
+  usePoints,
+  getTransactionHistory,
+} from './wallet';
+
+// Favorites API
+export {
+  getFavoriteCreators,
+  addFavoriteCreator,
+  removeFavoriteCreator,
+  isFavoriteCreator,
+} from './favorites';
+
+// Instructors API
+export {
+  listInstructors,
+  getInstructor,
+  getInstructorByUserId,
+  createInstructor,
+  updateInstructor,
+} from './instructors';
+
+// Admin API
+export {
+  getAdminStats,
+  listUsers,
+  updateUserRole,
+  listPendingCharges,
+  approveCharge,
+  rejectCharge,
+} from './admin';

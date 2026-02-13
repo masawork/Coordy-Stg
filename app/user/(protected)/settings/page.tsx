@@ -1,10 +1,14 @@
 'use client';
 
+// 動的レンダリングを強制（React 19 + Next.js 16）
+export const dynamic = 'force-dynamic';
+
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSession, clearSession } from '@/lib/auth';
-import { getClientProfile, updateClientProfile } from '@/lib/api/profile';
-import { signOut } from 'aws-amplify/auth';
+import { getClientProfile, updateClientProfile } from '@/lib/api/profile-client';
+import { signOut as betterAuthSignOut } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { User, Bell, Shield, CreditCard, HelpCircle, LogOut } from 'lucide-react';
 
@@ -14,13 +18,16 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
-    const session = getSession();
-    if (!session) {
-      router.push('/login/user');
-      return;
-    }
+    const loadData = async () => {
+      const session = await getSession();
+      if (!session?.user) {
+        router.push('/login/user');
+        return;
+      }
 
-    loadProfile(session.userId);
+      loadProfile(session.user.id);
+    };
+    loadData();
   }, [router]);
 
   const loadProfile = async (userId: string) => {
@@ -41,7 +48,7 @@ export default function SettingsPage() {
     }
 
     try {
-      await signOut();
+      await betterAuthSignOut();
       clearSession();
       router.push('/login/user');
     } catch (error) {
@@ -113,7 +120,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">メールアドレス</span>
-                    <span className="font-medium">{getSession()?.email}</span>
+                    <span className="font-medium">{profile?.email || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">ロール</span>

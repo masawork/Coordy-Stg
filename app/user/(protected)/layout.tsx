@@ -1,23 +1,24 @@
 /**
- * クライアント保護ルートのレイアウト
+ * クライアント保護ルートのレイアウト（Supabase Auth）
  * 認証チェックとレイアウトを提供
  */
 
 'use client';
 
+// 動的レンダリングを強制（React 19 + Next.js 16）
+export const dynamic = 'force-dynamic';
+
+
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { getCurrentAuthUser, saveSession, getSessionForRole } from '@/lib/auth';
-import type { User } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { useSidebar } from '@/components/layout/SidebarProvider';
-import { getClientProfile } from '@/lib/api/profile';
 import { X } from 'lucide-react';
-import { resolveDisplayName } from '@/lib/auth/displayName';
 
 function ProtectedContent({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any | null>(null);
   const [displayName, setDisplayName] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -27,58 +28,69 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // まずローカル user セッションを優先
-        const storedUser = getSessionForRole('user');
-        if (storedUser) {
-          console.log('[DEBUG] user layout stored session', { role: storedUser.role, path: pathname });
-          if (!pathname.includes('/profile/setup')) {
-            try {
-              const profile = await getClientProfile(storedUser.userId);
-              if (!profile || !profile.isProfileComplete) {
-                router.push('/user/profile/setup');
-                return;
-              }
-              setDisplayName(resolveDisplayName(storedUser, profile));
-            } catch (err) {
-              console.error('プロフィールチェックエラー:', err);
-              setDisplayName(resolveDisplayName(storedUser));
-            }
-          } else {
-            setDisplayName(resolveDisplayName(storedUser));
-          }
-          setUser(storedUser);
-          setLoading(false);
-          return;
-        }
+        const session = await getSession();
 
-        // ローカルに無い場合のみ Cognito を確認
-        const authUser = await getCurrentAuthUser();
-        console.log('[DEBUG] user layout cognito user', { role: authUser.role, path: pathname });
-
-        if (authUser.role !== 'user') {
+        if (!session?.user) {
           router.push('/login/user');
           return;
         }
 
-        saveSession(authUser);
+        const authUser = session.user;
 
+        // プロフィール完了チェック（セットアップページ以外）
         if (!pathname.includes('/profile/setup')) {
           try {
-            const profile = await getClientProfile(authUser.userId);
-            if (!profile || !profile.isProfileComplete) {
+            // ロール別にプロフィールを取得（USERロールのユーザーを検索）
+            const response = await fetch(`/api/auth/check-role?role=user`, {
+              credentials: 'include',
+            });
+
+            if (!response.ok) {
+              // 500エラーの場合はセットアップページへ（無限ループを防ぐ）
+              if (response.status === 500) {
+                console.error('🚫 Layout: Server error in check-role API, redirecting to setup');
+                router.push('/user/profile/setup');
+                return;
+              }
+              // 404エラーの場合はログインページへ
+              if (response.status === 404) {
+                console.log('🚫 Layout: User not registered with USER role, redirecting to login');
+                router.push('/login/user');
+                return;
+              }
+              // その他のエラーもセットアップへ
+              console.error('🚫 Layout: Unexpected error in check-role API, redirecting to setup');
               router.push('/user/profile/setup');
               return;
             }
-            setDisplayName(resolveDisplayName(authUser, profile));
+
+            const { user: dbUser, profile } = await response.json();
+            console.log('📋 Layout: Profile check result:', {
+              hasProfile: !!profile,
+              isProfileComplete: profile?.isProfileComplete,
+              phoneVerified: profile?.phoneVerified,
+              fullName: profile?.fullName,
+            });
+
+            // プロフィールが存在しないか、完了していない場合はセットアップへ
+            if (!profile || !profile.isProfileComplete) {
+              console.log('🚫 Layout: Profile incomplete, redirecting to setup');
+              router.push('/user/profile/setup');
+              return;
+            }
+            setDisplayName(profile.displayName || authUser.user_metadata?.name || authUser.email || 'ユーザー');
+            setUser(authUser);
           } catch (err) {
             console.error('プロフィールチェックエラー:', err);
-            setDisplayName(resolveDisplayName(authUser));
+            // エラー時はセットアップページへ（無限ループを防ぐ）
+            router.push('/user/profile/setup');
+            return;
           }
         } else {
-          setDisplayName(resolveDisplayName(authUser));
+          setDisplayName(authUser.user_metadata?.name || authUser.email || 'ユーザー');
+          setUser(authUser);
         }
 
-        setUser(authUser);
         setLoading(false);
       } catch (error) {
         console.error('認証チェックエラー:', error);

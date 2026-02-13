@@ -1,0 +1,654 @@
+// Prismaスキーマ - Supabase Auth用
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ユーザーテーブル（Supabase auth.users と連携）
+// 同じメールアドレスでも、ロールが異なれば別ユーザーとして登録可能
+model User {
+  id             String    @id @default(uuid())
+  authId         String?   @map("auth_id") // Supabase auth.users.id (optional for backward compatibility)
+  name           String
+  email          String
+  emailVerified  DateTime? @map("email_verified") @db.Timestamptz(6)
+  image          String?
+  role           UserRole  @default(USER)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // アプリケーション固有のリレーション
+  instructor          Instructor?
+  clientProfile       ClientProfile?
+  wallet              Wallet?
+  reservations        Reservation[]
+  pointTransactions   PointTransaction[]
+  favoriteCreators    FavoriteCreator[]
+  phoneVerifications  PhoneVerification[]
+  paymentMethods      PaymentMethod[]
+  bankAccounts        BankAccount[]
+  withdrawalRequests  WithdrawalRequest[]
+  notifications       Notification[]
+  authoredAnnouncements AdminAnnouncement[] @relation("AuthorAnnouncements")
+  identityVerificationRequests IdentityVerificationRequest[]
+  reviewedVerificationRequests IdentityVerificationRequest[] @relation("ReviewedRequests")
+
+  @@unique([email, role]) // 同じメール+ロールの組み合わせは不可
+  @@index([authId])
+  @@map("users")
+}
+
+// アプリケーション固有のモデル
+enum UserRole {
+  USER       @map("user")
+  INSTRUCTOR @map("instructor")
+  ADMIN      @map("admin")
+
+  @@map("user_role")
+}
+
+model Instructor {
+  id          String   @id @default(uuid())
+  userId      String   @unique @map("user_id")
+  bio         String?  @db.Text
+  specialties String[]
+  hourlyRate  Int?     @map("hourly_rate")
+  isVerified  Boolean  @default(false) @map("is_verified")
+  // Google OAuth for Meet integration
+  googleAccessToken  String?  @map("google_access_token") @db.Text
+  googleRefreshToken String?  @map("google_refresh_token") @db.Text
+  googleTokenExpiry  DateTime? @map("google_token_expiry")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  services  Service[]
+  reservations Reservation[]
+  favoriteCreators FavoriteCreator[]
+  campaigns Campaign[]
+
+  @@map("instructors")
+}
+
+// サービスの繰り返しタイプ
+enum RecurrenceType {
+  ONCE     // 単発
+  WEEKLY   // 毎週
+  BIWEEKLY // 隔週
+  MONTHLY  // 毎月
+  CUSTOM   // カスタム
+
+  @@map("recurrence_type")
+}
+
+model Service {
+  id           String   @id @default(uuid())
+  instructorId String   @map("instructor_id")
+  title        String
+  description  String?  @db.Text
+  category     String
+  deliveryType String   @default("remote") @map("delivery_type") // remote, onsite, hybrid
+  location     String?  // 都道府県（例: 東京、大阪）
+  price        Int
+  duration     Int      // 分単位
+  isActive     Boolean  @default(true) @map("is_active")
+
+  // スケジュール設定
+  recurrenceType    RecurrenceType @default(ONCE) @map("recurrence_type")
+  availableDays     String[]       @default([]) @map("available_days") // ['monday', 'wednesday']
+  startTime         String?        @map("start_time") // "10:00"
+  endTime           String?        @map("end_time")   // "11:00"
+  timezone          String         @default("Asia/Tokyo")
+  validFrom         DateTime?      @map("valid_from")
+  validUntil        DateTime?      @map("valid_until")
+  maxParticipants   Int            @default(1) @map("max_participants")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  instructor   Instructor        @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  reservations Reservation[]
+  schedules    ServiceSchedule[]
+  campaigns    Campaign[]
+  images       ServiceImage[]
+
+  @@index([instructorId])
+  @@map("services")
+}
+
+model ServiceImage {
+  id         String   @id @default(uuid())
+  serviceId  String   @map("service_id")
+  url        String
+  storageKey String   @map("storage_key")
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([serviceId])
+  @@map("service_images")
+}
+
+// カスタムスケジュール用（個別の開催日時）
+model ServiceSchedule {
+  id          String   @id @default(uuid())
+  serviceId   String   @map("service_id")
+  date        DateTime @db.Date  // 開催日
+  startTime   String   @map("start_time") // "10:00"
+  endTime     String   @map("end_time")   // "11:00"
+  isCancelled Boolean  @default(false) @map("is_cancelled")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([serviceId])
+  @@index([date])
+  @@map("service_schedules")
+}
+
+enum ReservationStatus {
+  PENDING   @map("pending")
+  CONFIRMED @map("confirmed")
+  CANCELLED @map("cancelled")
+  COMPLETED @map("completed")
+
+  @@map("reservation_status")
+}
+
+model Reservation {
+  id          String            @id @default(uuid())
+  userId      String?           @map("user_id") // null = ゲスト予約
+  serviceId   String            @map("service_id")
+  instructorId String           @map("instructor_id")
+  scheduledAt DateTime          @map("scheduled_at")
+  status      ReservationStatus  @default(PENDING)
+  notes       String?           @db.Text
+  meetUrl     String?           @map("meet_url")  // オンラインミーティングURL
+  participants Int              @default(1) // 予約人数
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  // ゲスト予約対応
+  guestUserId String?           @map("guest_user_id")
+
+  user        User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guestUser   GuestUser?        @relation(fields: [guestUserId], references: [id], onDelete: SetNull)
+  service     Service           @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  instructor  Instructor        @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  externalReservation ExternalReservation?
+
+  @@index([userId])
+  @@index([serviceId])
+  @@index([instructorId])
+  @@index([scheduledAt])
+  @@index([guestUserId])
+  @@map("reservations")
+}
+
+model ClientProfile {
+  id              String    @id @default(uuid())
+  userId          String    @unique @map("user_id")
+  fullName        String?   @map("full_name")        // 氏名（本名）
+  displayName     String?   @map("display_name")     // 表示名（ニックネーム）
+  address         String?
+  phoneNumber     String?   @map("phone_number")
+  dateOfBirth     DateTime? @map("date_of_birth") @db.Date
+  gender          String?
+  isProfileComplete Boolean @default(false) @map("is_profile_complete")
+  
+  // 本人確認関連
+  verificationLevel       Int       @default(0) @map("verification_level") // 0: Unverified, 1: Basic, 2: Verified
+  phoneVerified           Boolean   @default(false) @map("phone_verified")
+  phoneVerifiedAt         DateTime? @map("phone_verified_at")
+  identityVerified        Boolean   @default(false) @map("identity_verified")
+  identityVerifiedAt      DateTime? @map("identity_verified_at")
+  identityDocumentUrl     String?   @map("identity_document_url")
+  identityRejectedReason  String?   @map("identity_rejected_reason")
+  identitySubmittedAt     DateTime? @map("identity_submitted_at")
+  identityReviewedBy      String?   @map("identity_reviewed_by")
+  identityReviewedAt      DateTime? @map("identity_reviewed_at")
+  
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("client_profiles")
+}
+
+model PhoneVerification {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  phoneNumber String    @map("phone_number")
+  code        String    // 6桁の認証コード
+  expiresAt   DateTime  @map("expires_at")
+  verified    Boolean   @default(false)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([phoneNumber])
+  @@map("phone_verifications")
+}
+
+model Wallet {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  balance   Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("wallets")
+}
+
+enum TransactionType {
+  CHARGE  @map("charge")
+  USE     @map("use")
+  EXPIRED @map("expired")
+
+  @@map("transaction_type")
+}
+
+enum TransactionStatus {
+  PENDING     @map("pending")      // 申請中（振込前）
+  TRANSFERRED @map("transferred")  // 振込完了報告済み（管理者確認待ち）
+  COMPLETED   @map("completed")    // 承認完了
+  FAILED      @map("failed")       // 却下
+
+  @@map("transaction_status")
+}
+
+model PointTransaction {
+  id          String            @id @default(uuid())
+  userId      String            @map("user_id")
+  type        TransactionType
+  amount      Int
+  method      String?           // 'credit' | 'bank_transfer'
+  status      TransactionStatus  @default(COMPLETED)
+  transferId  String?           @map("transfer_id") // 振込番号（銀行振込用、4桁）
+  description String?           @db.Text
+  expiresAt   DateTime?         @map("expires_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([transferId])
+  @@map("point_transactions")
+}
+
+model FavoriteCreator {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  instructorId String  @map("instructor_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  instructor Instructor @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, instructorId])
+  @@index([userId])
+  @@index([instructorId])
+  @@map("favorite_creators")
+}
+
+// ========================================
+// 決済・入金システム
+// ========================================
+
+model PaymentMethod {
+  id                    String    @id @default(uuid())
+  userId                String    @map("user_id")
+  type                  String    // 'card', 'bank_transfer'
+  stripeCustomerId      String?   @map("stripe_customer_id")
+  stripePaymentMethodId String?   @map("stripe_payment_method_id")
+  cardBrand             String?   @map("card_brand") // 'visa', 'mastercard', etc.
+  cardLast4             String?   @map("card_last4")
+  cardExpMonth          Int?      @map("card_exp_month")
+  cardExpYear           Int?      @map("card_exp_year")
+  isDefault             Boolean   @default(false) @map("is_default")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([stripeCustomerId])
+  @@map("payment_methods")
+}
+
+model BankAccount {
+  id                String    @id @default(uuid())
+  userId            String    @map("user_id")
+  accountType       String    @map("account_type") // 'savings', 'checking'
+  bankName          String    @map("bank_name")
+  bankCode          String    @map("bank_code")
+  branchName        String    @map("branch_name")
+  branchCode        String    @map("branch_code")
+  accountNumber     String    @map("account_number") // 暗号化
+  accountHolderName String    @map("account_holder_name")
+  isVerified        Boolean   @default(false) @map("is_verified")
+  isDefault         Boolean   @default(false) @map("is_default")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  withdrawalRequests WithdrawalRequest[]
+
+  @@index([userId])
+  @@map("bank_accounts")
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+
+  @@map("withdrawal_status")
+}
+
+model WithdrawalRequest {
+  id             String           @id @default(uuid())
+  instructorId   String           @map("instructor_id")
+  amount         Int              // 引き出し額（円）
+  fee            Int              // 振込手数料（円）
+  netAmount      Int              @map("net_amount") // 実際の振込額
+  bankAccountId  String           @map("bank_account_id")
+  status         WithdrawalStatus @default(PENDING)
+  rejectedReason String?          @map("rejected_reason")
+  processedAt    DateTime?        @map("processed_at")
+  completedAt    DateTime?        @map("completed_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  instructor  User        @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id])
+
+  @@index([instructorId])
+  @@index([status])
+  @@map("withdrawal_requests")
+}
+
+// ========================================
+// お知らせ・通知システム
+// ========================================
+
+model Notification {
+  id          String    @id @default(uuid())
+  userId      String?   @map("user_id") // null = 全ユーザー
+  type        String    // 'system', 'admin', 'action'
+  category    String    // 'verification', 'payment', 'reservation', 'announcement'
+  priority    String    @default("medium") // 'low', 'medium', 'high', 'critical'
+  title       String
+  message     String    @db.Text
+  actionLabel String?   @map("action_label") // ボタンのラベル
+  actionUrl   String?   @map("action_url") // ボタンのリンク先
+  isRead      Boolean   @default(false) @map("is_read")
+  isDismissed Boolean   @default(false) @map("is_dismissed")
+  expiresAt   DateTime? @map("expires_at") // 有効期限（期限切れは非表示）
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model AdminAnnouncement {
+  id          String    @id @default(uuid())
+  authorId    String    @map("author_id") // 管理者のID
+  target      String    @default("all") // 'all', 'users', 'instructors'
+  priority    String    @default("medium") // 'low', 'medium', 'high'
+  title       String
+  content     String    @db.Text
+  isPublished Boolean   @default(false) @map("is_published")
+  publishedAt DateTime? @map("published_at")
+  expiresAt   DateTime? @map("expires_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  author User @relation("AuthorAnnouncements", fields: [authorId], references: [id])
+
+  @@index([isPublished])
+  @@index([publishedAt])
+  @@map("admin_announcements")
+}
+
+// ========================================
+// 本人確認書類申請
+// ========================================
+
+model IdentityVerificationRequest {
+  id                String    @id @default(uuid())
+  userId            String    @map("user_id")
+  
+  // 書類情報
+  documentType      String    @map("document_type")      // 'license', 'mynumber', 'passport'
+  documentFrontUrl  String    @map("document_front_url") // 表面画像URL
+  documentBackUrl   String?   @map("document_back_url")  // 裏面画像URL（免許証のみ）
+  additionalImages  String[]  @default([]) @db.Text @map("additional_images") // 補足画像（自撮り等）のURL配列
+  
+  // 提出情報
+  fullName          String    @map("full_name")          // 書類に記載の氏名
+  dateOfBirth       DateTime  @map("date_of_birth") @db.Date // 生年月日
+  address           String    @map("address")            // 住所
+  
+  // ステータス
+  status            String    @default("pending") @map("status") // 'pending', 'approved', 'rejected'
+  
+  // 管理者レビュー
+  reviewedBy        String?   @map("reviewed_by")       // 管理者ID
+  reviewedAt        DateTime? @map("reviewed_at")
+  rejectedReason    String?   @map("rejected_reason") @db.Text
+  adminNote         String?   @map("admin_note") @db.Text // 管理者メモ
+  
+  // タイムスタンプ
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  
+  // リレーション
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewer          User?     @relation("ReviewedRequests", fields: [reviewedBy], references: [id])
+  
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("identity_verification_requests")
+}
+
+// ========================================
+// キャンペーン機能
+// ========================================
+
+enum CampaignType {
+  PERCENT_OFF     // 割引率
+  FIXED_DISCOUNT  // 定額割引
+  TRIAL           // 体験価格
+  EARLY_BIRD      // 早期予約割引
+  BULK            // 回数券
+  FIRST_TIME      // 初回限定
+  REFERRAL        // 紹介割引
+  SEASONAL        // 季節限定
+
+  @@map("campaign_type")
+}
+
+model Campaign {
+  id              String       @id @default(uuid())
+  serviceId       String?      @map("service_id") // nullの場合は全サービス対象
+  instructorId    String       @map("instructor_id")
+
+  // キャンペーン情報
+  name            String
+  description     String?      @db.Text
+  type            CampaignType
+
+  // 割引設定
+  discountPercent Int?         @map("discount_percent") // 割引率（%）
+  discountAmount  Int?         @map("discount_amount")  // 割引額（円）
+  fixedPrice      Int?         @map("fixed_price")      // 固定価格（体験価格など）
+
+  // 適用条件
+  minPurchaseAmount   Int?     @map("min_purchase_amount")  // 最低購入金額
+  minBookingCount     Int?     @map("min_booking_count")    // 最低予約回数（回数券用）
+  maxUsagePerUser     Int?     @map("max_usage_per_user")   // ユーザーあたり最大利用回数
+  maxTotalUsage       Int?     @map("max_total_usage")      // 総利用回数上限
+  isFirstTimeOnly     Boolean  @default(false) @map("is_first_time_only") // 初回限定
+  earlyBirdDays       Int?     @map("early_bird_days")      // 早期予約日数
+
+  // 期間設定
+  validFrom       DateTime     @map("valid_from")
+  validUntil      DateTime     @map("valid_until")
+
+  // ステータス
+  isActive        Boolean      @default(true) @map("is_active")
+  currentUsage    Int          @default(0) @map("current_usage") // 現在の利用回数
+
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  // リレーション
+  service         Service?     @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  instructor      Instructor   @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  usages          CampaignUsage[]
+
+  @@index([serviceId])
+  @@index([instructorId])
+  @@index([isActive])
+  @@index([validFrom, validUntil])
+  @@map("campaigns")
+}
+
+model CampaignUsage {
+  id             String    @id @default(uuid())
+  campaignId     String    @map("campaign_id")
+  userId         String    @map("user_id")
+  reservationId  String?   @map("reservation_id")
+  discountAmount Int       @map("discount_amount") // 実際の割引額
+  usedAt         DateTime  @default(now()) @map("used_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([userId])
+  @@map("campaign_usages")
+}
+
+// ========================================
+// 外部予約API連携
+// ========================================
+
+enum PaymentMode {
+  COORDY     @map("coordy")     // Coordy側で決済
+  EXTERNAL   @map("external")   // 外部で決済済み
+  BOTH       @map("both")       // 両方対応
+
+  @@map("payment_mode")
+}
+
+// パートナー（外部連携サイト）管理
+model Partner {
+  id              String   @id @default(uuid())
+
+  // 基本情報
+  name            String                  // パートナー名
+  code            String   @unique        // パートナーコード（URL用）
+  description     String?  @db.Text
+  websiteUrl      String?  @map("website_url")
+  logoUrl         String?  @map("logo_url")
+
+  // API認証
+  apiKey          String   @unique @map("api_key")
+  secretKey       String   @map("secret_key")
+
+  // Webhook設定
+  webhookUrl      String?  @map("webhook_url")
+  webhookSecret   String?  @map("webhook_secret")
+
+  // CORS設定（将来のウィジェット用）
+  allowedOrigins  String[] @default([]) @map("allowed_origins")
+
+  // 連携設定
+  paymentMode     PaymentMode @default(COORDY) @map("payment_mode")
+  allowGuest      Boolean     @default(true) @map("allow_guest")
+  requirePhone    Boolean     @default(false) @map("require_phone")
+
+  // 紐付け制限（空の場合は制限なし）
+  instructorIds   String[] @default([]) @map("instructor_ids")
+  serviceIds      String[] @default([]) @map("service_ids")
+
+  // 手数料設定
+  commissionRate  Float    @default(0.0) @map("commission_rate")
+
+  // ステータス
+  isActive        Boolean  @default(true) @map("is_active")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  externalReservations ExternalReservation[]
+
+  @@index([apiKey])
+  @@index([code])
+  @@map("partners")
+}
+
+// 外部経由予約の追跡
+model ExternalReservation {
+  id                 String      @id @default(uuid())
+
+  partnerId          String      @map("partner_id")
+  reservationId      String      @unique @map("reservation_id")
+
+  // 外部参照
+  externalRef        String?     @map("external_ref")
+
+  // 決済情報
+  paymentMode        PaymentMode @map("payment_mode")
+  externalPaymentRef String?     @map("external_payment_ref")
+
+  // 手数料
+  commissionRate     Float       @map("commission_rate")
+  commissionAmount   Int         @default(0) @map("commission_amount")
+
+  createdAt          DateTime    @default(now()) @map("created_at")
+
+  partner            Partner     @relation(fields: [partnerId], references: [id])
+  reservation        Reservation @relation(fields: [reservationId], references: [id])
+
+  @@index([partnerId])
+  @@index([externalRef])
+  @@map("external_reservations")
+}
+
+// ゲストユーザー（外部予約時のアカウント不要ユーザー）
+model GuestUser {
+  id          String   @id @default(uuid())
+  email       String
+  name        String
+  phoneNumber String?  @map("phone_number")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  reservations Reservation[]
+
+  @@index([email])
+  @@map("guest_users")
+}

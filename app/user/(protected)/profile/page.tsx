@@ -1,28 +1,59 @@
 'use client';
 
+// 動的レンダリングを強制（React 19 + Next.js 16）
+export const dynamic = 'force-dynamic';
+
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSession } from '@/lib/auth';
-import { getClientProfile } from '@/lib/api/profile';
+import { getClientProfile } from '@/lib/api/profile-client';
 import { Button } from '@/components/ui/button';
 import { User, MapPin, Phone, Calendar, Users } from 'lucide-react';
-import { toJapanDomesticPhoneNumber } from '@/lib/phone';
+import { createClient } from '@/lib/supabase/client';
+import { formatDate } from '@/lib/utils/date';
 
 export default function ProfilePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
-  const [user, setUser] = useState<any>(null);
+  const [email, setEmail] = useState<string>('');
+  const [emailVerified, setEmailVerified] = useState<boolean>(false);
 
   useEffect(() => {
-    const session = getSession();
-    if (!session) {
-      router.push('/login/user');
-      return;
-    }
+    const loadSessionAndProfile = async () => {
+      const session = await getSession();
+      if (!session?.user) {
+        router.push('/login/user');
+        return;
+      }
 
-    setUser(session);
-    loadProfile(session.userId);
+      // Supabase Auth から直接メールアドレスを取得
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setEmail(user.email || '');
+        setEmailVerified(!!user.email_confirmed_at);
+      }
+
+      // check-role APIからPrisma User IDを取得
+      try {
+        const response = await fetch('/api/auth/check-role?role=user', {
+          credentials: 'include',
+        });
+        if (response.ok) {
+          const { user: dbUser } = await response.json();
+          if (dbUser?.id) {
+            loadProfile(dbUser.id);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('check-role error:', err);
+      }
+      setLoading(false);
+    };
+    loadSessionAndProfile();
   }, [router]);
 
   const loadProfile = async (clientId: string) => {
@@ -53,10 +84,7 @@ export default function ProfilePage() {
     other: 'その他',
     'no-answer': '回答しない',
   };
-  const displayPhoneNumber =
-    profile?.phoneNumber
-      ? toJapanDomesticPhoneNumber(profile.phoneNumber) || '-'
-      : '-';
+  const displayPhoneNumber = profile?.phoneNumber || '-';
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -94,18 +122,29 @@ export default function ProfilePage() {
                 </div>
                 <div className="ml-3">
                   <p className="text-sm font-medium text-gray-500">メールアドレス</p>
-                  <p className="mt-1 text-sm text-gray-900">{user?.email || '-'}</p>
+                  <p className="mt-1 text-sm text-gray-900">{email || '-'}</p>
                 </div>
               </div>
 
-              {/* 氏名 */}
+              {/* 氏名（本名） */}
               <div className="flex items-start">
                 <div className="flex-shrink-0 mt-1">
                   <User className="h-5 w-5 text-gray-400" />
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm font-medium text-gray-500">氏名</p>
-                  <p className="mt-1 text-sm text-gray-900">{profile?.name || '-'}</p>
+                  <p className="text-sm font-medium text-gray-500">氏名（本名）</p>
+                  <p className="mt-1 text-sm text-gray-900">{profile?.fullName || '-'}</p>
+                </div>
+              </div>
+
+              {/* 表示名（ニックネーム） */}
+              <div className="flex items-start">
+                <div className="flex-shrink-0 mt-1">
+                  <User className="h-5 w-5 text-gray-400" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-500">表示名（ニックネーム）</p>
+                  <p className="mt-1 text-sm text-gray-900">{profile?.displayName || '-'}</p>
                 </div>
               </div>
 
@@ -142,7 +181,7 @@ export default function ProfilePage() {
                   <div className="ml-3">
                     <p className="text-sm font-medium text-gray-500">生年月日</p>
                     <p className="mt-1 text-sm text-gray-900">
-                      {profile.dateOfBirth}
+                      {formatDate(profile.dateOfBirth)}
                     </p>
                   </div>
                 </div>
@@ -191,7 +230,7 @@ export default function ProfilePage() {
                 </div>
                 <div className="ml-3">
                   <p className="text-sm font-medium text-gray-500">メール確認状態</p>
-                  {user?.emailVerified ? (
+                  {emailVerified ? (
                     <span className="mt-1 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                       確認済み
                     </span>

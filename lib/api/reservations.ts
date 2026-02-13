@@ -1,9 +1,24 @@
 /**
- * 予約関連のAPI操作
+ * 予約関連のAPI操作（Prisma版）
  */
 
-import { getDataClient } from './data-client';
-import type { Reservation, ReservationStatus } from './data-client';
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
+import { ReservationStatus, Reservation as PrismaReservation } from '@prisma/client';
+
+export type Reservation = PrismaReservation & {
+  user?: any;
+  service?: any;
+  instructor?: any;
+};
+
+export interface ReservationInput {
+  userId: string;
+  serviceId: string;
+  instructorId: string;
+  scheduledAt: Date | string;
+  notes?: string;
+}
 
 /**
  * 予約一覧取得
@@ -11,26 +26,42 @@ import type { Reservation, ReservationStatus } from './data-client';
 export async function listReservations(filters?: {
   userId?: string;
   serviceId?: string;
+  instructorId?: string;
   status?: ReservationStatus;
 }) {
   try {
-    const client = getDataClient();
-    const { data, errors } = await client.models.Reservation.list({
-      filter: filters
-        ? {
-            ...(filters.userId && { userId: { eq: filters.userId } }),
-            ...(filters.serviceId && { serviceId: { eq: filters.serviceId } }),
-            ...(filters.status && { status: { eq: filters.status } }),
-          }
-        : undefined,
-    });
+    const where: any = {};
 
-    if (errors) {
-      console.error('Error listing reservations:', errors);
-      throw new Error('予約一覧の取得に失敗しました');
+    if (filters?.userId) {
+      where.userId = filters.userId;
+    }
+    if (filters?.serviceId) {
+      where.serviceId = filters.serviceId;
+    }
+    if (filters?.instructorId) {
+      where.instructorId = filters.instructorId;
+    }
+    if (filters?.status) {
+      where.status = filters.status;
     }
 
-    return data;
+    const reservations = await prisma.reservation.findMany({
+      where,
+      include: {
+        user: true,
+        service: true,
+        instructor: {
+          include: {
+            user: true,
+          },
+        },
+      },
+      orderBy: {
+        scheduledAt: 'desc',
+      },
+    });
+
+    return reservations;
   } catch (error) {
     console.error('List reservations error:', error);
     throw error;
@@ -42,15 +73,28 @@ export async function listReservations(filters?: {
  */
 export async function getReservation(id: string) {
   try {
-    const client = getDataClient();
-    const { data, errors } = await client.models.Reservation.get({ id });
+    const reservation = await prisma.reservation.findUnique({
+      where: { id },
+      include: {
+        user: true,
+        service: {
+          include: {
+            instructor: {
+              include: {
+                user: true,
+              },
+            },
+          },
+        },
+        instructor: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
 
-    if (errors) {
-      console.error('Error getting reservation:', errors);
-      throw new Error('予約の取得に失敗しました');
-    }
-
-    return data;
+    return reservation;
   } catch (error) {
     console.error('Get reservation error:', error);
     throw error;
@@ -60,61 +104,94 @@ export async function getReservation(id: string) {
 /**
  * 予約作成
  */
-export async function createReservation(input: {
-  userId: string;
-  serviceId: string;
-  instructorId: string;
-  startTime: string;
-  endTime: string;
-  participants?: number;
-  price: number;
-  notes?: string;
-}) {
+export async function createReservation(input: ReservationInput) {
   try {
-    const client = getDataClient();
-    const { data, errors } = await client.models.Reservation.create({
-      ...input,
-      status: 'pending',
+    const reservation = await prisma.reservation.create({
+      data: {
+        userId: input.userId,
+        serviceId: input.serviceId,
+        instructorId: input.instructorId,
+        scheduledAt: typeof input.scheduledAt === 'string' ? new Date(input.scheduledAt) : input.scheduledAt,
+        notes: input.notes,
+        status: ReservationStatus.PENDING,
+      },
+      include: {
+        user: true,
+        service: {
+          include: {
+            instructor: {
+              include: {
+                user: true,
+              },
+            },
+          },
+        },
+        instructor: {
+          include: {
+            user: true,
+          },
+        },
+      },
     });
 
-    if (errors) {
-      console.error('Error creating reservation:', errors);
-      throw new Error('予約の作成に失敗しました');
-    }
-
-    return data;
-  } catch (error) {
+    return reservation;
+  } catch (error: any) {
     console.error('Create reservation error:', error);
-    throw error;
+    throw new Error(`予約の作成に失敗しました: ${error.message}`);
   }
 }
 
 /**
- * 予約更新（ステータス変更など）
+ * 予約更新
  */
 export async function updateReservation(
   id: string,
   updates: Partial<{
     status: ReservationStatus;
     notes: string;
+    scheduledAt: Date | string;
   }>
 ) {
   try {
-    const client = getDataClient();
-    const { data, errors } = await client.models.Reservation.update({
-      id,
-      ...updates,
-    });
+    const updateData: any = {};
 
-    if (errors) {
-      console.error('Error updating reservation:', errors);
-      throw new Error('予約の更新に失敗しました');
+    if (updates.status !== undefined) {
+      updateData.status = updates.status;
+    }
+    if (updates.notes !== undefined) {
+      updateData.notes = updates.notes;
+    }
+    if (updates.scheduledAt !== undefined) {
+      updateData.scheduledAt =
+        typeof updates.scheduledAt === 'string' ? new Date(updates.scheduledAt) : updates.scheduledAt;
     }
 
-    return data;
-  } catch (error) {
+    const reservation = await prisma.reservation.update({
+      where: { id },
+      data: updateData,
+      include: {
+        user: true,
+        service: {
+          include: {
+            instructor: {
+              include: {
+                user: true,
+              },
+            },
+          },
+        },
+        instructor: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    return reservation;
+  } catch (error: any) {
     console.error('Update reservation error:', error);
-    throw error;
+    throw new Error(`予約の更新に失敗しました: ${error.message}`);
   }
 }
 
@@ -122,7 +199,7 @@ export async function updateReservation(
  * 予約キャンセル
  */
 export async function cancelReservation(id: string) {
-  return updateReservation(id, { status: 'cancelled' });
+  return updateReservation(id, { status: ReservationStatus.CANCELLED });
 }
 
 /**
@@ -130,17 +207,12 @@ export async function cancelReservation(id: string) {
  */
 export async function deleteReservation(id: string) {
   try {
-    const client = getDataClient();
-    const { data, errors } = await client.models.Reservation.delete({ id });
-
-    if (errors) {
-      console.error('Error deleting reservation:', errors);
-      throw new Error('予約の削除に失敗しました');
-    }
-
-    return data;
-  } catch (error) {
+    await prisma.reservation.delete({
+      where: { id },
+    });
+    return { success: true };
+  } catch (error: any) {
     console.error('Delete reservation error:', error);
-    throw error;
+    throw new Error(`予約の削除に失敗しました: ${error.message}`);
   }
 }

@@ -6,9 +6,8 @@ import { ArrowLeft, Menu, LogOut, User, Home, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from './SidebarProvider';
 import { getRoleFromPath } from '@/lib/utils';
-import { signOut } from 'aws-amplify/auth';
+import { signOut as betterAuthSignOut } from '@/lib/auth';
 import { getSession, clearSession } from '@/lib/auth';
-import { getClientWallet } from '@/lib/api/wallet';
 import { useEffect, useState } from 'react';
 
 interface AppHeaderProps {
@@ -21,13 +20,22 @@ export function AppHeader({ userName }: AppHeaderProps) {
   const { toggle } = useSidebar();
   const [balance, setBalance] = useState<number | null>(null);
 
+  const role = getRoleFromPath(pathname);
+
   useEffect(() => {
     const loadBalance = async () => {
-      const session = getSession();
-      if (session) {
+      if (!role || role !== 'user') return; // ユーザーのみ残高表示
+
+      const session = await getSession();
+      if (session?.user) {
         try {
-          const wallet = await getClientWallet(session.userId);
-          setBalance(wallet?.balance || 0);
+          const response = await fetch(`/api/wallet/me?role=${role}`, {
+            credentials: 'include',
+          });
+          if (response.ok) {
+            const wallet = await response.json();
+            setBalance(wallet?.balance || 0);
+          }
         } catch (err) {
           console.error('残高取得エラー:', err);
         }
@@ -35,14 +43,12 @@ export function AppHeader({ userName }: AppHeaderProps) {
     };
 
     loadBalance();
-  }, [pathname]);
+  }, [pathname, role]);
 
   // Don't show header on login/signup pages
   if (/\/(login|signup|verify)/.test(pathname)) {
     return null;
   }
-
-  const role = getRoleFromPath(pathname);
 
   const handleBack = () => {
     // Check if there's history to go back to
@@ -59,15 +65,16 @@ export function AppHeader({ userName }: AppHeaderProps) {
     try {
       console.log('🚪 ログアウト処理開始（AppHeader）');
       // Cognitoセッションをクリア
-      await signOut();
+      await betterAuthSignOut();
       console.log('✅ Cognitoセッション削除完了');
 
       // localStorageをクリア
       clearSession();
       console.log('✅ localStorage削除完了');
 
-      // トップページにリダイレクト
-      window.location.href = '/';
+      // ロールごとにリダイレクト先を分岐（管理者は管理画面へ戻す）
+      const fallbackPath = role === 'admin' ? '/manage/admin' : '/';
+      window.location.href = fallbackPath;
     } catch (error) {
       console.error('❌ ログアウトエラー:', error);
     }

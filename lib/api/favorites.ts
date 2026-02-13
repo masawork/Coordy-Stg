@@ -1,27 +1,30 @@
 /**
- * お気に入りクリエイター関連のAPI操作
+ * お気に入りクリエイター関連のAPI操作（Prisma版）
  */
 
-import { getDataClient } from './data-client';
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
 
 /**
  * お気に入りクリエイター一覧取得
  */
-export async function getFavoriteCreators(clientId: string) {
+export async function getFavoriteCreators(userId: string) {
   try {
-    const client = getDataClient();
-    const { data, errors } = await client.models.FavoriteCreator.list({
-      filter: {
-        clientId: { eq: clientId },
+    const favorites = await prisma.favoriteCreator.findMany({
+      where: { userId },
+      include: {
+        instructor: {
+          include: {
+            user: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
       },
     });
 
-    if (errors) {
-      console.error('Error listing favorite creators:', errors);
-      throw new Error('お気に入りクリエイターの取得に失敗しました');
-    }
-
-    return data || [];
+    return favorites;
   } catch (error) {
     console.error('Get favorite creators error:', error);
     throw error;
@@ -31,65 +34,66 @@ export async function getFavoriteCreators(clientId: string) {
 /**
  * お気に入りクリエイター追加
  */
-export async function addFavoriteCreator(clientId: string, instructorId: string) {
+export async function addFavoriteCreator(userId: string, instructorId: string) {
   try {
-    const client = getDataClient();
-    const { data, errors } = await client.models.FavoriteCreator.create({
-      clientId,
-      instructorId,
+    const favorite = await prisma.favoriteCreator.create({
+      data: {
+        userId,
+        instructorId,
+      },
+      include: {
+        instructor: {
+          include: {
+            user: true,
+          },
+        },
+      },
     });
 
-    if (errors) {
-      console.error('Error adding favorite creator:', errors);
-      throw new Error('お気に入り追加に失敗しました');
-    }
-
-    return data;
-  } catch (error) {
+    return favorite;
+  } catch (error: any) {
     console.error('Add favorite creator error:', error);
-    throw error;
+    if (error.code === 'P2002') {
+      throw new Error('既にお気に入りに登録されています');
+    }
+    throw new Error(`お気に入り追加に失敗しました: ${error.message}`);
   }
 }
 
 /**
  * お気に入りクリエイター削除
  */
-export async function removeFavoriteCreator(id: string) {
+export async function removeFavoriteCreator(userId: string, instructorId: string) {
   try {
-    const client = getDataClient();
-    const { data, errors } = await client.models.FavoriteCreator.delete({ id });
+    await prisma.favoriteCreator.deleteMany({
+      where: {
+        userId,
+        instructorId,
+      },
+    });
 
-    if (errors) {
-      console.error('Error removing favorite creator:', errors);
-      throw new Error('お気に入り削除に失敗しました');
-    }
-
-    return data;
-  } catch (error) {
+    return { success: true };
+  } catch (error: any) {
     console.error('Remove favorite creator error:', error);
-    throw error;
+    throw new Error(`お気に入り削除に失敗しました: ${error.message}`);
   }
 }
 
 /**
  * 特定のクリエイターがお気に入りかチェック
  */
-export async function isFavoriteCreator(clientId: string, instructorId: string) {
+export async function isFavoriteCreator(userId: string, instructorId: string) {
   try {
-    const client = getDataClient();
-    const { data, errors } = await client.models.FavoriteCreator.list({
-      filter: {
-        clientId: { eq: clientId },
-        instructorId: { eq: instructorId },
+    const favorite = await prisma.favoriteCreator.findUnique({
+      where: {
+        userId_instructorId: {
+          userId,
+          instructorId,
+        },
       },
     });
 
-    if (errors) {
-      console.error('Error checking favorite creator:', errors);
-      return false;
-    }
-
-    return (data || []).length > 0;
+    return !!favorite;
   } catch (error) {
     console.error('Check favorite creator error:', error);
     return false;

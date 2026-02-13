@@ -1,21 +1,24 @@
 /**
- * 管理者保護ルートのレイアウト
+ * 管理者保護ルートのレイアウト（Supabase Auth）
  * 認証チェックとレイアウトを提供
  */
 
 'use client';
 
+// 動的レンダリングを強制（React 19 + Next.js 16）
+export const dynamic = 'force-dynamic';
+
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getCurrentAuthUser, saveSession } from '@/lib/auth';
-import type { User } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { useSidebar } from '@/components/layout/SidebarProvider';
 import { X } from 'lucide-react';
 
 function ProtectedContent({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const { open, isDesktop, close } = useSidebar();
@@ -23,23 +26,25 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // Cognitoから最新のユーザー情報を取得
-        const authUser = await getCurrentAuthUser();
-
-        // ロールがadminであることを確認
-        if (authUser.role !== 'admin') {
+        const session = await getSession();
+        
+        if (!session?.user) {
           router.push('/manage/login?next=/manage/admin');
           return;
         }
 
-        // セッションを更新
-        saveSession(authUser);
+        const user = session.user;
 
-        setUser(authUser);
+        // ロールがadminであることを確認
+        if (user.user_metadata?.role?.toLowerCase() !== 'admin') {
+          router.push('/manage/login?next=/manage/admin');
+          return;
+        }
+
+        setUser(user);
         setLoading(false);
       } catch (error) {
         console.error('認証チェックエラー:', error);
-        // 認証エラーの場合はログインページへ
         router.push('/manage/login?next=/manage/admin');
       }
     };
@@ -65,7 +70,7 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ヘッダー */}
-      <AppHeader userName={user.name} />
+      <AppHeader userName={user.user_metadata?.name || user.email || '管理者'} />
 
       <div className="flex">
         {/* サイドバー - デスクトップ: 固定表示でメインが縮む / モバイル: オーバーレイ */}
@@ -116,7 +121,7 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function AdminProtectedLayout({
+export default function ManageProtectedLayout({
   children,
 }: {
   children: React.ReactNode;

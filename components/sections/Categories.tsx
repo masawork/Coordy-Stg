@@ -1,17 +1,27 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { FaChartLine, FaLaptopCode, FaGlobeAmericas, FaPalette, FaHeartbeat, FaGraduationCap } from 'react-icons/fa';
+import { FaHeartbeat, FaGlobeAmericas, FaLaptopCode, FaPalette, FaChartLine, FaGraduationCap } from 'react-icons/fa';
 
 export default function Categories() {
   const categories = [
     {
-      icon: <FaChartLine className="text-4xl text-purple-600" />,
-      title: 'ビジネススキル',
+      icon: <FaHeartbeat className="text-4xl text-green-600" />,
+      title: 'ヨガ・フィットネス',
       items: [
-        'マーケティング・営業術',
-        'プレゼンテーション・資料作成',
-        '起業・副業ノウハウ',
+        'ハタヨガ・パワーヨガ',
+        'ピラティス・ストレッチ',
+        '瞑想・マインドフルネス',
+      ],
+      featured: true, // 最優先カテゴリー
+    },
+    {
+      icon: <FaGlobeAmericas className="text-4xl text-blue-600" />,
+      title: '語学・コミュニケーション',
+      items: [
+        '英会話・ビジネス英語',
+        'その他外国語',
+        'コミュニケーションスキル',
       ],
     },
     {
@@ -24,15 +34,6 @@ export default function Categories() {
       ],
     },
     {
-      icon: <FaGlobeAmericas className="text-4xl text-blue-600" />,
-      title: '語学・コミュニケーション',
-      items: [
-        '英会話・ビジネス英語',
-        'その他外国語',
-        'コミュニケーションスキル',
-      ],
-    },
-    {
       icon: <FaPalette className="text-4xl text-orange-600" />,
       title: 'クリエイティブ',
       items: [
@@ -42,12 +43,12 @@ export default function Categories() {
       ],
     },
     {
-      icon: <FaHeartbeat className="text-4xl text-green-600" />,
-      title: '健康・ライフスタイル',
+      icon: <FaChartLine className="text-4xl text-purple-600" />,
+      title: 'ビジネススキル',
       items: [
-        'フィットネス・ヨガ',
-        '料理・栄養管理',
-        'メンタルケア',
+        'マーケティング・営業術',
+        'プレゼンテーション',
+        '起業・副業ノウハウ',
       ],
     },
     {
@@ -70,9 +71,15 @@ export default function Categories() {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
+          <div className="inline-block bg-green-600 text-white px-4 py-2 rounded-full text-sm font-bold mb-4">
+            🧘‍♀️ オンラインヨガから始めよう
+          </div>
           <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
-            こんな分野で活動できます
+            様々な分野のレッスンに対応
           </h2>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            ヨガ・フィットネスをメインに、語学、IT、ビジネスまで幅広くカバー
+          </p>
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
@@ -83,8 +90,21 @@ export default function Categories() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: index * 0.1 }}
-              className="bg-gray-50 p-8 rounded-xl hover:shadow-lg transition-shadow duration-300"
+              className={`relative p-8 rounded-xl hover:shadow-lg transition-all duration-300 ${
+                category.featured
+                  ? 'bg-gradient-to-br from-green-100 to-emerald-100 ring-2 ring-green-500 shadow-md'
+                  : 'bg-gray-50'
+              }`}
             >
+              {/* 人気バッジ */}
+              {category.featured && (
+                <div className="absolute top-4 right-4">
+                  <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-green-600 text-white shadow-md">
+                    🔥 人気
+                  </span>
+                </div>
+              )}
+              
               <div className="flex justify-center mb-4">{category.icon}</div>
               <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">
                 {category.title}
