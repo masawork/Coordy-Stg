@@ -1,90 +1,120 @@
 'use client';
 
-// 動的レンダリングを強制（React 19 + Next.js 16）
-export const dynamic = 'force-dynamic';
-
-
-import { useState, useEffect } from 'react';
-import { listServices } from '@/lib/api/services';
+import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { searchServices } from '@/lib/api/services';
+import type { ServiceSearchResult, ServiceSearchFilters as Filters } from '@/lib/api/services';
 import { ServiceCard } from '@/components/features/service/ServiceCard';
-// ServiceCategory型を定義
-type ServiceCategory = string;
+import {
+  ServiceSearchFilters,
+  type SearchFilterValues,
+} from '@/components/features/service/ServiceSearchFilters';
+import { Pagination } from '@/components/features/service/Pagination';
 
-export default function ServicesPage() {
-  const [services, setServices] = useState<any[]>([]);
-  const [filteredServices, setFilteredServices] = useState<any[]>([]);
+function parseFiltersFromParams(sp: URLSearchParams): SearchFilterValues {
+  return {
+    q: sp.get('q') || '',
+    category: sp.get('category') || '',
+    deliveryType: sp.get('deliveryType') || '',
+    location: sp.get('location') || '',
+    priceMin: sp.get('priceMin') || '',
+    priceMax: sp.get('priceMax') || '',
+    sortBy: sp.get('sortBy') || 'newest',
+  };
+}
+
+function filtersToSearchString(f: SearchFilterValues, p: number): string {
+  const params = new URLSearchParams();
+  if (f.q) params.set('q', f.q);
+  if (f.category) params.set('category', f.category);
+  if (f.deliveryType) params.set('deliveryType', f.deliveryType);
+  if (f.location) params.set('location', f.location);
+  if (f.priceMin) params.set('priceMin', f.priceMin);
+  if (f.priceMax) params.set('priceMax', f.priceMax);
+  if (f.sortBy && f.sortBy !== 'newest') params.set('sortBy', f.sortBy);
+  if (p > 1) params.set('page', String(p));
+  return params.toString();
+}
+
+function ServicesContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [filters, setFilters] = useState<SearchFilterValues>(() => parseFiltersFromParams(searchParams));
+  const [page, setPage] = useState(() => Number(searchParams.get('page')) || 1);
+  const [result, setResult] = useState<ServiceSearchResult | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<ServiceCategory | null>(null);
-  const [searchKeyword, setSearchKeyword] = useState('');
-  const [instructorSearch, setInstructorSearch] = useState('');
+
+  // ブラウザバック/フォワード対応
+  const lastPushedQs = useRef(filtersToSearchString(filters, page));
 
   useEffect(() => {
-    // 認証はレイアウトで実施済み
-    loadServices();
-  }, [selectedCategory]);
-
-  const loadServices = async () => {
-    try {
-      setLoading(true);
-
-      const filters = selectedCategory ? { category: selectedCategory, isActive: true } : { isActive: true };
-      const allServices = await listServices(filters);
-
-      // インストラクター情報はAPIレスポンスに含まれている（instructor.user）
-      const servicesWithInstructor = (allServices || []).map((service: any) => ({
-        ...service,
-        instructorName: service.instructor?.user?.name || service.instructor?.bio || 'クリエイター',
-      }));
-
-      setServices(servicesWithInstructor);
-      setFilteredServices(servicesWithInstructor);
-    } catch (err) {
-      console.error('サービス取得エラー:', err);
-      setServices([]);
-      setFilteredServices([]);
-    } finally {
-      setLoading(false);
+    const currentQs = searchParams.toString();
+    if (currentQs !== lastPushedQs.current) {
+      const newFilters = parseFiltersFromParams(searchParams);
+      const newPage = Number(searchParams.get('page')) || 1;
+      setFilters(newFilters);
+      setPage(newPage);
+      lastPushedQs.current = filtersToSearchString(newFilters, newPage);
     }
+  }, [searchParams]);
+
+  // データフェッチ
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      try {
+        const params: Filters = {
+          q: filters.q || undefined,
+          category: filters.category || undefined,
+          deliveryType: filters.deliveryType || undefined,
+          location: filters.location || undefined,
+          priceMin: filters.priceMin ? Number(filters.priceMin) : undefined,
+          priceMax: filters.priceMax ? Number(filters.priceMax) : undefined,
+          sortBy: (filters.sortBy as Filters['sortBy']) || 'newest',
+          page,
+          limit: 12,
+          isActive: true,
+        };
+        const data = await searchServices(params);
+        if (!cancelled) setResult(data);
+      } catch (err) {
+        console.error('サービス取得エラー:', err);
+        if (!cancelled) setResult({ services: [], total: 0, page: 1, limit: 12, totalPages: 0 });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    load();
+    return () => { cancelled = true; };
+  }, [filters, page]);
+
+  const syncUrl = useCallback(
+    (f: SearchFilterValues, p: number) => {
+      const qs = filtersToSearchString(f, p);
+      lastPushedQs.current = qs;
+      router.replace(`/user/services${qs ? `?${qs}` : ''}`, { scroll: false });
+    },
+    [router],
+  );
+
+  const handleFilterChange = (newFilters: SearchFilterValues) => {
+    setFilters(newFilters);
+    setPage(1);
+    syncUrl(newFilters, 1);
   };
 
-  // フィルター処理
-  useEffect(() => {
-    let result = [...services];
-
-    // キーワード検索
-    if (searchKeyword) {
-      const keyword = searchKeyword.toLowerCase();
-      result = result.filter(
-        (service) =>
-          service.title.toLowerCase().includes(keyword) ||
-          service.description?.toLowerCase().includes(keyword)
-      );
-    }
-
-    // インストラクター検索
-    if (instructorSearch) {
-      const instructor = instructorSearch.toLowerCase();
-      result = result.filter((service) =>
-        service.instructorName.toLowerCase().includes(instructor)
-      );
-    }
-
-    setFilteredServices(result);
-  }, [services, searchKeyword, instructorSearch]);
-
-  const categories: Array<{ value: ServiceCategory | null; label: string }> = [
-    { value: null, label: 'すべて' },
-    { value: 'coaching', label: 'コーチング' },
-    { value: 'training', label: 'トレーニング' },
-    { value: 'consultation', label: 'コンサルテーション' },
-    { value: 'workshop', label: 'ワークショップ' },
-    { value: 'seminar', label: 'セミナー' },
-    { value: 'other', label: 'その他' },
-  ];
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    syncUrl(filters, newPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
     <div className="space-y-8">
-      {/* ヘッダー */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">サービス検索</h1>
         <p className="mt-2 text-gray-600">
@@ -92,87 +122,50 @@ export default function ServicesPage() {
         </p>
       </div>
 
-      {/* 検索フィルター */}
-      <div className="bg-white rounded-lg shadow p-6 space-y-4">
-        {/* キーワード検索 */}
-        <div className="grid md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="keyword" className="block text-sm font-medium text-gray-700 mb-2">
-              サービス名で検索
-            </label>
-            <input
-              type="text"
-              id="keyword"
-              value={searchKeyword}
-              onChange={(e) => setSearchKeyword(e.target.value)}
-              placeholder="キーワードを入力..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
-          </div>
-          <div>
-            <label htmlFor="instructor" className="block text-sm font-medium text-gray-700 mb-2">
-              クリエイター名で検索
-            </label>
-            <input
-              type="text"
-              id="instructor"
-              value={instructorSearch}
-              onChange={(e) => setInstructorSearch(e.target.value)}
-              placeholder="クリエイター名を入力..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
-          </div>
-        </div>
+      <ServiceSearchFilters values={filters} onChange={handleFilterChange} />
 
-        {/* カテゴリーフィルター */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">カテゴリー</label>
-          <div className="flex flex-wrap gap-2">
-            {categories.map((category) => (
-              <button
-                key={category.value || 'all'}
-                onClick={() => setSelectedCategory(category.value)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  selectedCategory === category.value
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {category.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* サービス一覧 */}
       {loading ? (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">読み込み中...</p>
         </div>
-      ) : filteredServices.length > 0 ? (
+      ) : result && result.services.length > 0 ? (
         <>
           <div className="flex justify-between items-center">
             <p className="text-sm text-gray-600">
-              {filteredServices.length}件のサービスが見つかりました
+              {result.total}件中 {(result.page - 1) * result.limit + 1}〜
+              {Math.min(result.page * result.limit, result.total)}件を表示
             </p>
           </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredServices.map((service) => (
-              <ServiceCard key={service.id} service={service} />
+            {result.services.map((service) => (
+              <ServiceCard key={service.id} service={service} linkPrefix="/user/services" />
             ))}
           </div>
+
+          <Pagination
+            page={result.page}
+            totalPages={result.totalPages}
+            onPageChange={handlePageChange}
+          />
         </>
       ) : (
         <div className="text-center py-12">
           <p className="text-gray-500">該当するサービスが見つかりませんでした</p>
-          {(searchKeyword || instructorSearch) && (
+          {(filters.q || filters.category || filters.location || filters.priceMin || filters.priceMax || filters.deliveryType) && (
             <button
-              onClick={() => {
-                setSearchKeyword('');
-                setInstructorSearch('');
-              }}
+              onClick={() =>
+                handleFilterChange({
+                  q: '',
+                  category: '',
+                  deliveryType: '',
+                  location: '',
+                  priceMin: '',
+                  priceMax: '',
+                  sortBy: 'newest',
+                })
+              }
               className="mt-4 text-purple-600 hover:text-purple-700 font-medium"
             >
               検索条件をクリア
@@ -181,5 +174,20 @@ export default function ServicesPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ServicesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">読み込み中...</p>
+        </div>
+      }
+    >
+      <ServicesContent />
+    </Suspense>
   );
 }

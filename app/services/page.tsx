@@ -1,91 +1,119 @@
 'use client';
 
-// 動的レンダリングを強制（React 19 + Next.js 16）
-export const dynamic = 'force-dynamic';
+import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { searchServices } from '@/lib/api/services';
+import type { ServiceSearchResult, ServiceSearchFilters as Filters } from '@/lib/api/services';
+import { ServiceCard } from '@/components/features/service/ServiceCard';
+import {
+  ServiceSearchFilters,
+  type SearchFilterValues,
+} from '@/components/features/service/ServiceSearchFilters';
+import { Pagination } from '@/components/features/service/Pagination';
 
+function parseFiltersFromParams(sp: URLSearchParams): SearchFilterValues {
+  return {
+    q: sp.get('q') || '',
+    category: sp.get('category') || '',
+    deliveryType: sp.get('deliveryType') || '',
+    location: sp.get('location') || '',
+    priceMin: sp.get('priceMin') || '',
+    priceMax: sp.get('priceMax') || '',
+    sortBy: sp.get('sortBy') || 'newest',
+  };
+}
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { listServices } from '@/lib/api/services';
-import { Search, Filter, ArrowRight } from 'lucide-react';
+function filtersToSearchString(f: SearchFilterValues, p: number): string {
+  const params = new URLSearchParams();
+  if (f.q) params.set('q', f.q);
+  if (f.category) params.set('category', f.category);
+  if (f.deliveryType) params.set('deliveryType', f.deliveryType);
+  if (f.location) params.set('location', f.location);
+  if (f.priceMin) params.set('priceMin', f.priceMin);
+  if (f.priceMax) params.set('priceMax', f.priceMax);
+  if (f.sortBy && f.sortBy !== 'newest') params.set('sortBy', f.sortBy);
+  if (p > 1) params.set('page', String(p));
+  return params.toString();
+}
 
-export default function ServicesPage() {
+function ServicesContent() {
   const router = useRouter();
-  const [services, setServices] = useState<any[]>([]);
-  const [filteredServices, setFilteredServices] = useState<any[]>([]);
+  const searchParams = useSearchParams();
+
+  const [filters, setFilters] = useState<SearchFilterValues>(() => parseFiltersFromParams(searchParams));
+  const [page, setPage] = useState(() => Number(searchParams.get('page')) || 1);
+  const [result, setResult] = useState<ServiceSearchResult | null>(null);
   const [loading, setLoading] = useState(true);
-  const [searchKeyword, setSearchKeyword] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [sortBy, setSortBy] = useState<'price' | 'newest' | 'popular'>('newest');
 
-  const categories = [
-    'プログラミング',
-    'デザイン',
-    '語学',
-    '音楽',
-    'スポーツ',
-    'ビジネス',
-    'その他',
-  ];
+  // ブラウザバック/フォワード対応:
+  // searchParams が変わったとき、自分が起こした変更ではなければ state を同期する
+  const lastPushedQs = useRef(filtersToSearchString(filters, page));
 
   useEffect(() => {
-    loadServices();
-  }, []);
+    const currentQs = searchParams.toString();
+    if (currentQs !== lastPushedQs.current) {
+      // ブラウザバック等、外部起因の URL 変更
+      const newFilters = parseFiltersFromParams(searchParams);
+      const newPage = Number(searchParams.get('page')) || 1;
+      setFilters(newFilters);
+      setPage(newPage);
+      lastPushedQs.current = filtersToSearchString(newFilters, newPage);
+    }
+  }, [searchParams]);
 
+  // データフェッチ
   useEffect(() => {
-    filterServices();
-  }, [services, searchKeyword, selectedCategory, sortBy]);
+    let cancelled = false;
 
-  const loadServices = async () => {
-    try {
+    const load = async () => {
       setLoading(true);
-      const allServices = await listServices({ isActive: true });
-      setServices(allServices || []);
-    } catch (error) {
-      console.error('Failed to load services:', error);
-      setServices([]);
-    } finally {
-      setLoading(false);
-    }
+      try {
+        const params: Filters = {
+          q: filters.q || undefined,
+          category: filters.category || undefined,
+          deliveryType: filters.deliveryType || undefined,
+          location: filters.location || undefined,
+          priceMin: filters.priceMin ? Number(filters.priceMin) : undefined,
+          priceMax: filters.priceMax ? Number(filters.priceMax) : undefined,
+          sortBy: (filters.sortBy as Filters['sortBy']) || 'newest',
+          page,
+          limit: 12,
+          isActive: true,
+        };
+        const data = await searchServices(params);
+        if (!cancelled) setResult(data);
+      } catch (error) {
+        console.error('Failed to load services:', error);
+        if (!cancelled) setResult({ services: [], total: 0, page: 1, limit: 12, totalPages: 0 });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    load();
+    return () => { cancelled = true; };
+  }, [filters, page]);
+
+  const syncUrl = useCallback(
+    (f: SearchFilterValues, p: number) => {
+      const qs = filtersToSearchString(f, p);
+      lastPushedQs.current = qs;
+      router.replace(`/services${qs ? `?${qs}` : ''}`, { scroll: false });
+    },
+    [router],
+  );
+
+  const handleFilterChange = (newFilters: SearchFilterValues) => {
+    setFilters(newFilters);
+    setPage(1);
+    syncUrl(newFilters, 1);
   };
 
-  const filterServices = () => {
-    let filtered = [...services];
-
-    // キーワード検索
-    if (searchKeyword) {
-      filtered = filtered.filter(
-        (service) =>
-          service.title.toLowerCase().includes(searchKeyword.toLowerCase()) ||
-          service.description?.toLowerCase().includes(searchKeyword.toLowerCase()) ||
-          service.instructor?.user?.name?.toLowerCase().includes(searchKeyword.toLowerCase())
-      );
-    }
-
-    // カテゴリーフィルタ
-    if (selectedCategory) {
-      filtered = filtered.filter((service) => service.category === selectedCategory);
-    }
-
-    // ソート
-    if (sortBy === 'price') {
-      filtered.sort((a, b) => a.price - b.price);
-    } else if (sortBy === 'newest') {
-      filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    }
-
-    setFilteredServices(filtered);
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    syncUrl(filters, newPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -95,95 +123,55 @@ export default function ServicesPage() {
           <p className="text-gray-600">様々なスキルを学べるサービスをご覧いただけます</p>
         </div>
 
-        {/* 検索・フィルタ */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* キーワード検索 */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="サービス名、インストラクター名で検索"
-                value={searchKeyword}
-                onChange={(e) => setSearchKeyword(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* カテゴリーフィルタ */}
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent appearance-none bg-white"
-              >
-                <option value="">すべてのカテゴリー</option>
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* ソート */}
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            >
-              <option value="newest">新着順</option>
-              <option value="price">価格順</option>
-              <option value="popular">人気順</option>
-            </select>
-          </div>
+        <div className="mb-8">
+          <ServiceSearchFilters values={filters} onChange={handleFilterChange} />
         </div>
 
-        {/* サービス一覧 */}
-        {filteredServices.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+          </div>
+        ) : !result || result.services.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-500 text-lg">該当するサービスが見つかりませんでした</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredServices.map((service) => (
-              <motion.div
-                key={service.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow"
-              >
-                <Link href={`/services/${service.id}`}>
-                  <div className="p-6">
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">{service.title}</h3>
-                    <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                      {service.description || '説明なし'}
-                    </p>
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-sm text-gray-500">{service.category}</span>
-                      <span className="text-2xl font-bold text-purple-600">
-                        ¥{service.price.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-500">
-                        {service.instructor?.user?.name || 'インストラクター'}
-                      </span>
-                      <span className="text-sm text-gray-500">{service.duration}分</span>
-                    </div>
-                    <div className="mt-4 flex items-center text-purple-600">
-                      <span className="text-sm font-semibold">詳細を見る</span>
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </div>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
-          </div>
+          <>
+            <p className="text-sm text-gray-600 mb-4">
+              {result.total}件中 {(result.page - 1) * result.limit + 1}〜
+              {Math.min(result.page * result.limit, result.total)}件を表示
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {result.services.map((service) => (
+                <ServiceCard key={service.id} service={service} linkPrefix="/services" />
+              ))}
+            </div>
+
+            <div className="mt-8">
+              <Pagination
+                page={result.page}
+                totalPages={result.totalPages}
+                onPageChange={handlePageChange}
+              />
+            </div>
+          </>
         )}
       </div>
     </div>
   );
 }
 
+export default function ServicesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        </div>
+      }
+    >
+      <ServicesContent />
+    </Suspense>
+  );
+}
