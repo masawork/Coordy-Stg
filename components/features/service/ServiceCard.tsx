@@ -16,10 +16,10 @@ interface ServiceCardProps {
   service: {
     id: string;
     title: string;
-    description?: string;
+    description?: string | null;
     category?: string;
     deliveryType?: string;
-    location?: string;
+    location?: string | null;
     duration: number;
     price?: number;
     basePrice?: number; // 互換性のため
@@ -31,12 +31,14 @@ interface ServiceCardProps {
       displayName?: string;
       user?: {
         name?: string;
+        image?: string | null;
       };
     };
   };
+  linkPrefix?: string;
 }
 
-export function ServiceCard({ service }: ServiceCardProps) {
+export function ServiceCard({ service, linkPrefix = '/user/services' }: ServiceCardProps) {
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteId, setFavoriteId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -88,7 +90,7 @@ export function ServiceCard({ service }: ServiceCardProps) {
   return (
     <div className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow overflow-hidden">
       {/* サービス画像（クリックで詳細へ遷移） */}
-      <Link href={`/user/services/${service.id}`} className="block">
+      <Link href={`${linkPrefix}/${service.id}`} className="block">
         <div className="relative h-48">
           {(service.images?.[0]?.url || service.image) ? (
             <img
@@ -125,7 +127,7 @@ export function ServiceCard({ service }: ServiceCardProps) {
       </Link>
 
       {/* サービス情報 */}
-      <Link href={`/user/services/${service.id}`} className="block p-4">
+      <Link href={`${linkPrefix}/${service.id}`} className="block p-4">
         <h3 className="font-semibold text-gray-900 line-clamp-1 mb-1">
           {service.title}
         </h3>
@@ -139,6 +141,12 @@ export function ServiceCard({ service }: ServiceCardProps) {
         {service.description && (
           <p className="text-xs text-gray-500 line-clamp-2 mb-2">
             {service.description}
+          </p>
+        )}
+
+        {(service.price != null || service.basePrice != null) && (
+          <p className="text-lg font-bold text-purple-600 mb-2">
+            ¥{(service.price ?? service.basePrice ?? 0).toLocaleString()}
           </p>
         )}
 
