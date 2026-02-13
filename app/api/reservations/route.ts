@@ -163,6 +163,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
           amount: totalPrice,
           method: 'credit',
           status: TransactionStatus.COMPLETED,
+          reservationId: reservation.id,
           description: `予約時クレジット決済（${service.title}）`,
         },
       });
@@ -174,6 +175,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
           type: TransactionType.USE,
           amount: totalPrice,
           status: TransactionStatus.COMPLETED,
+          reservationId: reservation.id,
           description: `サービス予約: ${service.title}`,
         },
       });
@@ -257,6 +259,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
           type: TransactionType.USE,
           amount: totalPrice,
           status: TransactionStatus.COMPLETED,
+          reservationId: reservation.id,
           description: `サービス予約: ${service.title}`,
         },
       });

@@ -184,6 +184,7 @@ model Reservation {
   service     Service           @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   instructor  Instructor        @relation(fields: [instructorId], references: [id], onDelete: Cascade)
   externalReservation ExternalReservation?
+  pointTransactions   PointTransaction[]
 
   @@index([userId])
   @@index([serviceId])
@@ -270,21 +271,24 @@ enum TransactionStatus {
 }
 
 model PointTransaction {
-  id          String            @id @default(uuid())
-  userId      String            @map("user_id")
-  type        TransactionType
-  amount      Int
-  method      String?           // 'credit' | 'bank_transfer'
-  status      TransactionStatus  @default(COMPLETED)
-  transferId  String?           @map("transfer_id") // 振込番号（銀行振込用、4桁）
-  description String?           @db.Text
-  expiresAt   DateTime?         @map("expires_at")
-  createdAt   DateTime          @default(now()) @map("created_at")
+  id            String            @id @default(uuid())
+  userId        String            @map("user_id")
+  type          TransactionType
+  amount        Int
+  method        String?           // 'credit' | 'bank_transfer'
+  status        TransactionStatus  @default(COMPLETED)
+  transferId    String?           @map("transfer_id") // 振込番号（銀行振込用、4桁）
+  reservationId String?           @map("reservation_id") // 予約との紐付け（返金特定用）
+  description   String?           @db.Text
+  expiresAt     DateTime?         @map("expires_at")
+  createdAt     DateTime          @default(now()) @map("created_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reservation Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([transferId])
+  @@index([reservationId])
   @@map("point_transactions")
 }
 
