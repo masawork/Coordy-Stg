@@ -3,9 +3,29 @@
  */
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resendInstance: Resend | null = null;
+
+function getResend(): Resend {
+  if (!resendInstance) {
+    resendInstance = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resendInstance;
+}
+
 const FROM_EMAIL = process.env.FROM_EMAIL || 'onboarding@resend.dev';
 const APP_NAME = 'Coordy';
+
+/**
+ * HTMLエスケープ: ユーザー入力値のXSS対策
+ */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 export interface ReservationEmailData {
   reservationId: string;
@@ -89,32 +109,37 @@ export async function sendReservationConfirmationEmail(
     const priceText = formatCurrency(data.price);
     const paymentMethodText = formatPaymentMethod(data.paymentMethod);
 
+    const safeUserName = escapeHtml(data.userName);
+    const safeServiceName = escapeHtml(data.serviceName);
+    const safeInstructorName = escapeHtml(data.instructorName);
+
     // 場所またはMeet URLを表示
     let locationHtml = '';
     if (data.deliveryType === 'remote' && data.meetUrl) {
+      const safeMeetUrl = escapeHtml(data.meetUrl);
       locationHtml = `
-        <p style="margin: 4px 0;"><strong>参加URL:</strong> <a href="${data.meetUrl}" style="color: #0066cc;">${data.meetUrl}</a></p>
+        <p style="margin: 4px 0;"><strong>参加URL:</strong> <a href="${safeMeetUrl}" style="color: #0066cc;">${safeMeetUrl}</a></p>
       `;
     } else if (data.location) {
       locationHtml = `
-        <p style="margin: 4px 0;"><strong>場所:</strong> ${data.location}</p>
+        <p style="margin: 4px 0;"><strong>場所:</strong> ${escapeHtml(data.location)}</p>
       `;
     }
 
-    await resend.emails.send({
+    await getResend().emails.send({
       from: `${APP_NAME} <${FROM_EMAIL}>`,
       to: data.userEmail,
       subject: `【${APP_NAME}】予約が確定しました`,
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">${data.userName}様</h2>
+          <h2 style="color: #333;">${safeUserName}様</h2>
           <p>予約が確定しました。以下の内容をご確認ください。</p>
 
           <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin: 16px 0;">
             <h3 style="margin-top: 0; color: #333;">予約詳細</h3>
-            <p style="margin: 4px 0;"><strong>予約ID:</strong> ${data.reservationId}</p>
-            <p style="margin: 4px 0;"><strong>サービス名:</strong> ${data.serviceName}</p>
-            <p style="margin: 4px 0;"><strong>インストラクター:</strong> ${data.instructorName}</p>
+            <p style="margin: 4px 0;"><strong>予約ID:</strong> ${escapeHtml(data.reservationId)}</p>
+            <p style="margin: 4px 0;"><strong>サービス名:</strong> ${safeServiceName}</p>
+            <p style="margin: 4px 0;"><strong>インストラクター:</strong> ${safeInstructorName}</p>
             <p style="margin: 4px 0;"><strong>日時:</strong> ${dateTimeText}</p>
             <p style="margin: 4px 0;"><strong>所要時間:</strong> ${data.duration}分</p>
             ${locationHtml}
@@ -155,20 +180,24 @@ export async function sendReservationNotifyInstructorEmail(
     const dateTimeText = formatDateJapanese(data.scheduledAt);
     const priceText = formatCurrency(data.price);
 
-    await resend.emails.send({
+    const safeInstructorName = escapeHtml(data.instructorName);
+    const safeServiceName = escapeHtml(data.serviceName);
+    const safeUserName = escapeHtml(data.userName);
+
+    await getResend().emails.send({
       from: `${APP_NAME} <${FROM_EMAIL}>`,
       to: data.instructorEmail,
       subject: `【${APP_NAME}】新しい予約が入りました`,
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">${data.instructorName}様</h2>
+          <h2 style="color: #333;">${safeInstructorName}様</h2>
           <p>新しい予約が入りました。</p>
 
           <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin: 16px 0;">
             <h3 style="margin-top: 0; color: #333;">予約詳細</h3>
-            <p style="margin: 4px 0;"><strong>予約ID:</strong> ${data.reservationId}</p>
-            <p style="margin: 4px 0;"><strong>サービス名:</strong> ${data.serviceName}</p>
-            <p style="margin: 4px 0;"><strong>予約者:</strong> ${data.userName}</p>
+            <p style="margin: 4px 0;"><strong>予約ID:</strong> ${escapeHtml(data.reservationId)}</p>
+            <p style="margin: 4px 0;"><strong>サービス名:</strong> ${safeServiceName}</p>
+            <p style="margin: 4px 0;"><strong>予約者:</strong> ${safeUserName}</p>
             <p style="margin: 4px 0;"><strong>日時:</strong> ${dateTimeText}</p>
             <p style="margin: 4px 0;"><strong>所要時間:</strong> ${data.duration}分</p>
             <p style="margin: 4px 0;"><strong>参加人数:</strong> ${data.participants}名</p>
@@ -205,9 +234,13 @@ export async function sendCancellationConfirmationEmail(
   try {
     const dateTimeText = formatDateJapanese(data.scheduledAt);
 
+    const safeUserName = escapeHtml(data.userName);
+    const safeServiceName = escapeHtml(data.serviceName);
+    const safeInstructorName = escapeHtml(data.instructorName);
+
     // キャンセル理由の表示
     const cancelReasonHtml = data.cancelReason
-      ? `<p style="margin: 4px 0;"><strong>キャンセル理由:</strong> ${data.cancelReason}</p>`
+      ? `<p style="margin: 4px 0;"><strong>キャンセル理由:</strong> ${escapeHtml(data.cancelReason)}</p>`
       : '';
 
     // 返金情報の表示
@@ -219,7 +252,7 @@ export async function sendCancellationConfirmationEmail(
         <div style="background: #e8f5e9; padding: 16px; border-radius: 8px; margin: 16px 0;">
           <h3 style="margin-top: 0; color: #2e7d32;">返金について</h3>
           <p style="margin: 4px 0;"><strong>返金額:</strong> ${refundAmountText}</p>
-          <p style="margin: 4px 0;"><strong>返金方法:</strong> ${refundMethodText}</p>
+          <p style="margin: 4px 0;"><strong>返金方法:</strong> ${escapeHtml(refundMethodText)}</p>
           <p style="margin: 8px 0 0 0; font-size: 14px; color: #555;">
             返金処理は完了しています。
           </p>
@@ -241,20 +274,20 @@ export async function sendCancellationConfirmationEmail(
         break;
     }
 
-    await resend.emails.send({
+    await getResend().emails.send({
       from: `${APP_NAME} <${FROM_EMAIL}>`,
       to: data.userEmail,
       subject: `【${APP_NAME}】予約がキャンセルされました`,
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">${data.userName}様</h2>
+          <h2 style="color: #333;">${safeUserName}様</h2>
           <p>予約がキャンセルされました。</p>
 
           <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin: 16px 0;">
             <h3 style="margin-top: 0; color: #333;">キャンセル詳細</h3>
-            <p style="margin: 4px 0;"><strong>予約ID:</strong> ${data.reservationId}</p>
-            <p style="margin: 4px 0;"><strong>サービス名:</strong> ${data.serviceName}</p>
-            <p style="margin: 4px 0;"><strong>インストラクター:</strong> ${data.instructorName}</p>
+            <p style="margin: 4px 0;"><strong>予約ID:</strong> ${escapeHtml(data.reservationId)}</p>
+            <p style="margin: 4px 0;"><strong>サービス名:</strong> ${safeServiceName}</p>
+            <p style="margin: 4px 0;"><strong>インストラクター:</strong> ${safeInstructorName}</p>
             <p style="margin: 4px 0;"><strong>日時:</strong> ${dateTimeText}</p>
             <p style="margin: 4px 0;"><strong>キャンセル者:</strong> ${cancelledByText}</p>
             ${cancelReasonHtml}
@@ -292,9 +325,13 @@ export async function sendCancellationNotifyInstructorEmail(
   try {
     const dateTimeText = formatDateJapanese(data.scheduledAt);
 
+    const safeInstructorName = escapeHtml(data.instructorName);
+    const safeServiceName = escapeHtml(data.serviceName);
+    const safeUserName = escapeHtml(data.userName);
+
     // キャンセル理由の表示
     const cancelReasonHtml = data.cancelReason
-      ? `<p style="margin: 4px 0;"><strong>キャンセル理由:</strong> ${data.cancelReason}</p>`
+      ? `<p style="margin: 4px 0;"><strong>キャンセル理由:</strong> ${escapeHtml(data.cancelReason)}</p>`
       : '';
 
     // キャンセル者の表示
@@ -311,20 +348,20 @@ export async function sendCancellationNotifyInstructorEmail(
         break;
     }
 
-    await resend.emails.send({
+    await getResend().emails.send({
       from: `${APP_NAME} <${FROM_EMAIL}>`,
       to: data.instructorEmail,
       subject: `【${APP_NAME}】予約がキャンセルされました`,
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">${data.instructorName}様</h2>
+          <h2 style="color: #333;">${safeInstructorName}様</h2>
           <p>予約がキャンセルされました。</p>
 
           <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin: 16px 0;">
             <h3 style="margin-top: 0; color: #333;">キャンセル詳細</h3>
-            <p style="margin: 4px 0;"><strong>予約ID:</strong> ${data.reservationId}</p>
-            <p style="margin: 4px 0;"><strong>サービス名:</strong> ${data.serviceName}</p>
-            <p style="margin: 4px 0;"><strong>予約者:</strong> ${data.userName}</p>
+            <p style="margin: 4px 0;"><strong>予約ID:</strong> ${escapeHtml(data.reservationId)}</p>
+            <p style="margin: 4px 0;"><strong>サービス名:</strong> ${safeServiceName}</p>
+            <p style="margin: 4px 0;"><strong>予約者:</strong> ${safeUserName}</p>
             <p style="margin: 4px 0;"><strong>日時:</strong> ${dateTimeText}</p>
             <p style="margin: 4px 0;"><strong>キャンセル者:</strong> ${cancelledByText}</p>
             ${cancelReasonHtml}
