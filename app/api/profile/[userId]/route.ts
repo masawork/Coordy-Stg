@@ -7,183 +7,137 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/lib/prisma';
 import { createClient } from '@/lib/supabase/server';
+import { withErrorHandler, validationError, unauthorizedError, notFoundError, forbiddenError } from '@/lib/api/errors';
 
-const prisma = new PrismaClient();
-
-export async function GET(
+export const GET = withErrorHandler(async (
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
-) {
-  try {
-    const { userId } = await params;
+) => {
+  const { userId } = await params;
 
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'ユーザーIDが必要です' },
-        { status: 400 }
-      );
-    }
-
-    // Supabase認証を確認
-    const supabase = await createClient();
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !authUser) {
-      return NextResponse.json(
-        { error: '認証が必要です' },
-        { status: 401 }
-      );
-    }
-
-    // Prisma UserをIDで検索
-    const dbUser = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!dbUser) {
-      return NextResponse.json(
-        { error: 'ユーザーが見つかりません' },
-        { status: 404 }
-      );
-    }
-
-    // メールアドレスが一致するか確認（セキュリティチェック）
-    if (dbUser.email !== authUser.email) {
-      return NextResponse.json(
-        { error: '権限がありません' },
-        { status: 403 }
-      );
-    }
-
-    let profile = await prisma.clientProfile.findUnique({
-      where: { userId },
-    });
-
-    // プロフィールが無ければデフォルトで作成
-    if (!profile) {
-      profile = await prisma.clientProfile.create({
-        data: {
-          userId,
-          fullName: authUser.user_metadata?.full_name || null,
-          displayName: authUser.user_metadata?.name || authUser.email || null,
-          address: null,
-          phoneNumber: authUser.phone || null,
-          isProfileComplete: false,
-          verificationLevel: 0,
-          phoneVerified: false,
-          identityVerified: false,
-        },
-      });
-    }
-
-    return NextResponse.json(profile);
-  } catch (error: any) {
-    console.error('Get profile error:', error);
-    return NextResponse.json(
-      { error: 'プロフィールの取得に失敗しました', details: error.message },
-      { status: 500 }
-    );
-  } finally {
-    await prisma.$disconnect();
+  if (!userId) {
+    return validationError('ユーザーIDが必要です');
   }
-}
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
-) {
-  try {
-    const { userId } = await params;
-    const body = await request.json();
+  // Supabase認証を確認
+  const supabase = await createClient();
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
 
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'ユーザーIDが必要です' },
-        { status: 400 }
-      );
-    }
+  if (authError || !authUser) {
+    return unauthorizedError();
+  }
 
-    // Supabase認証を確認
-    const supabase = await createClient();
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  // Prisma UserをIDで検索
+  const dbUser = await prisma.user.findUnique({
+    where: { id: userId },
+  });
 
-    if (authError || !authUser) {
-      return NextResponse.json(
-        { error: '認証が必要です' },
-        { status: 401 }
-      );
-    }
+  if (!dbUser) {
+    return notFoundError('ユーザー');
+  }
 
-    // Prisma UserをIDで検索
-    const dbUser = await prisma.user.findUnique({
-      where: { id: userId },
-    });
+  // メールアドレスが一致するか確認（セキュリティチェック）
+  if (dbUser.email !== authUser.email) {
+    return forbiddenError('権限がありません');
+  }
 
-    if (!dbUser) {
-      return NextResponse.json(
-        { error: 'ユーザーが見つかりません' },
-        { status: 404 }
-      );
-    }
+  let profile = await prisma.clientProfile.findUnique({
+    where: { userId },
+  });
 
-    // メールアドレスが一致するか確認（セキュリティチェック）
-    if (dbUser.email !== authUser.email) {
-      return NextResponse.json(
-        { error: '権限がありません' },
-        { status: 403 }
-      );
-    }
-
-    // 更新データの準備
-    const updateData: any = {};
-
-    if (body.fullName !== undefined) {
-      updateData.fullName = body.fullName || null;
-    }
-    if (body.displayName !== undefined) {
-      updateData.displayName = body.displayName || null;
-    }
-    if (body.address !== undefined) {
-      updateData.address = body.address || null;
-    }
-    if (body.phoneNumber !== undefined) {
-      updateData.phoneNumber = body.phoneNumber || null;
-    }
-    if (body.dateOfBirth !== undefined) {
-      updateData.dateOfBirth = body.dateOfBirth ? new Date(body.dateOfBirth) : null;
-    }
-    if (body.gender !== undefined) {
-      updateData.gender = body.gender || null;
-    }
-    if (body.isProfileComplete !== undefined) {
-      updateData.isProfileComplete = body.isProfileComplete;
-    }
-
-    // プロフィールをupsert（存在しなければ作成）
-    const profile = await prisma.clientProfile.upsert({
-      where: { userId },
-      update: updateData,
-      create: {
+  // プロフィールが無ければデフォルトで作成
+  if (!profile) {
+    profile = await prisma.clientProfile.create({
+      data: {
         userId,
-        ...updateData,
-        isProfileComplete: updateData.isProfileComplete ?? false,
+        fullName: authUser.user_metadata?.full_name || null,
+        displayName: authUser.user_metadata?.name || authUser.email || null,
+        address: null,
+        phoneNumber: authUser.phone || null,
+        isProfileComplete: false,
         verificationLevel: 0,
         phoneVerified: false,
         identityVerified: false,
       },
     });
-
-    return NextResponse.json(profile);
-  } catch (error: any) {
-    console.error('Update profile error:', error);
-
-    return NextResponse.json(
-      { error: 'プロフィールの更新に失敗しました', details: error.message },
-      { status: 500 }
-    );
-  } finally {
-    await prisma.$disconnect();
   }
-}
+
+  return NextResponse.json(profile);
+});
+
+export const PUT = withErrorHandler(async (
+  request: NextRequest,
+  { params }: { params: Promise<{ userId: string }> }
+) => {
+  const { userId } = await params;
+  const body = await request.json();
+
+  if (!userId) {
+    return validationError('ユーザーIDが必要です');
+  }
+
+  // Supabase認証を確認
+  const supabase = await createClient();
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !authUser) {
+    return unauthorizedError();
+  }
+
+  // Prisma UserをIDで検索
+  const dbUser = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!dbUser) {
+    return notFoundError('ユーザー');
+  }
+
+  // メールアドレスが一致するか確認（セキュリティチェック）
+  if (dbUser.email !== authUser.email) {
+    return forbiddenError('権限がありません');
+  }
+
+  // 更新データの準備
+  const updateData: any = {};
+
+  if (body.fullName !== undefined) {
+    updateData.fullName = body.fullName || null;
+  }
+  if (body.displayName !== undefined) {
+    updateData.displayName = body.displayName || null;
+  }
+  if (body.address !== undefined) {
+    updateData.address = body.address || null;
+  }
+  if (body.phoneNumber !== undefined) {
+    updateData.phoneNumber = body.phoneNumber || null;
+  }
+  if (body.dateOfBirth !== undefined) {
+    updateData.dateOfBirth = body.dateOfBirth ? new Date(body.dateOfBirth) : null;
+  }
+  if (body.gender !== undefined) {
+    updateData.gender = body.gender || null;
+  }
+  if (body.isProfileComplete !== undefined) {
+    updateData.isProfileComplete = body.isProfileComplete;
+  }
+
+  // プロフィールをupsert（存在しなければ作成）
+  const profile = await prisma.clientProfile.upsert({
+    where: { userId },
+    update: updateData,
+    create: {
+      userId,
+      ...updateData,
+      isProfileComplete: updateData.isProfileComplete ?? false,
+      verificationLevel: 0,
+      phoneVerified: false,
+      identityVerified: false,
+    },
+  });
+
+  return NextResponse.json(profile);
+});

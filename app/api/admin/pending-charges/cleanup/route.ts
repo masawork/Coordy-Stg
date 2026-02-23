@@ -34,49 +34,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { TransactionStatus } from '@prisma/client';
+import { withErrorHandler } from '@/lib/api/errors';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: NextRequest) {
-  try {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+export const POST = withErrorHandler(async (request: NextRequest) => {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    // 30日以上経過した未処理の振込申請を検索
-    const expiredTransactions = await prisma.pointTransaction.findMany({
-      where: {
-        method: 'bank_transfer',
-        status: TransactionStatus.TRANSFERRED,
-        createdAt: { lt: thirtyDaysAgo },
+  // 30日以上経過した未処理の振込申請を検索
+  const expiredTransactions = await prisma.pointTransaction.findMany({
+    where: {
+      method: 'bank_transfer',
+      status: TransactionStatus.TRANSFERRED,
+      createdAt: { lt: thirtyDaysAgo },
+    },
+  });
+
+  // 各トランザクションを個別に更新（description を保持するため）
+  let expiredCount = 0;
+  for (const tx of expiredTransactions) {
+    await prisma.pointTransaction.update({
+      where: { id: tx.id },
+      data: {
+        status: TransactionStatus.FAILED,
+        description: `${tx.description || ''} [30日経過により自動キャンセル]`,
       },
     });
-
-    // 各トランザクションを個別に更新（description を保持するため）
-    let expiredCount = 0;
-    for (const tx of expiredTransactions) {
-      await prisma.pointTransaction.update({
-        where: { id: tx.id },
-        data: {
-          status: TransactionStatus.FAILED,
-          description: `${tx.description || ''} [30日経過により自動キャンセル]`,
-        },
-      });
-      expiredCount++;
-    }
-
-    return NextResponse.json({
-      success: true,
-      expiredCount,
-      message: expiredCount > 0
-        ? `${expiredCount}件の振込申請を期限切れ処理しました`
-        : '期限切れの振込申請はありませんでした',
-    });
-
-  } catch (error: any) {
-    console.error('Cleanup expired transfers error:', error);
-    return NextResponse.json(
-      { error: 'クリーンアップに失敗しました', details: error.message },
-      { status: 500 }
-    );
+    expiredCount++;
   }
-}
+
+  return NextResponse.json({
+    success: true,
+    expiredCount,
+    message: expiredCount > 0
+      ? `${expiredCount}件の振込申請を期限切れ処理しました`
+      : '期限切れの振込申請はありませんでした',
+  });
+});

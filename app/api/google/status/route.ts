@@ -5,87 +5,58 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import prisma from '@/lib/prisma';
+import { getAuthUser } from '@/lib/api/auth';
+import { withErrorHandler, notFoundError } from '@/lib/api/errors';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest) {
-  try {
-    const supabase = await createClient();
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+export const GET = withErrorHandler(async (request: NextRequest) => {
+  const authResult = await getAuthUser();
+  if (authResult instanceof NextResponse) return authResult;
+  const { dbUser } = authResult;
 
-    if (authError || !authUser) {
-      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
-    }
+  const instructor = await prisma.instructor.findUnique({
+    where: { userId: dbUser.id },
+    select: {
+      googleAccessToken: true,
+      googleRefreshToken: true,
+    },
+  });
 
-    const dbUser = await prisma.user.findFirst({
-      where: { authId: authUser.id },
-      include: {
-        instructor: {
-          select: {
-            googleAccessToken: true,
-            googleRefreshToken: true,
-          },
-        },
-      },
-    });
-
-    if (!dbUser?.instructor) {
-      return NextResponse.json({ connected: false });
-    }
-
-    const connected = !!(
-      dbUser.instructor.googleAccessToken && dbUser.instructor.googleRefreshToken
-    );
-
-    return NextResponse.json({ connected });
-  } catch (error: any) {
-    console.error('Google status error:', error);
-    return NextResponse.json(
-      { error: 'ステータス確認に失敗しました', details: error.message },
-      { status: 500 }
-    );
+  if (!instructor) {
+    return NextResponse.json({ connected: false });
   }
-}
 
-export async function DELETE(request: NextRequest) {
-  try {
-    const supabase = await createClient();
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  const connected = !!(
+    instructor.googleAccessToken && instructor.googleRefreshToken
+  );
 
-    if (authError || !authUser) {
-      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
-    }
+  return NextResponse.json({ connected });
+});
 
-    const dbUser = await prisma.user.findFirst({
-      where: { authId: authUser.id },
-      include: { instructor: true },
-    });
+export const DELETE = withErrorHandler(async (request: NextRequest) => {
+  const authResult = await getAuthUser();
+  if (authResult instanceof NextResponse) return authResult;
+  const { dbUser } = authResult;
 
-    if (!dbUser?.instructor) {
-      return NextResponse.json(
-        { error: 'インストラクターが見つかりません' },
-        { status: 404 }
-      );
-    }
+  const instructor = await prisma.instructor.findUnique({
+    where: { userId: dbUser.id },
+  });
 
-    // Google連携を解除
-    await prisma.instructor.update({
-      where: { id: dbUser.instructor.id },
-      data: {
-        googleAccessToken: null,
-        googleRefreshToken: null,
-        googleTokenExpiry: null,
-      },
-    });
-
-    return NextResponse.json({ success: true, message: 'Google連携を解除しました' });
-  } catch (error: any) {
-    console.error('Google disconnect error:', error);
-    return NextResponse.json(
-      { error: '連携解除に失敗しました', details: error.message },
-      { status: 500 }
-    );
+  if (!instructor) {
+    return notFoundError('インストラクター');
   }
-}
+
+  // Google連携を解除
+  await prisma.instructor.update({
+    where: { id: instructor.id },
+    data: {
+      googleAccessToken: null,
+      googleRefreshToken: null,
+      googleTokenExpiry: null,
+    },
+  });
+
+  return NextResponse.json({ success: true, message: 'Google連携を解除しました' });
+});
