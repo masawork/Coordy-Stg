@@ -1,33 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient, UserRole } from '@prisma/client';
+import prisma from '@/lib/prisma';
+import { UserRole } from '@prisma/client';
+import { getAuthAdmin } from '@/lib/api/auth';
+import { withErrorHandler, validationError } from '@/lib/api/errors';
 
-const prisma = new PrismaClient();
 export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/manage/users/set-role
  * body: { userId: string, role: 'USER' | 'INSTRUCTOR' | 'ADMIN' }
  */
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { userId, role } = body as { userId?: string; role?: UserRole };
+export const POST = withErrorHandler(async (req: NextRequest) => {
+  const authResult = await getAuthAdmin();
+  if (authResult instanceof NextResponse) return authResult;
 
-    if (!userId || !role) {
-      return NextResponse.json({ error: 'userId と role は必須です' }, { status: 400 });
-    }
+  const body = await req.json();
+  const { userId, role } = body as { userId?: string; role?: UserRole };
 
-    const updated = await prisma.user.update({
-      where: { id: userId },
-      data: { role },
-    });
-
-    return NextResponse.json({ success: true, user: updated });
-  } catch (error: any) {
-    console.error('Set role error:', error);
-    return NextResponse.json({ error: 'ロール更新に失敗しました', details: error.message }, { status: 500 });
-  } finally {
-    await prisma.$disconnect();
+  if (!userId || !role) {
+    return validationError('userId と role は必須です');
   }
-}
 
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: { role },
+  });
+
+  return NextResponse.json({ success: true, user: updated });
+});

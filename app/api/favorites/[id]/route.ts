@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import { createClient } from '@/lib/supabase/server';
-
-const prisma = new PrismaClient();
+import prisma from '@/lib/prisma';
+import { getAuthUser } from '@/lib/api/auth';
+import { withErrorHandler, notFoundError, forbiddenError } from '@/lib/api/errors';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,63 +9,32 @@ export const dynamic = 'force-dynamic';
  * お気に入りクリエイター削除
  * DELETE /api/favorites/[id]
  */
-export async function DELETE(
+export const DELETE = withErrorHandler(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+) => {
+  const authResult = await getAuthUser();
+  if (authResult instanceof NextResponse) return authResult;
+  const { dbUser } = authResult;
 
-    if (authError || !user) {
-      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
-    }
+  const { id } = await params;
 
-    // Supabase Auth IDからPrisma User IDを取得
-    const dbUser = await prisma.user.findFirst({
-      where: { authId: user.id },
-    });
+  // お気に入りを取得して所有者確認
+  const favorite = await prisma.favoriteCreator.findUnique({
+    where: { id },
+  });
 
-    if (!dbUser) {
-      return NextResponse.json(
-        { error: 'ユーザーデータが見つかりません' },
-        { status: 400 }
-      );
-    }
-
-    const { id } = await params;
-
-    // お気に入りを取得して所有者確認
-    const favorite = await prisma.favoriteCreator.findUnique({
-      where: { id },
-    });
-
-    if (!favorite) {
-      return NextResponse.json(
-        { error: 'お気に入りが見つかりません' },
-        { status: 404 }
-      );
-    }
-
-    if (favorite.userId !== dbUser.id) {
-      return NextResponse.json(
-        { error: '削除権限がありません' },
-        { status: 403 }
-      );
-    }
-
-    await prisma.favoriteCreator.delete({
-      where: { id },
-    });
-
-    return NextResponse.json({ success: true, message: 'お気に入りを削除しました' });
-  } catch (error: any) {
-    console.error('Delete favorite error:', error);
-    return NextResponse.json(
-      { error: 'お気に入り削除に失敗しました', details: error.message },
-      { status: 500 }
-    );
-  } finally {
-    await prisma.$disconnect();
+  if (!favorite) {
+    return notFoundError('お気に入り');
   }
-}
+
+  if (favorite.userId !== dbUser.id) {
+    return forbiddenError('削除権限がありません');
+  }
+
+  await prisma.favoriteCreator.delete({
+    where: { id },
+  });
+
+  return NextResponse.json({ success: true, message: 'お気に入りを削除しました' });
+});

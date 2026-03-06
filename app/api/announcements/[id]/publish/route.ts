@@ -1,59 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import { createClient } from '@/lib/supabase/server';
-
-const prisma = new PrismaClient();
+import prisma from '@/lib/prisma';
+import { getAuthAdmin } from '@/lib/api/auth';
+import { withErrorHandler } from '@/lib/api/errors';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * お知らせを公開（管理者のみ）
  */
-export async function POST(
+export const POST = withErrorHandler(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const supabase = await createClient();
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+) => {
+  const authResult = await getAuthAdmin();
+  if (authResult instanceof NextResponse) return authResult;
 
-    if (authError || !authUser) {
-      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
-    }
+  const { id } = await params;
 
-    const userId = authUser.id;
+  const announcement = await prisma.adminAnnouncement.update({
+    where: { id },
+    data: {
+      isPublished: true,
+      publishedAt: new Date(),
+    },
+  });
 
-    // 管理者権限チェック
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: '管理者のみお知らせを公開できます' },
-        { status: 403 }
-      );
-    }
-
-    const { id } = await params;
-
-    const announcement = await prisma.adminAnnouncement.update({
-      where: { id },
-      data: {
-        isPublished: true,
-        publishedAt: new Date(),
-      },
-    });
-
-    return NextResponse.json(announcement);
-  } catch (error: any) {
-    console.error('Publish announcement error:', error);
-    return NextResponse.json(
-      { error: 'お知らせの公開に失敗しました', details: error.message },
-      { status: 500 }
-    );
-  } finally {
-    await prisma.$disconnect();
-  }
-}
-
+  return NextResponse.json(announcement);
+});

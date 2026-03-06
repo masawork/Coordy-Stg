@@ -1,78 +1,63 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import prisma from '@/lib/prisma';
+import { UserRole } from '@prisma/client';
 import { createClient } from '@/lib/supabase/server';
-import { PrismaClient, UserRole } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { withErrorHandler, unauthorizedError, validationError } from '@/lib/api/errors';
 
 /**
  * ユーザーのロールを更新するAPI（Supabase Auth）
  * サインアップ時にロールを設定するために使用
  */
-export async function POST(request: NextRequest) {
-  try {
-    const supabase = await createClient();
-    
-    // セッションを取得
-    const { data: { session } } = await supabase.auth.getSession();
+export const POST = withErrorHandler(async (request: NextRequest) => {
+  const supabase = await createClient();
 
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+  // セッションを取得
+  const { data: { session } } = await supabase.auth.getSession();
 
-    const { role } = await request.json();
+  if (!session?.user) {
+    return unauthorizedError();
+  }
 
-    if (!role || !['user', 'instructor', 'admin'].includes(role)) {
-      return NextResponse.json(
-        { error: 'Invalid role' },
-        { status: 400 }
-      );
-    }
+  const { role } = await request.json();
 
-    const prismaRole = role.toUpperCase() as UserRole;
+  if (!role || !['user', 'instructor', 'admin'].includes(role)) {
+    return validationError('Invalid role');
+  }
 
-    // Supabase Authのuser_metadataを更新
-    await supabase.auth.updateUser({
-      data: { role }
-    });
+  const prismaRole = role.toUpperCase() as UserRole;
 
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { authId: session.user.id },
-          { id: session.user.id },
-        ],
+  // Supabase Authのuser_metadataを更新
+  await supabase.auth.updateUser({
+    data: { role }
+  });
+
+  const existingUser = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { authId: session.user.id },
+        { id: session.user.id },
+      ],
+    },
+  });
+
+  if (existingUser) {
+    await prisma.user.update({
+      where: { id: existingUser.id },
+      data: {
+        role: prismaRole,
+        authId: existingUser.authId || session.user.id,
       },
     });
-
-    if (existingUser) {
-      await prisma.user.update({
-        where: { id: existingUser.id },
-        data: {
-          role: prismaRole,
-          authId: existingUser.authId || session.user.id,
-        },
-      });
-    } else {
-      await prisma.user.create({
-        data: {
-          authId: session.user.id,
-          email: session.user.email || '',
-          name: session.user.user_metadata?.name || session.user.email || '',
-          role: prismaRole,
-        },
-      });
-    }
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Update role error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+  } else {
+    await prisma.user.create({
+      data: {
+        authId: session.user.id,
+        email: session.user.email || '',
+        name: session.user.user_metadata?.name || session.user.email || '',
+        role: prismaRole,
+      },
+    });
   }
-}
+
+  return NextResponse.json({ success: true });
+});

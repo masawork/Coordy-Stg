@@ -1,83 +1,61 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import { createClient } from '@/lib/supabase/server';
+import prisma from '@/lib/prisma';
+import { getAuthUser } from '@/lib/api/auth';
 import { setDefaultPaymentMethod } from '@/lib/stripe/helpers';
-
-const prisma = new PrismaClient();
+import { withErrorHandler, notFoundError, forbiddenError } from '@/lib/api/errors';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * デフォルトカードを設定
  */
-export async function PUT(
+export const PUT = withErrorHandler(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+) => {
+  const authResult = await getAuthUser();
+  if (authResult instanceof NextResponse) return authResult;
+  const { dbUser } = authResult;
 
-    if (authError || !user) {
-      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
-    }
+  const { id } = await params;
 
-    const { id } = await params;
-    const userId = user.id;
+  // カード情報を取得
+  const paymentMethod = await prisma.paymentMethod.findUnique({
+    where: { id },
+  });
 
-    // カード情報を取得
-    const paymentMethod = await prisma.paymentMethod.findUnique({
-      where: { id },
-    });
-
-    if (!paymentMethod) {
-      return NextResponse.json(
-        { error: 'カードが見つかりません' },
-        { status: 404 }
-      );
-    }
-
-    if (paymentMethod.userId !== userId) {
-      return NextResponse.json(
-        { error: 'このカードを設定する権限がありません' },
-        { status: 403 }
-      );
-    }
-
-    // 既存のデフォルトを解除
-    await prisma.paymentMethod.updateMany({
-      where: {
-        userId,
-        isDefault: true,
-      },
-      data: {
-        isDefault: false,
-      },
-    });
-
-    // 新しいデフォルトを設定
-    const updatedMethod = await prisma.paymentMethod.update({
-      where: { id },
-      data: { isDefault: true },
-    });
-
-    // Stripeにもデフォルトを設定
-    if (paymentMethod.stripeCustomerId && paymentMethod.stripePaymentMethodId) {
-      await setDefaultPaymentMethod(
-        paymentMethod.stripeCustomerId,
-        paymentMethod.stripePaymentMethodId
-      );
-    }
-
-    return NextResponse.json(updatedMethod);
-  } catch (error: any) {
-    console.error('Set default payment method error:', error);
-    return NextResponse.json(
-      { error: 'デフォルトカードの設定に失敗しました', details: error.message },
-      { status: 500 }
-    );
-  } finally {
-    await prisma.$disconnect();
+  if (!paymentMethod) {
+    return notFoundError('カード');
   }
-}
 
+  if (paymentMethod.userId !== dbUser.id) {
+    return forbiddenError('このカードを設定する権限がありません');
+  }
+
+  // 既存のデフォルトを解除
+  await prisma.paymentMethod.updateMany({
+    where: {
+      userId: dbUser.id,
+      isDefault: true,
+    },
+    data: {
+      isDefault: false,
+    },
+  });
+
+  // 新しいデフォルトを設定
+  const updatedMethod = await prisma.paymentMethod.update({
+    where: { id },
+    data: { isDefault: true },
+  });
+
+  // Stripeにもデフォルトを設定
+  if (paymentMethod.stripeCustomerId && paymentMethod.stripePaymentMethodId) {
+    await setDefaultPaymentMethod(
+      paymentMethod.stripeCustomerId,
+      paymentMethod.stripePaymentMethodId
+    );
+  }
+
+  return NextResponse.json(updatedMethod);
+});
