@@ -16,6 +16,7 @@ import {
   validationError,
   withErrorHandler,
 } from '@/lib/api/errors';
+import { sendAndLogWebhook, buildReservationWebhookData } from '@/lib/partner/webhook';
 
 export const dynamic = 'force-dynamic';
 
@@ -140,6 +141,34 @@ export const PATCH = withErrorHandler(async (
 
     return updatedReservation;
   });
+
+  // 外部予約の場合、パートナーにWebhook通知
+  const externalReservation = await prisma.externalReservation.findUnique({
+    where: { reservationId: id },
+    include: { partner: true },
+  });
+  if (externalReservation?.partner.webhookUrl && externalReservation.partner.webhookSecret) {
+    const webhookData = buildReservationWebhookData({
+      reservationId: id,
+      externalRef: externalReservation.externalRef,
+      status: 'CANCELLED',
+      service: { id: reservation.service.id, title: reservation.service.title },
+      scheduledAt: reservation.scheduledAt.toISOString(),
+      participants: reservation.participants,
+      guest: null,
+      totalAmount: reservation.service.price * reservation.participants,
+      commissionAmount: externalReservation.commissionAmount,
+      paymentMode: externalReservation.paymentMode,
+    });
+    sendAndLogWebhook({
+      partnerId: externalReservation.partnerId,
+      reservationId: id,
+      webhookUrl: externalReservation.partner.webhookUrl,
+      webhookSecret: externalReservation.partner.webhookSecret,
+      event: 'reservation.cancelled',
+      data: webhookData,
+    }).catch((err) => console.error('Webhook failed:', err));
+  }
 
   return NextResponse.json({
     success: true,

@@ -591,7 +591,23 @@ Webhook接続テスト
 
 ### 4.2 Webhook通知
 
-予約完了時にパートナーのwebhookUrlへPOST
+予約ステータス変更時にパートナーのwebhookUrlへPOST。
+`reservation.created`（外部予約作成時）、`reservation.cancelled`（キャンセル時）、`reservation.completed`（完了時）の3イベントを送信。
+
+**リトライ仕様**
+
+| 項目 | 値 |
+|------|-----|
+| 最大リトライ回数 | 3回（初回 + リトライ3回 = 最大4回試行） |
+| リトライ間隔 | 指数バックオフ（1秒→2秒→4秒 + ランダムジッター0〜1秒） |
+| 最大待機時間 | 30秒 |
+| タイムアウト | 10秒/リクエスト |
+| リトライ対象 | 5xxエラー、ネットワークエラー |
+| リトライ非対象 | 2xx（成功）、4xx（クライアントエラー） |
+
+**配信ログ（WebhookLog）**
+
+全てのWebhook送信結果はWebhookLogテーブルに永続化され、管理者画面から確認・手動再送が可能。
 
 **リクエストヘッダー**
 ```
@@ -627,15 +643,76 @@ X-Coordy-Timestamp: 1707400000
 
 **Webhookイベント種別**
 
-| イベント | 説明 |
-|---------|------|
-| `reservation.created` | 予約作成完了 |
-| `reservation.cancelled` | 予約キャンセル |
-| `reservation.completed` | 予約完了（サービス提供完了） |
+| イベント | 送信タイミング | 説明 |
+|---------|--------------|------|
+| `reservation.created` | 外部予約作成時 | 予約作成完了 |
+| `reservation.cancelled` | ユーザー/インストラクター/管理者によるキャンセル時 | 予約キャンセル |
+| `reservation.completed` | インストラクター/管理者による完了時 | 予約完了（サービス提供完了） |
 
 ---
 
-### 4.3 管理用エンドポイント
+### 4.3 管理者用Webhook API
+
+#### GET /api/admin/partners/[id]/webhooks
+
+Webhook配信ログ一覧（Admin専用）
+
+**クエリパラメータ**
+
+| パラメータ | 型 | 説明 |
+|-----------|-----|------|
+| `page` | number | ページ番号（デフォルト: 1） |
+| `limit` | number | 取得件数（デフォルト: 50、最大: 100） |
+| `success` | boolean | 成功/失敗フィルタ |
+| `event` | string | イベント名フィルタ |
+
+**レスポンス**
+```json
+{
+  "logs": [
+    {
+      "id": "xxx",
+      "partnerId": "ptr_xxx",
+      "reservationId": "res_xxx",
+      "event": "reservation.created",
+      "url": "https://partner.com/webhook",
+      "requestBody": "{...}",
+      "statusCode": 200,
+      "success": true,
+      "attempts": 1,
+      "lastError": null,
+      "lastAttemptAt": "2025-02-08T12:00:00Z",
+      "createdAt": "2025-02-08T12:00:00Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 50,
+    "total": 100,
+    "totalPages": 2
+  }
+}
+```
+
+#### POST /api/admin/partners/[id]/webhooks/[logId]/retry
+
+Webhook手動再送（Admin専用）
+
+元のWebhookLogのペイロードを使って再送信し、新しいWebhookLogを作成。
+
+**レスポンス**
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "attempts": 1,
+  "error": null
+}
+```
+
+---
+
+### 4.4 管理用エンドポイント
 
 #### GET /api/admin/partners
 

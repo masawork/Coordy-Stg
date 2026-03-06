@@ -607,6 +607,7 @@ model Partner {
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   externalReservations ExternalReservation[]
+  webhookLogs          WebhookLog[]
 
   @@index([apiKey])
   @@index([code])
@@ -655,4 +656,27 @@ model GuestUser {
 
   @@index([email])
   @@map("guest_users")
+}
+
+// Webhook配信ログ
+model WebhookLog {
+  id             String    @id @default(uuid())
+  partnerId      String    @map("partner_id")
+  reservationId  String?   @map("reservation_id")
+  event          String                          // "reservation.created" etc.
+  url            String
+  requestBody    String    @db.Text              // JSON payload
+  statusCode     Int?      @map("status_code")
+  success        Boolean   @default(false)
+  attempts       Int       @default(0)
+  lastError      String?   @map("last_error") @db.Text
+  lastAttemptAt  DateTime? @map("last_attempt_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  partner        Partner   @relation(fields: [partnerId], references: [id])
+
+  @@index([partnerId])
+  @@index([success])
+  @@index([createdAt])
+  @@map("webhook_logs")
 }

@@ -2,6 +2,7 @@
  * パートナーWebhook通知ユーティリティ
  */
 import { signWebhookPayload } from './auth';
+import prisma from '@/lib/prisma';
 
 export type WebhookEvent =
   | 'reservation.created'
@@ -188,4 +189,44 @@ export function buildReservationWebhookData(params: {
     commission: params.commissionAmount,
     paymentMode: params.paymentMode,
   };
+}
+
+/**
+ * Webhook送信 + WebhookLogへ配信結果を永続化
+ */
+export async function sendAndLogWebhook(params: {
+  partnerId: string;
+  reservationId?: string;
+  webhookUrl: string;
+  webhookSecret: string;
+  event: WebhookEvent;
+  data: Record<string, unknown>;
+}): Promise<WebhookResult> {
+  const result = await sendWebhookNotification(
+    params.webhookUrl,
+    params.webhookSecret,
+    params.event,
+    params.data,
+  );
+
+  try {
+    await prisma.webhookLog.create({
+      data: {
+        partnerId: params.partnerId,
+        reservationId: params.reservationId ?? null,
+        event: params.event,
+        url: params.webhookUrl,
+        requestBody: JSON.stringify({ event: params.event, data: params.data }),
+        statusCode: result.statusCode ?? null,
+        success: result.success,
+        attempts: result.attempts ?? 0,
+        lastError: result.error ?? null,
+        lastAttemptAt: result.lastAttemptAt ?? null,
+      },
+    });
+  } catch (logError) {
+    console.error('Failed to save WebhookLog:', logError);
+  }
+
+  return result;
 }
