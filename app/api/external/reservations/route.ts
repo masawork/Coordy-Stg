@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyPartnerRequest } from '@/lib/partner/auth';
-import { sendWebhookNotification, buildReservationWebhookData } from '@/lib/partner/webhook';
+import { sendAndLogWebhook, buildReservationWebhookData } from '@/lib/partner/webhook';
 import { ReservationStatus, PaymentMode } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
@@ -227,12 +227,14 @@ export async function POST(request: NextRequest) {
       });
 
       // Fire and forget
-      sendWebhookNotification(
-        partner.webhookUrl,
-        partner.webhookSecret,
-        'reservation.created',
-        webhookData,
-      ).catch((err) => console.error('Webhook notification failed:', err));
+      sendAndLogWebhook({
+        partnerId: partner.id,
+        reservationId: result.reservation.id,
+        webhookUrl: partner.webhookUrl,
+        webhookSecret: partner.webhookSecret,
+        event: 'reservation.created',
+        data: webhookData,
+      }).catch((err) => console.error('Webhook notification failed:', err));
     }
 
     return NextResponse.json(
