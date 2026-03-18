@@ -382,3 +382,199 @@ export async function sendCancellationNotifyInstructorEmail(
     console.error('Failed to send cancellation notification email to instructor:', error);
   }
 }
+
+export interface ReminderEmailData {
+  reservationId: string;
+  userName: string;
+  userEmail: string;
+  serviceName: string;
+  instructorName: string;
+  scheduledAt: Date;
+  duration: number;
+  deliveryType: string;
+  meetUrl?: string | null;
+  location?: string;
+}
+
+/**
+ * 予約リマインダーメールをユーザーに送信
+ * 予約の前日に送信する想定
+ */
+export async function sendReminderEmail(
+  data: ReminderEmailData
+): Promise<void> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('RESEND_API_KEY is not set. Skipping email notification.');
+    return;
+  }
+
+  try {
+    const dateTimeText = formatDateJapanese(data.scheduledAt);
+    const safeUserName = escapeHtml(data.userName);
+    const safeServiceName = escapeHtml(data.serviceName);
+    const safeInstructorName = escapeHtml(data.instructorName);
+
+    // 場所またはMeet URLを表示
+    let locationHtml = '';
+    if (data.deliveryType === 'remote' && data.meetUrl) {
+      const safeMeetUrl = escapeHtml(data.meetUrl);
+      locationHtml = `
+        <p style="margin: 4px 0;"><strong>参加URL:</strong> <a href="${safeMeetUrl}" style="color: #0066cc;">${safeMeetUrl}</a></p>
+      `;
+    } else if (data.location) {
+      locationHtml = `
+        <p style="margin: 4px 0;"><strong>場所:</strong> ${escapeHtml(data.location)}</p>
+      `;
+    }
+
+    await getResend().emails.send({
+      from: `${APP_NAME} <${FROM_EMAIL}>`,
+      to: data.userEmail,
+      subject: `【${APP_NAME}】明日の予約リマインダー`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #333;">${safeUserName}様</h2>
+          <p>明日の予約についてお知らせします。</p>
+
+          <div style="background: #fff3e0; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #ff9800;">
+            <h3 style="margin-top: 0; color: #e65100;">予約リマインダー</h3>
+            <p style="margin: 4px 0;"><strong>予約ID:</strong> ${escapeHtml(data.reservationId)}</p>
+            <p style="margin: 4px 0;"><strong>サービス名:</strong> ${safeServiceName}</p>
+            <p style="margin: 4px 0;"><strong>インストラクター:</strong> ${safeInstructorName}</p>
+            <p style="margin: 4px 0;"><strong>日時:</strong> ${dateTimeText}</p>
+            <p style="margin: 4px 0;"><strong>所要時間:</strong> ${data.duration}分</p>
+            ${locationHtml}
+          </div>
+
+          <p style="color: #666; font-size: 14px;">
+            準備をお忘れなく。お会いできることを楽しみにしています。
+          </p>
+
+          <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+          <p style="color: #999; font-size: 12px;">
+            このメールは${APP_NAME}から自動送信されています。
+          </p>
+        </div>
+      `,
+    });
+  } catch (error) {
+    console.error('Failed to send reminder email:', error);
+  }
+}
+
+/**
+ * 予約リマインダーメールをインストラクターに送信
+ */
+export async function sendReminderInstructorEmail(
+  data: ReminderEmailData & { instructorEmail: string }
+): Promise<void> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('RESEND_API_KEY is not set. Skipping email notification.');
+    return;
+  }
+
+  try {
+    const dateTimeText = formatDateJapanese(data.scheduledAt);
+    const safeInstructorName = escapeHtml(data.instructorName);
+    const safeServiceName = escapeHtml(data.serviceName);
+    const safeUserName = escapeHtml(data.userName);
+
+    await getResend().emails.send({
+      from: `${APP_NAME} <${FROM_EMAIL}>`,
+      to: data.instructorEmail,
+      subject: `【${APP_NAME}】明日の予約リマインダー`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #333;">${safeInstructorName}様</h2>
+          <p>明日の予約についてお知らせします。</p>
+
+          <div style="background: #fff3e0; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #ff9800;">
+            <h3 style="margin-top: 0; color: #e65100;">予約リマインダー</h3>
+            <p style="margin: 4px 0;"><strong>予約ID:</strong> ${escapeHtml(data.reservationId)}</p>
+            <p style="margin: 4px 0;"><strong>サービス名:</strong> ${safeServiceName}</p>
+            <p style="margin: 4px 0;"><strong>予約者:</strong> ${safeUserName}</p>
+            <p style="margin: 4px 0;"><strong>日時:</strong> ${dateTimeText}</p>
+            <p style="margin: 4px 0;"><strong>所要時間:</strong> ${data.duration}分</p>
+          </div>
+
+          <p style="color: #666; font-size: 14px;">
+            準備をお願いいたします。詳細は管理画面からご確認ください。
+          </p>
+
+          <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+          <p style="color: #999; font-size: 12px;">
+            このメールは${APP_NAME}から自動送信されています。
+          </p>
+        </div>
+      `,
+    });
+  } catch (error) {
+    console.error('Failed to send reminder email to instructor:', error);
+  }
+}
+
+export interface CompletionEmailData {
+  reservationId: string;
+  userName: string;
+  userEmail: string;
+  serviceName: string;
+  instructorName: string;
+  scheduledAt: Date;
+  duration: number;
+  price: number;
+  participants: number;
+}
+
+/**
+ * 予約完了メールをユーザーに送信
+ */
+export async function sendCompletionEmail(
+  data: CompletionEmailData
+): Promise<void> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('RESEND_API_KEY is not set. Skipping email notification.');
+    return;
+  }
+
+  try {
+    const dateTimeText = formatDateJapanese(data.scheduledAt);
+    const priceText = formatCurrency(data.price);
+
+    const safeUserName = escapeHtml(data.userName);
+    const safeServiceName = escapeHtml(data.serviceName);
+    const safeInstructorName = escapeHtml(data.instructorName);
+
+    await getResend().emails.send({
+      from: `${APP_NAME} <${FROM_EMAIL}>`,
+      to: data.userEmail,
+      subject: `【${APP_NAME}】サービスが完了しました`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #333;">${safeUserName}様</h2>
+          <p>ご利用ありがとうございました。サービスが完了しました。</p>
+
+          <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin: 16px 0;">
+            <h3 style="margin-top: 0; color: #333;">完了サービス</h3>
+            <p style="margin: 4px 0;"><strong>予約ID:</strong> ${escapeHtml(data.reservationId)}</p>
+            <p style="margin: 4px 0;"><strong>サービス名:</strong> ${safeServiceName}</p>
+            <p style="margin: 4px 0;"><strong>インストラクター:</strong> ${safeInstructorName}</p>
+            <p style="margin: 4px 0;"><strong>日時:</strong> ${dateTimeText}</p>
+            <p style="margin: 4px 0;"><strong>参加人数:</strong> ${data.participants}名</p>
+            <p style="margin: 4px 0;"><strong>料金:</strong> ${priceText}</p>
+          </div>
+
+          <p style="color: #666; font-size: 14px;">
+            またのご利用をお待ちしております。
+          </p>
+
+          <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+          <p style="color: #999; font-size: 12px;">
+            このメールは${APP_NAME}から自動送信されています。
+          </p>
+        </div>
+      `,
+    });
+  } catch (error) {
+    console.error('Failed to send completion email:', error);
+  }
+}
