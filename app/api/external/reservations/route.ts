@@ -10,6 +10,12 @@ import prisma from '@/lib/prisma';
 import { verifyPartnerRequest } from '@/lib/partner/auth';
 import { sendAndLogWebhook, buildReservationWebhookData } from '@/lib/partner/webhook';
 import { ReservationStatus, PaymentMode } from '@prisma/client';
+import {
+  sendReservationConfirmationEmail,
+  sendReservationNotifyInstructorEmail,
+} from '@/lib/mail/reservation';
+import { withPartnerRateLimit } from '@/lib/api/rate-limit-helper';
+import { RATE_LIMIT_PARTNER } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +44,10 @@ export async function POST(request: NextRequest) {
     }
 
     const partner = verifyResult.partner!;
+
+    // パートナーベースのレート制限チェック
+    const rateLimitResponse = withPartnerRateLimit(partnerId, RATE_LIMIT_PARTNER);
+    if (rateLimitResponse) return rateLimitResponse;
 
     const body = await request.json();
     const {
@@ -235,6 +245,40 @@ export async function POST(request: NextRequest) {
         event: 'reservation.created',
         data: webhookData,
       }).catch((err) => console.error('Webhook notification failed:', err));
+    }
+
+    // ゲストへ確認メール送信（非同期）
+    const guestEmailData = {
+      reservationId: result.reservation.id,
+      userName: result.guestUser.name,
+      userEmail: result.guestUser.email,
+      serviceName: service.title,
+      instructorName: result.reservation.instructor?.user?.name || 'インストラクター',
+      scheduledAt: result.reservation.scheduledAt,
+      duration: service.duration,
+      location: service.location || undefined,
+      deliveryType: service.deliveryType || 'remote',
+      meetUrl: null,
+      price: totalAmount,
+      participants,
+      paymentMethod: actualPaymentMode === PaymentMode.EXTERNAL ? 'external' : 'coordy',
+    };
+    sendReservationConfirmationEmail(guestEmailData).catch((err) =>
+      console.error('Failed to send guest confirmation email:', err)
+    );
+
+    // インストラクターへ通知メール送信（非同期）
+    const extInstructorUser = await prisma.user.findUnique({
+      where: { id: service.instructor.userId },
+      select: { email: true },
+    });
+    if (extInstructorUser?.email) {
+      sendReservationNotifyInstructorEmail({
+        ...guestEmailData,
+        instructorEmail: extInstructorUser.email,
+      }).catch((err) =>
+        console.error('Failed to send instructor notification email:', err)
+      );
     }
 
     return NextResponse.json(

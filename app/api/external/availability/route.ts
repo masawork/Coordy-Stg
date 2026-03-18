@@ -5,6 +5,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyPartnerRequest } from '@/lib/partner/auth';
+import { withPartnerRateLimit } from '@/lib/api/rate-limit-helper';
+import { RATE_LIMIT_PARTNER } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +38,10 @@ export async function GET(request: NextRequest) {
     }
 
     const partner = verifyResult.partner!;
+
+    // パートナーベースのレート制限チェック
+    const rateLimitResponse = withPartnerRateLimit(partnerId, RATE_LIMIT_PARTNER);
+    if (rateLimitResponse) return rateLimitResponse;
 
     // パートナーのサービス制限チェック
     if (partner.serviceIds.length > 0 && !partner.serviceIds.includes(serviceId)) {
