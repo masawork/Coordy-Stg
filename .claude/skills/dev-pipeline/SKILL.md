@@ -1,93 +1,110 @@
 ---
 name: dev-pipeline
-description: Coordyの開発を自動で進める。TASKS.mdからTODOを取得→実装→lint→build→ブラウザ確認→commit→pushの一連パイプライン。
+description: Coordyの開発を自動で進める。TASKS.mdからTODOを取得→仕様確認→実装→lint→build→テスト→commit→pushの一連パイプライン。全タスク完了時は仕様書から不足機能を検出して新規タスク化する。
 trigger: 開発進める、次のタスク、パイプライン実行、自動開発、TODO進める
 ---
 
-# 開発パイプライン
+# 開発パイプライン（完全自律版）
 
 Coordy-Stgプロジェクトの開発を一連の流れで自動実行する。
+ユーザーの介入なしにタスクを完了させることを目標とする。
 
 ## パイプライン全体フロー
 
 ```
-1. タスク選定 → 2. 実装 → 3. Lint → 4. Build → 5. ブラウザ確認 → 6. Commit → 7. Push
+1. タスク選定 → 2. 仕様確認 → 3. 実装 → 4. Lint → 5. Build → 6. テスト → 7. Commit → 8. TASKS.md更新 → 9. Push → (次のタスクへ)
 ```
 
 ## Step 1: タスク選定
 
-1. `DOCS/TASKS.md` を読み、未実装タスク（TODO-XX）を確認する
-2. 高優先度 → 中優先度 → 低優先度の順で、見積が「小」または「中」のタスクを選ぶ
-3. 選んだタスクをユーザーに提示し、承認を得る
-4. 承認されたら新しいブランチを切る:
-   ```bash
-   git checkout -b feature/todo-XX-簡潔な説明
-   ```
+1. `DOCS/TASKS.md` を読む
+2. ~~取り消し線~~がついていないTODO-XX / DEBT-XX を抽出する
+3. 見積サイズ順でソート: 小 → 中 → 大
+4. 最も小さいタスクを選ぶ
+5. **全タスク完了している場合** → Step 0（仕様ギャップ検出）に進む
 
-## Step 2: 実装
+## Step 0: 仕様ギャップ検出（全タスク完了時のみ）
 
-1. CLAUDE.md のアーキテクチャとConventionsに従う
-2. 関連するDOCSファイル（API.md, DATABASE.md, SCREENS.md）を参照する
-3. 既存のコードパターンに合わせる:
-   - APIルート: `app/api/[feature]/route.ts` のパターンに従う
-   - クライアントAPI: `lib/api/*-client.ts` の命名規則
-   - UI言語: 日本語
-4. 1タスクにつき1つの機能に集中する（スコープを広げない）
+1. `DOCS/REQUIREMENTS.md` を読む
+2. 全機能ID（AUTH-XX, PROF-XX, SVC-XX, RSV-XX, PAY-XX, CMP-XX, NTF-XX, FAV-XX, ADM-XX, EXT-XX）を確認
+3. 各機能について、対応する実装コードが存在するか検証する:
+   - APIルート（`app/api/`）
+   - 画面（`app/`配下のpage.tsx）
+   - クライアントAPI（`lib/api/`）
+4. 仕様にあるが未実装の機能を新しいTODOとしてTASKS.mdに追記
+5. Step 1に戻る
 
-## Step 3: Lint チェック
+## Step 2: 仕様確認
+
+選んだタスクについて、以下のドキュメントを確認する:
+- `DOCS/REQUIREMENTS.md` — 機能の詳細仕様
+- `DOCS/API.md` — APIエンドポイント仕様
+- `DOCS/DATABASE.md` — テーブル定義・リレーション
+- `DOCS/SCREENS.md` — 画面定義・遷移
+- `CLAUDE.md` — アーキテクチャとコーディング規約
+
+## Step 3: 実装
+
+### 規約
+- APIルート: `app/api/[feature]/route.ts` パターン
+- クライアントAPI: `lib/api/*-client.ts` 命名
+- UI言語: 日本語
+- 型: TypeScript strict、any禁止
+- 関数コンポーネントのみ（class禁止）
+- Next.js 16: params は `Promise<{ id: string }>` で await
+
+### 実装手順
+1. 既存の類似コードを参考にする（`grep`で探す）
+2. 1タスク = 1機能に集中（スコープを広げない）
+3. コメントは日本語で書く
+
+## Step 4: Lint
 
 ```bash
 npm run lint
 ```
+- エラー → 修正して再実行（最大3回）
+- 3回失敗 → エラーをログに記録してスキップ
 
-- エラーがあれば修正してから次へ進む
-- warningは許容するがerrorは0にする
-
-## Step 4: Build チェック
+## Step 5: Build
 
 ```bash
 npm run build
 ```
+- エラー → 修正して再実行（最大3回）
+- 3回失敗 → エラーをログに記録してスキップ
 
-- ビルドエラーがあれば修正する
-- 型エラー（TypeScript）は全て解消する
+## Step 6: テスト
 
-## Step 5: ブラウザ確認
+```bash
+npm test -- --passWithNoTests
+```
+- 新しく作った関数にはテストを書く（`test-runner`スキル参照）
+- 既存テストが壊れたら修正する
 
-1. `npm run dev` でdev serverを起動
-2. 実装した機能に関連するページをブラウザで開く
-3. 以下を確認:
-   - ページが正常に表示されるか
-   - エラーがコンソールに出ていないか
-   - 基本的なUI操作ができるか
-4. スクリーンショットを撮って確認結果を報告
-
-## Step 6: Commit
+## Step 7: Commit
 
 ```bash
 git add <変更したファイル>
-git commit -m "feat: 簡潔な説明 (TODO-XX)"
+git commit -m "feat: 説明 (TODO-XX)"
 ```
+- Conventional Commits: feat / fix / refactor / docs
+- 1タスク = 1コミット
 
-- コミットメッセージは Conventional Commits に従う
-  - feat: 新機能
-  - fix: バグ修正
-  - refactor: リファクタリング
-- コミットの粒度: 1タスク = 1コミット
+## Step 8: TASKS.md更新
 
-## Step 7: Push
+1. `DOCS/TASKS.md` の該当行を ~~取り消し線~~ + コミットハッシュで更新
+2. 更新をcommitする: `docs: TASKS.md更新 - TODO-XXを完了済みに`
+
+## Step 9: Push
 
 ```bash
-git push -u origin feature/todo-XX-簡潔な説明
+git push -u origin <現在のブランチ名>
 ```
 
-- pushする前にユーザーに確認を取る
-- push後、PRの作成が必要か確認する
+## エラーハンドリング
 
-## 中断ルール
-
-以下の場合はパイプラインを中断してユーザーに報告する:
-- Lintエラーが10個以上ある
-- Buildが失敗し、原因が既存コードにある
-- タスクの見積が「大」以上で、実装に2時間以上かかりそうな場合
-- DB スキーマの変更が必要な場合（prisma schema変更は要確認）
+- 各ステップで最大3回リトライする
+- 3回失敗したタスクはスキップして次に進む
+- DBスキーマ変更（prisma schema）が必要な場合はスキップしてログに記録
+- 「大」以上のタスクで複雑度が高い場合は分割を検討する
