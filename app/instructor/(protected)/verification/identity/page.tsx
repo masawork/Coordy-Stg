@@ -377,7 +377,7 @@ export default function InstructorIdentityVerificationPage() {
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || '書類の提出に失敗しました');
+        throw new Error(data.error?.message || data.error || '書類の提出に失敗しました');
       }
 
       setSuccess(data.message || '本人確認書類を提出しました');

@@ -64,7 +64,7 @@ export async function markNotificationAsRead(notificationId: string): Promise<No
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || '通知の更新に失敗しました');
+    throw new Error(error.error?.message || error.error || '通知の更新に失敗しました');
   }
 
   return await response.json();
@@ -81,7 +81,7 @@ export async function dismissNotification(notificationId: string): Promise<Notif
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || '通知の非表示に失敗しました');
+    throw new Error(error.error?.message || error.error || '通知の非表示に失敗しました');
   }
 
   return await response.json();
@@ -97,7 +97,7 @@ export async function markAllNotificationsAsRead(): Promise<{ success: boolean; 
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || 'すべての通知を既読にできませんでした');
+    throw new Error(error.error?.message || error.error || 'すべての通知を既読にできませんでした');
   }
 
   return await response.json();

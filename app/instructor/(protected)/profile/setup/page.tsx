@@ -209,6 +209,12 @@ export default function InstructorProfileSetupPage() {
                 name="dateOfBirth"
                 value={formData.dateOfBirth}
                 onChange={handleChange}
+                onFocus={() => {
+                  if (!formData.dateOfBirth) {
+                    setFormData((prev) => ({ ...prev, dateOfBirth: '1996-01-01' }));
+                  }
+                }}
+                max={new Date().toISOString().split('T')[0]}
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
               />

@@ -16,6 +16,10 @@ import {
   insufficientBalanceError,
   withErrorHandler,
 } from '@/lib/api/errors';
+import {
+  sendReservationConfirmationEmail,
+  sendReservationNotifyInstructorEmail,
+} from '@/lib/mail/reservation';
 
 export const dynamic = 'force-dynamic';
 
@@ -204,6 +208,39 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       }
     }
 
+    // メール送信（非同期、失敗してもエラーにしない）
+    const emailData = {
+      reservationId: result.id,
+      userName: dbUser.name || dbUser.email,
+      userEmail: dbUser.email,
+      serviceName: service.title,
+      instructorName: result.instructor?.user?.name || 'インストラクター',
+      scheduledAt: new Date(scheduledAt),
+      duration: service.duration,
+      location: service.location || undefined,
+      deliveryType: service.deliveryType || 'remote',
+      meetUrl: meetUrl,
+      price: totalPrice,
+      participants,
+      paymentMethod: 'credit',
+    };
+    sendReservationConfirmationEmail(emailData).catch((err) =>
+      console.error('Failed to send confirmation email:', err)
+    );
+    // インストラクターへ通知
+    const instructorUser = await prisma.user.findUnique({
+      where: { id: service.instructor.userId },
+      select: { email: true },
+    });
+    if (instructorUser?.email) {
+      sendReservationNotifyInstructorEmail({
+        ...emailData,
+        instructorEmail: instructorUser.email,
+      }).catch((err) =>
+        console.error('Failed to send instructor notification email:', err)
+      );
+    }
+
     return NextResponse.json({
       success: true,
       reservation: { ...result, meetUrl },
@@ -286,6 +323,39 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
           data: { meetUrl },
         });
       }
+    }
+
+    // メール送信（非同期、失敗してもエラーにしない）
+    const emailDataPoints = {
+      reservationId: result.id,
+      userName: dbUser.name || dbUser.email,
+      userEmail: dbUser.email,
+      serviceName: service.title,
+      instructorName: result.instructor?.user?.name || 'インストラクター',
+      scheduledAt: new Date(scheduledAt),
+      duration: service.duration,
+      location: service.location || undefined,
+      deliveryType: service.deliveryType || 'remote',
+      meetUrl: meetUrl,
+      price: totalPrice,
+      participants,
+      paymentMethod: 'points',
+    };
+    sendReservationConfirmationEmail(emailDataPoints).catch((err) =>
+      console.error('Failed to send confirmation email:', err)
+    );
+    // インストラクターへ通知
+    const instructorUserPoints = await prisma.user.findUnique({
+      where: { id: service.instructor.userId },
+      select: { email: true },
+    });
+    if (instructorUserPoints?.email) {
+      sendReservationNotifyInstructorEmail({
+        ...emailDataPoints,
+        instructorEmail: instructorUserPoints.email,
+      }).catch((err) =>
+        console.error('Failed to send instructor notification email:', err)
+      );
     }
 
     return NextResponse.json({

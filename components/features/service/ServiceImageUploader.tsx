@@ -95,7 +95,7 @@ export function ServiceImageUploader({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || '削除に失敗しました');
+        throw new Error(data.error?.message || data.error || '削除に失敗しました');
       }
 
       setUploadedImages((prev) => prev.filter((img) => img.id !== imageId));
@@ -129,7 +129,7 @@ export function ServiceImageUploader({
 
         if (!res.ok) {
           const data = await res.json();
-          throw new Error(data.error || 'アップロードに失敗しました');
+          throw new Error(data.error?.message || data.error || 'アップロードに失敗しました');
         }
 
         const image = await res.json();

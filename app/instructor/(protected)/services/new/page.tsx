@@ -55,6 +55,7 @@ export default function NewServicePage() {
     isActive: true,
     deliveryType: 'remote', // remote | onsite | hybrid
     location: '',
+    locationDetail: '', // 区・最寄り駅など
     // スケジュール設定
     recurrenceType: 'ONCE',
     availableDays: [] as string[],
@@ -150,7 +151,7 @@ export default function NewServicePage() {
       return;
     }
     if ((formData.deliveryType === 'onsite' || formData.deliveryType === 'hybrid') && !formData.location.trim()) {
-      setError('対面またはハイブリッドの場合は場所を入力してください');
+      setError('対面またはハイブリッドの場合は都道府県を選択してください');
       return;
     }
     // スケジュールバリデーション
@@ -169,21 +170,19 @@ export default function NewServicePage() {
     setError('');
 
     try {
-      const deliveryLabel: Record<string, string> = {
-        remote: 'リモート',
-        onsite: '対面',
-        hybrid: 'リモート＋対面',
-      };
-      const meta = `【提供形態:${deliveryLabel[formData.deliveryType]}${formData.location ? `／場所:${formData.location}` : ''}】`;
-      const description = [meta, formData.description].filter(Boolean).join('\n');
+      const locationFull = formData.location
+        ? formData.locationDetail
+          ? `${formData.location} ${formData.locationDetail}`
+          : formData.location
+        : undefined;
 
       const createdService = await createService({
         instructorId,
         title: formData.title,
-        description,
+        description: formData.description || undefined,
         category: formData.category,
         deliveryType: formData.deliveryType,
-        location: formData.location || undefined,
+        location: locationFull,
         price: parseInt(formData.price),
         duration: parseInt(formData.duration),
         isActive: formData.isActive,
@@ -330,26 +329,48 @@ export default function NewServicePage() {
           </div>
         </div>
 
-        <div>
-          <label htmlFor="location" className="block text-sm font-semibold text-gray-700 mb-2">
-            都道府県
-          </label>
-          <select
-            id="location"
-            name="location"
-            value={formData.location}
-            onChange={handleChange}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-          >
-            <option value="">選択してください</option>
-            {['北海道', '青森', '岩手', '宮城', '秋田', '山形', '福島', '茨城', '栃木', '群馬', '埼玉', '千葉', '東京', '神奈川', '新潟', '富山', '石川', '福井', '山梨', '長野', '岐阜', '静岡', '愛知', '三重', '滋賀', '京都', '大阪', '兵庫', '奈良', '和歌山', '鳥取', '島根', '岡山', '広島', '山口', '徳島', '香川', '愛媛', '高知', '福岡', '佐賀', '長崎', '熊本', '大分', '宮崎', '鹿児島', '沖縄'].map((pref) => (
-              <option key={pref} value={pref}>{pref}</option>
-            ))}
-          </select>
-          <p className="text-xs text-gray-500 mt-1">
-            サービスを提供する地域を選択してください
-          </p>
-        </div>
+        {/* 場所設定（対面・ハイブリッドの場合のみ表示） */}
+        {(formData.deliveryType === 'onsite' || formData.deliveryType === 'hybrid') && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="location" className="block text-sm font-semibold text-gray-700 mb-2">
+                  都道府県 <span className="text-red-500">*</span>
+                </label>
+                <select
+                  id="location"
+                  name="location"
+                  value={formData.location}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                >
+                  <option value="">選択してください</option>
+                  {['北海道', '青森', '岩手', '宮城', '秋田', '山形', '福島', '茨城', '栃木', '群馬', '埼玉', '千葉', '東京', '神奈川', '新潟', '富山', '石川', '福井', '山梨', '長野', '岐阜', '静岡', '愛知', '三重', '滋賀', '京都', '大阪', '兵庫', '奈良', '和歌山', '鳥取', '島根', '岡山', '広島', '山口', '徳島', '香川', '愛媛', '高知', '福岡', '佐賀', '長崎', '熊本', '大分', '宮崎', '鹿児島', '沖縄'].map((pref) => (
+                    <option key={pref} value={pref}>{pref}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="locationDetail" className="block text-sm font-semibold text-gray-700 mb-2">
+                  エリア・最寄り駅
+                </label>
+                <input
+                  type="text"
+                  id="locationDetail"
+                  name="locationDetail"
+                  value={formData.locationDetail}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="例: 渋谷区・渋谷駅徒歩5分"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-gray-500">
+              詳しい住所やビル名は上の「説明」欄に記載してください。エリア・最寄り駅はサービス一覧に表示されます。
+            </p>
+          </div>
+        )}
 
         {/* スケジュール設定セクション */}
         <div className="border-t border-gray-200 pt-6 mt-6">

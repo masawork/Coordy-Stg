@@ -16,6 +16,7 @@ import {
   withErrorHandler,
 } from '@/lib/api/errors';
 import { sendAndLogWebhook, buildReservationWebhookData } from '@/lib/partner/webhook';
+import { sendCompletionEmail } from '@/lib/mail/reservation';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,6 +102,21 @@ export const PATCH = withErrorHandler(async (
       },
     },
   });
+
+  // 完了メール送信（非同期）
+  if (updatedReservation.user?.email) {
+    sendCompletionEmail({
+      reservationId: id,
+      userName: updatedReservation.user.name || updatedReservation.user.email,
+      userEmail: updatedReservation.user.email,
+      serviceName: updatedReservation.service.title,
+      instructorName: updatedReservation.instructor?.user?.name || 'インストラクター',
+      scheduledAt: updatedReservation.scheduledAt,
+      duration: updatedReservation.service.duration,
+      price: updatedReservation.service.price * updatedReservation.participants,
+      participants: updatedReservation.participants,
+    }).catch((err) => console.error('Failed to send completion email:', err));
+  }
 
   // 外部予約の場合、パートナーにWebhook通知
   const externalReservation = await prisma.externalReservation.findUnique({

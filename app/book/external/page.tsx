@@ -265,7 +265,9 @@ export default function ExternalBookingPage() {
           SERVICE_NOT_FOUND: 'サービスが見つかりません。',
           SERVICE_NOT_ALLOWED: 'このサービスは予約できません。',
         };
-        setError(errorMessages[data.error] || data.error || '予約に失敗しました。');
+        const errorCode = typeof data.error === 'string' ? data.error : data.error?.code;
+        const errorMsg = data.error?.message || (typeof data.error === 'string' ? data.error : null);
+        setError(errorMessages[errorCode] || errorMsg || '予約に失敗しました。');
         setStep('schedule');
         return;
       }

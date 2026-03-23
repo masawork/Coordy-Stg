@@ -36,6 +36,7 @@ export default function EditServicePage() {
     category: '',
     deliveryType: 'remote',
     location: '',
+    locationDetail: '',
     price: '',
     duration: '',
     isActive: true,
@@ -74,12 +75,27 @@ export default function EditServicePage() {
         return;
       }
 
+      // 都道府県リスト（location パース用）
+      const prefectures = ['北海道', '青森', '岩手', '宮城', '秋田', '山形', '福島', '茨城', '栃木', '群馬', '埼玉', '千葉', '東京', '神奈川', '新潟', '富山', '石川', '福井', '山梨', '長野', '岐阜', '静岡', '愛知', '三重', '滋賀', '京都', '大阪', '兵庫', '奈良', '和歌山', '鳥取', '島根', '岡山', '広島', '山口', '徳島', '香川', '愛媛', '高知', '福岡', '佐賀', '長崎', '熊本', '大分', '宮崎', '鹿児島', '沖縄'];
+      let parsedLocation = '';
+      let parsedLocationDetail = '';
+      if (service.location) {
+        const matchedPref = prefectures.find((p) => service.location.startsWith(p));
+        if (matchedPref) {
+          parsedLocation = matchedPref;
+          parsedLocationDetail = service.location.slice(matchedPref.length).trim();
+        } else {
+          parsedLocation = service.location;
+        }
+      }
+
       setFormData({
         title: service.title,
         description: service.description || '',
         category: service.category,
         deliveryType: service.deliveryType || 'remote',
-        location: service.location || '',
+        location: parsedLocation,
+        locationDetail: parsedLocationDetail,
         price: service.price.toString(),
         duration: service.duration.toString(),
         isActive: service.isActive,
@@ -113,17 +129,27 @@ export default function EditServicePage() {
       setError('必須項目を入力してください');
       return;
     }
+    if ((formData.deliveryType === 'onsite' || formData.deliveryType === 'hybrid') && !formData.location.trim()) {
+      setError('対面またはハイブリッドの場合は都道府県を選択してください');
+      return;
+    }
 
     setSaving(true);
     setError('');
 
     try {
+      const locationFull = formData.location
+        ? formData.locationDetail
+          ? `${formData.location} ${formData.locationDetail}`
+          : formData.location
+        : undefined;
+
       await updateService(serviceId, {
         title: formData.title,
         description: formData.description,
         category: formData.category,
         deliveryType: formData.deliveryType,
-        location: formData.location || undefined,
+        location: formData.deliveryType === 'remote' ? undefined : locationFull,
         price: parseInt(formData.price),
         duration: parseInt(formData.duration),
         isActive: formData.isActive,
@@ -236,42 +262,65 @@ export default function EditServicePage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="deliveryType" className="block text-sm font-semibold text-gray-700 mb-2">
-              提供形態
-            </label>
-            <select
-              id="deliveryType"
-              name="deliveryType"
-              value={formData.deliveryType}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            >
-              <option value="remote">オンライン</option>
-              <option value="onsite">対面</option>
-              <option value="hybrid">オンライン/対面</option>
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="location" className="block text-sm font-semibold text-gray-700 mb-2">
-              都道府県
-            </label>
-            <select
-              id="location"
-            name="location"
-            value={formData.location}
+        <div>
+          <label htmlFor="deliveryType" className="block text-sm font-semibold text-gray-700 mb-2">
+            提供形態
+          </label>
+          <select
+            id="deliveryType"
+            name="deliveryType"
+            value={formData.deliveryType}
             onChange={handleChange}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
           >
-            <option value="">選択してください</option>
-            {['北海道', '青森', '岩手', '宮城', '秋田', '山形', '福島', '茨城', '栃木', '群馬', '埼玉', '千葉', '東京', '神奈川', '新潟', '富山', '石川', '福井', '山梨', '長野', '岐阜', '静岡', '愛知', '三重', '滋賀', '京都', '大阪', '兵庫', '奈良', '和歌山', '鳥取', '島根', '岡山', '広島', '山口', '徳島', '香川', '愛媛', '高知', '福岡', '佐賀', '長崎', '熊本', '大分', '宮崎', '鹿児島', '沖縄'].map((pref) => (
-              <option key={pref} value={pref}>{pref}</option>
-            ))}
-            </select>
-          </div>
+            <option value="remote">リモート</option>
+            <option value="onsite">対面（場所指定）</option>
+            <option value="hybrid">リモート＋場所指定</option>
+          </select>
         </div>
+
+        {/* 場所設定（対面・ハイブリッドの場合のみ表示） */}
+        {(formData.deliveryType === 'onsite' || formData.deliveryType === 'hybrid') && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="location" className="block text-sm font-semibold text-gray-700 mb-2">
+                  都道府県 <span className="text-red-500">*</span>
+                </label>
+                <select
+                  id="location"
+                  name="location"
+                  value={formData.location}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                >
+                  <option value="">選択してください</option>
+                  {['北海道', '青森', '岩手', '宮城', '秋田', '山形', '福島', '茨城', '栃木', '群馬', '埼玉', '千葉', '東京', '神奈川', '新潟', '富山', '石川', '福井', '山梨', '長野', '岐阜', '静岡', '愛知', '三重', '滋賀', '京都', '大阪', '兵庫', '奈良', '和歌山', '鳥取', '島根', '岡山', '広島', '山口', '徳島', '香川', '愛媛', '高知', '福岡', '佐賀', '長崎', '熊本', '大分', '宮崎', '鹿児島', '沖縄'].map((pref) => (
+                    <option key={pref} value={pref}>{pref}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="locationDetail" className="block text-sm font-semibold text-gray-700 mb-2">
+                  エリア・最寄り駅
+                </label>
+                <input
+                  type="text"
+                  id="locationDetail"
+                  name="locationDetail"
+                  value={formData.locationDetail}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="例: 渋谷区・渋谷駅徒歩5分"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-gray-500">
+              詳しい住所やビル名は上の「説明」欄に記載してください。エリア・最寄り駅はサービス一覧に表示されます。
+            </p>
+          </div>
+        )}
 
         <div>
           <label htmlFor="price" className="block text-sm font-semibold text-gray-700 mb-2">

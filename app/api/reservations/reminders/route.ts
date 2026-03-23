@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
     for (const reservation of upcomingReservations) {
       try {
         // ユーザー情報の取得（通常ユーザーまたはゲスト）
-        const userName = reservation.user?.displayName
+        const userName = reservation.user?.name
           || reservation.guestUser?.name
           || 'ゲスト';
         const userEmail = reservation.user?.email
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
           userName,
           userEmail,
           serviceName: reservation.service.title,
-          instructorName: reservation.instructor.user?.displayName || 'インストラクター',
+          instructorName: reservation.instructor.user?.name || 'インストラクター',
           scheduledAt: reservation.scheduledAt,
           duration: reservation.service.duration,
           deliveryType: reservation.service.deliveryType,

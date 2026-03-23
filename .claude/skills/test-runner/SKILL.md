@@ -1,7 +1,6 @@
 ---
 name: test-runner
-description: Coordyのテストを自動生成・実行する。不足しているテストを特定し、作成してカバレッジを上げる。
-trigger: テスト、テスト実行、テスト作成、カバレッジ、Jest
+description: Coordy-Stg (Next.js 16) のJestテストを自動生成・実行する。不足テストを特定し、Supabase/Prismaモック付きでテストを作成してカバレッジを上げる。Use when user says "テスト", "テスト実行", "テスト作成", "カバレッジ", "Jest". Coordy-Stg専用.
 ---
 
 # テスト自動化スキル

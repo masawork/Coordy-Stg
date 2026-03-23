@@ -318,12 +318,15 @@ export default function IdentityVerificationPage() {
       if (!response.ok) {
         const errorData = await response.json();
         // 詳細なエラーメッセージを構築
-        let errorMsg = errorData.error || '提出に失敗しました';
-        if (errorData.details) {
-          errorMsg += `\n詳細: ${errorData.details}`;
+        const errObj = errorData.error;
+        let errorMsg = (typeof errObj === 'object' ? errObj?.message : errObj) || '提出に失敗しました';
+        const details = errObj?.details || errorData.details;
+        const code = errObj?.code || errorData.code;
+        if (details) {
+          errorMsg += `\n詳細: ${details}`;
         }
-        if (errorData.code) {
-          errorMsg += `\n(エラーコード: ${errorData.code})`;
+        if (code) {
+          errorMsg += `\n(エラーコード: ${code})`;
         }
         throw new Error(errorMsg);
       }

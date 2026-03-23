@@ -14,7 +14,7 @@ export async function getFavoriteCreators() {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'お気に入り取得に失敗しました');
+      throw new Error(error.error?.message || error.error || 'お気に入り取得に失敗しました');
     }
 
     return await response.json();
@@ -40,7 +40,7 @@ export async function addFavoriteCreator(instructorId: string) {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'お気に入り追加に失敗しました');
+      throw new Error(error.error?.message || error.error || 'お気に入り追加に失敗しました');
     }
 
     return await response.json();
@@ -62,7 +62,7 @@ export async function removeFavoriteCreator(favoriteId: string) {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'お気に入り削除に失敗しました');
+      throw new Error(error.error?.message || error.error || 'お気に入り削除に失敗しました');
     }
 
     return await response.json();

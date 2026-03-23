@@ -32,7 +32,7 @@ function cleanup(windowMs: number): void {
   lastCleanup = now;
   const cutoff = now - windowMs;
 
-  for (const [key, entry] of store.entries()) {
+  for (const [key, entry] of Array.from(store.entries())) {
     entry.timestamps = entry.timestamps.filter((t) => t > cutoff);
     if (entry.timestamps.length === 0) {
       store.delete(key);

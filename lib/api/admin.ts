@@ -15,7 +15,7 @@ export async function cleanupExpiredCharges() {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'クリーンアップに失敗しました');
+      throw new Error(error.error?.message || error.error || 'クリーンアップに失敗しました');
     }
 
     return await response.json();
@@ -38,7 +38,7 @@ export async function listPendingCharges() {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || '承認待ちチャージの取得に失敗しました');
+      throw new Error(error.error?.message || error.error || '承認待ちチャージの取得に失敗しました');
     }
 
     return await response.json();
@@ -60,7 +60,7 @@ export async function approveCharge(transactionId: string) {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || '承認に失敗しました');
+      throw new Error(error.error?.message || error.error || '承認に失敗しました');
     }
 
     return await response.json();
@@ -86,7 +86,7 @@ export async function rejectCharge(transactionId: string, reason?: string) {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || '却下に失敗しました');
+      throw new Error(error.error?.message || error.error || '却下に失敗しました');
     }
 
     return await response.json();
@@ -108,7 +108,7 @@ export async function getAdminStats() {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || '統計情報の取得に失敗しました');
+      throw new Error(error.error?.message || error.error || '統計情報の取得に失敗しました');
     }
 
     return await response.json();
@@ -141,7 +141,7 @@ export async function listUsers(filters?: {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'ユーザー一覧の取得に失敗しました');
+      throw new Error(error.error?.message || error.error || 'ユーザー一覧の取得に失敗しました');
     }
 
     return await response.json();
@@ -167,7 +167,7 @@ export async function updateUserRole(userId: string, role: string) {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'ロールの更新に失敗しました');
+      throw new Error(error.error?.message || error.error || 'ロールの更新に失敗しました');
     }
 
     return await response.json();

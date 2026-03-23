@@ -35,7 +35,7 @@ export async function getReservations() {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || '予約一覧の取得に失敗しました');
+      throw new Error(error.error?.message || error.error || '予約一覧の取得に失敗しました');
     }
 
     return await response.json();
@@ -64,9 +64,9 @@ export async function createReservation(input: CreateReservationInput): Promise<
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || '予約に失敗しました',
-        required: data.required,
-        balance: data.balance,
+        error: data.error?.message || data.error || '予約に失敗しました',
+        required: data.error?.details?.required || data.required,
+        balance: data.error?.details?.balance || data.balance,
       };
     }
 
@@ -96,7 +96,7 @@ export async function cancelReservation(reservationId: string) {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || '予約のキャンセルに失敗しました');
+      throw new Error(error.error?.message || error.error || '予約のキャンセルに失敗しました');
     }
 
     return await response.json();

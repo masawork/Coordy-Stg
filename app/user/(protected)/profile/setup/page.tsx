@@ -228,7 +228,7 @@ export default function ProfileSetupPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'SMS送信に失敗しました');
+        throw new Error(errorData.error?.message || errorData.error || 'SMS送信に失敗しました');
       }
 
       setOtpSent(true);
@@ -291,7 +291,7 @@ export default function ProfileSetupPage() {
 
       if (!verifyResponse.ok) {
         const errorData = await verifyResponse.json();
-        throw new Error(errorData.error || '認証コードが正しくありません');
+        throw new Error(errorData.error?.message || errorData.error || '認証コードが正しくありません');
       }
 
       const verifyData = await verifyResponse.json();
@@ -356,7 +356,7 @@ export default function ProfileSetupPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'SMS送信に失敗しました');
+        throw new Error(errorData.error?.message || errorData.error || 'SMS送信に失敗しました');
       }
 
       setResendTimer(60);
@@ -489,6 +489,13 @@ export default function ProfileSetupPage() {
                     name="dateOfBirth"
                     value={formData.dateOfBirth}
                     onChange={handleChange}
+                    onFocus={(e) => {
+                      if (!formData.dateOfBirth) {
+                        // 未入力時は約30歳（1996年）を初期表示
+                        setFormData((prev) => ({ ...prev, dateOfBirth: '1996-01-01' }));
+                      }
+                    }}
+                    max={new Date().toISOString().split('T')[0]}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
                     required
                   />

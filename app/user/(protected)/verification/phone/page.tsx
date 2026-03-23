@@ -96,7 +96,7 @@ export default function PhoneVerificationPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'SMS送信に失敗しました');
+        throw new Error(errorData.error?.message || errorData.error || 'SMS送信に失敗しました');
       }
 
       setOtpSent(true);
@@ -136,7 +136,7 @@ export default function PhoneVerificationPage() {
 
       if (!verifyResponse.ok) {
         const errorData = await verifyResponse.json();
-        throw new Error(errorData.error || '認証コードが正しくありません');
+        throw new Error(errorData.error?.message || errorData.error || '認証コードが正しくありません');
       }
 
       const verifyData = await verifyResponse.json();

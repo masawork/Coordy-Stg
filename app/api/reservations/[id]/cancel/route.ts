@@ -17,6 +17,10 @@ import {
   withErrorHandler,
 } from '@/lib/api/errors';
 import { sendAndLogWebhook, buildReservationWebhookData } from '@/lib/partner/webhook';
+import {
+  sendCancellationConfirmationEmail,
+  sendCancellationNotifyInstructorEmail,
+} from '@/lib/mail/reservation';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,7 +53,13 @@ export const PATCH = withErrorHandler(async (
     include: {
       service: true,
       user: true,
-      instructor: true,
+      instructor: {
+        include: {
+          user: {
+            select: { name: true, email: true },
+          },
+        },
+      },
     },
   });
 
@@ -141,6 +151,48 @@ export const PATCH = withErrorHandler(async (
 
     return updatedReservation;
   });
+
+  // キャンセルメール送信（非同期）
+  const cancelledBy = isOwner ? 'user' as const : 'instructor' as const;
+  // 返金額の取得
+  const refundTx = await prisma.pointTransaction.findFirst({
+    where: {
+      reservationId: id,
+      type: TransactionType.CHARGE,
+      description: { contains: 'キャンセル返金' },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  if (reservation.user?.email) {
+    sendCancellationConfirmationEmail({
+      reservationId: id,
+      userName: reservation.user.name || reservation.user.email,
+      userEmail: reservation.user.email,
+      serviceName: reservation.service.title,
+      instructorName: reservation.instructor?.user?.name || 'インストラクター',
+      scheduledAt: reservation.scheduledAt,
+      cancelReason: reason,
+      cancelledBy,
+      refundAmount: refundTx?.amount,
+      refundMethod: 'ポイント',
+    }).catch((err) => console.error('Failed to send cancellation email:', err));
+  }
+
+  // インストラクターへキャンセル通知
+  if (reservation.instructor?.user?.email) {
+    sendCancellationNotifyInstructorEmail({
+      reservationId: id,
+      userName: reservation.user?.name || 'ゲスト',
+      userEmail: reservation.user?.email || '',
+      serviceName: reservation.service.title,
+      instructorName: reservation.instructor.user.name || 'インストラクター',
+      scheduledAt: reservation.scheduledAt,
+      cancelReason: reason,
+      cancelledBy,
+      instructorEmail: reservation.instructor.user.email,
+    }).catch((err) => console.error('Failed to send instructor cancel email:', err));
+  }
 
   // 外部予約の場合、パートナーにWebhook通知
   const externalReservation = await prisma.externalReservation.findUnique({
