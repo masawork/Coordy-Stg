@@ -1,6 +1,12 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resendInstance: Resend | null = null;
+function getResend(): Resend {
+  if (!resendInstance) {
+    resendInstance = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resendInstance;
+}
 
 // 開発環境: onboarding@resend.dev（自分宛てのみ送信可能）
 // 本番環境: 認証済みドメインのメールアドレスを設定
@@ -27,7 +33,7 @@ export async function sendBankAccountCreatedEmail(
   }
 
   try {
-    await resend.emails.send({
+    await getResend().emails.send({
       from: `${APP_NAME} <${FROM_EMAIL}>`,
       to: toEmail,
       subject: `【${APP_NAME}】銀行口座が登録されました`,
@@ -69,7 +75,7 @@ export async function sendBankAccountUpdatedEmail(
   }
 
   try {
-    await resend.emails.send({
+    await getResend().emails.send({
       from: `${APP_NAME} <${FROM_EMAIL}>`,
       to: toEmail,
       subject: `【${APP_NAME}】銀行口座情報が変更されました`,
@@ -111,7 +117,7 @@ export async function sendBankAccountDeletedEmail(
   }
 
   try {
-    await resend.emails.send({
+    await getResend().emails.send({
       from: `${APP_NAME} <${FROM_EMAIL}>`,
       to: toEmail,
       subject: `【${APP_NAME}】銀行口座が削除されました`,

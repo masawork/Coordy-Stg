@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 
 interface SidebarContextType {
@@ -26,32 +26,36 @@ const isProtectedRoute = (pathname: string) => {
 export function SidebarProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
-  const [initialized, setInitialized] = useState(false);
+  const initializedRef = useRef(false);
   const pathname = usePathname();
 
-  const toggle = () => setOpen(!open);
-  const close = () => setOpen(false);
+  const toggle = useCallback(() => setOpen((prev) => !prev), []);
+  const close = useCallback(() => setOpen(false), []);
 
   // 初期化: ビューポート幅に応じて初期状態を設定（保護ルートのみ）
   useEffect(() => {
     const checkViewport = () => {
       const desktop = window.innerWidth >= DESKTOP_BREAKPOINT;
-      setIsDesktop(desktop);
+      queueMicrotask(() => setIsDesktop(desktop));
       return desktop;
     };
 
     // 保護ルートでない場合は常にcloseを維持
     if (!isProtectedRoute(pathname)) {
-      setOpen(false);
-      setInitialized(true);
+      queueMicrotask(() => {
+        setOpen(false);
+      });
+      initializedRef.current = true;
       return;
     }
 
     // 保護ルートの場合のみ、初回にデスクトップなら開く
-    if (!initialized) {
+    if (!initializedRef.current) {
       const desktop = checkViewport();
-      setOpen(desktop); // デスクトップなら初期オープン
-      setInitialized(true);
+      queueMicrotask(() => {
+        setOpen(desktop); // デスクトップなら初期オープン
+      });
+      initializedRef.current = true;
     }
 
     // リサイズ時にisDesktopを更新（openは手動変更を尊重）
@@ -61,14 +65,14 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [initialized, pathname]);
+  }, [pathname]);
 
   // モバイル時のみルート変更でサイドバーを閉じる（保護ルートの場合のみ）
   useEffect(() => {
     if (!isDesktop && isProtectedRoute(pathname)) {
-      close();
+      queueMicrotask(() => close());
     }
-  }, [pathname, isDesktop]);
+  }, [pathname, isDesktop, close]);
 
   // Close sidebar on Escape key
   useEffect(() => {
@@ -80,7 +84,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [open]);
+  }, [open, close]);
 
   return (
     <SidebarContext.Provider value={{ open, isDesktop, toggle, close }}>

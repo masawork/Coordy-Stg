@@ -115,6 +115,24 @@ export async function detachPaymentMethod(
 }
 
 /**
+ * PaymentIntentの返金を実行
+ * @param paymentIntentId Stripe PaymentIntent ID
+ * @param amount 返金額（円）。指定しない場合は全額返金
+ */
+export async function refundPaymentIntent(
+  paymentIntentId: string,
+  amount?: number
+): Promise<Stripe.Refund> {
+  const params: Stripe.RefundCreateParams = {
+    payment_intent: paymentIntentId,
+  };
+  if (amount !== undefined) {
+    params.amount = amount;
+  }
+  return await stripe.refunds.create(params);
+}
+
+/**
  * 顧客のすべてのPayment Methodsを取得
  * @param customerId Stripe Customer ID
  */

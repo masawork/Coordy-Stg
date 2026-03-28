@@ -1,6 +1,6 @@
 # データベース定義書
 
-最終更新: 2025-02-08
+最終更新: 2026-03-28
 
 ## 1. ER図
 
@@ -66,7 +66,24 @@
 │ allowGuest       │     │ verificationLvl  │
 │ commissionRate   │     │ phoneVerified    │
 │ isActive         │     │ identityVerified │
-└──────────────────┘     └──────────────────┘
+└────────┬─────────┘     └──────────────────┘
+         │
+         │  ┌──────────────────┐
+         └──│   WebhookLog     │
+            │  (webhook_logs)  │
+            ├──────────────────┤
+            │ id (PK)          │
+            │ partnerId (FK)   │
+            │ reservationId    │
+            │ event            │
+            │ url              │
+            │ requestBody      │
+            │ statusCode       │
+            │ success          │
+            │ attempts         │
+            │ lastError        │
+            │ lastAttemptAt    │
+            └──────────────────┘
 
 ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
 │     Wallet       │     │PointTransaction  │     │  PaymentMethod   │
@@ -249,7 +266,24 @@
 | name | String | NO | | |
 | phone_number | String | YES | | |
 
-### 3.9 その他テーブル
+### 3.9 WebhookLog (webhook_logs)
+
+| カラム | 型 | NULL | 制約 | 説明 |
+|--------|-----|------|------|------|
+| id | UUID | NO | PK | |
+| partner_id | String | NO | FK(partners), INDEX | |
+| reservation_id | String | YES | | 予約ID（参照用） |
+| event | String | NO | | イベント名（reservation.created等） |
+| url | String | NO | | 送信先URL |
+| request_body | Text | NO | | JSONペイロード |
+| status_code | Int | YES | | HTTPレスポンスステータス |
+| success | Boolean | NO | DEFAULT(false), INDEX | 配信成功フラグ |
+| attempts | Int | NO | DEFAULT(0) | 試行回数 |
+| last_error | Text | YES | | 最後のエラーメッセージ |
+| last_attempt_at | DateTime | YES | | 最後の試行日時 |
+| created_at | DateTime | NO | DEFAULT(now()), INDEX | |
+
+### 3.10 その他テーブル
 
 | テーブル | 説明 |
 |---------|------|
@@ -296,6 +330,7 @@ Reservation *──1 GuestUser? (ゲスト時)
 Reservation 1──1 ExternalReservation? (外部予約時)
 
 Partner 1──* ExternalReservation
+Partner 1──* WebhookLog
 GuestUser 1──* Reservation
 ```
 

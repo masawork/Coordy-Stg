@@ -1,6 +1,6 @@
 # テスト仕様書
 
-最終更新: 2025-02-08
+最終更新: 2026-03-28
 
 ## 1. テスト方針
 
@@ -226,3 +226,24 @@ npm test -- --testPathPattern=phone
 npm run dev
 # → http://localhost:3000
 ```
+
+---
+
+## 14. 現在のテストカバレッジ
+
+| テストファイル | テスト数 | 対象 |
+|---------------|---------|------|
+| `lib/utils/__tests__/phone.test.ts` | 35 | 電話番号ユーティリティ（normalize, format, validate, getType, getErrorMessage） |
+| `lib/utils/__tests__/encryption.test.ts` | 14 | AES-256暗号化・復号化・マスク処理 |
+| `lib/utils/__tests__/date.test.ts` | 13 | 日付フォーマット（formatDate, formatDateForInput） |
+| `lib/partner/__tests__/auth.test.ts` | 多数 | HMAC署名生成・検証、タイムスタンプ検証、APIキー生成 |
+| `lib/partner/__tests__/webhook.test.ts` | 多数 | Webhook送信、指数バックオフリトライ、WebhookLogへの記録 |
+| `lib/stripe/__tests__/helpers.test.ts` | 多数 | Stripe PaymentIntent作成・返金、PaymentMethod管理 |
+| `lib/api/__tests__/errors.test.ts` | 多数 | エラーレスポンスヘルパー、withErrorHandlerラッパー |
+
+**合計**: 7テストスイート、173テスト
+
+**残課題**:
+- APIルートの統合テスト（認証→ビジネスロジック→レスポンスの一気通貫テスト）
+- フロントエンドコンポーネントテスト
+- E2Eテスト（Playwright等）

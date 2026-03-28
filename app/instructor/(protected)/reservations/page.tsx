@@ -4,18 +4,15 @@
 export const dynamic = 'force-dynamic';
 
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Calendar, Clock, User } from 'lucide-react';
 
 export default function InstructorReservationsPage() {
   const [reservations, setReservations] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    // TODO: 実際のAPI呼び出しに置き換え
-    setLoading(false);
-    setReservations([]);
-  }, []);
+  // TODO: 実際のAPI呼び出しに置き換え
+  // 現在はデフォルト値（loading: false, reservations: []）を使用
 
   if (loading) {
     return (

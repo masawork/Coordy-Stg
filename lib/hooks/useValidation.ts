@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 
 interface ValidationRules {
   email: string;
@@ -26,7 +26,9 @@ export function useValidation(): UseValidationReturn {
     displayName: '',
   });
 
-  const [isValid, setIsValid] = useState(false);
+  const isValid = useMemo(() => {
+    return !Object.values(errors).some((error) => error !== '');
+  }, [errors]);
 
   // Email validation: empty check + email format
   const validateEmail = (email: string): string => {
@@ -110,12 +112,6 @@ export function useValidation(): UseValidationReturn {
 
     return !emailError && !passwordError && !displayNameError;
   };
-
-  // Update isValid whenever errors change
-  useEffect(() => {
-    const hasErrors = Object.values(errors).some((error) => error !== '');
-    setIsValid(!hasErrors);
-  }, [errors]);
 
   return {
     errors,

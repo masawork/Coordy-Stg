@@ -41,8 +41,10 @@ export default function UserDashboardPage() {
     // LocalStorageから警告の表示状態を読み込む
     const savedVerificationAlert = localStorage.getItem('hideVerificationAlert');
     const savedPaymentAlert = localStorage.getItem('hidePaymentAlert');
-    if (savedVerificationAlert === 'true') setShowVerificationAlert(false);
-    if (savedPaymentAlert === 'true') setShowPaymentAlert(false);
+    queueMicrotask(() => {
+      if (savedVerificationAlert === 'true') setShowVerificationAlert(false);
+      if (savedPaymentAlert === 'true') setShowPaymentAlert(false);
+    });
   }, []);
 
   useEffect(() => {

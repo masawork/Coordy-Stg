@@ -159,7 +159,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       });
 
       // 取引履歴を作成（クレジット決済 → チャージ → 使用の2レコード）
-      // チャージ記録
+      // チャージ記録（transferIdにPaymentIntent IDを保存 → 返金時に使用）
       await tx.pointTransaction.create({
         data: {
           userId: dbUser.id,
@@ -167,6 +167,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
           amount: totalPrice,
           method: 'credit',
           status: TransactionStatus.COMPLETED,
+          transferId: paymentIntent.id,
           reservationId: reservation.id,
           description: `予約時クレジット決済（${service.title}）`,
         },

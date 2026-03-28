@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { getSession } from '@/lib/auth';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,13 +12,17 @@ interface HeroSectionProps {
 
 export default function HeroSection({ isInstructor, setIsInstructor }: HeroSectionProps) {
   const [session, setSession] = useState<any | null>(null);
+  const mountedRef = useRef(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    mountedRef.current = true;
+    queueMicrotask(() => setMounted(true));
     const checkSession = async () => {
       const currentSession = await getSession();
-      setSession(currentSession?.user || null);
+      if (mountedRef.current) {
+        setSession(currentSession?.user || null);
+      }
     };
     checkSession();
   }, []);

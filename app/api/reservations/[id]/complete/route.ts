@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { ReservationStatus } from '@prisma/client';
+import { ReservationStatus, TransactionType, TransactionStatus } from '@prisma/client';
 import { getAuthInstructor } from '@/lib/api/auth';
 import {
   notFoundError,
@@ -75,32 +75,65 @@ export const PATCH = withErrorHandler(async (
     return validationError('この予約は完了できません。ステータスがCONFIRMEDではありません。');
   }
 
-  // 予約を完了
-  const updatedReservation = await prisma.reservation.update({
-    where: { id },
-    data: {
-      status: ReservationStatus.COMPLETED,
-    },
-    include: {
-      service: true,
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
+  // 売上金額を計算
+  const revenueAmount = reservation.service.price * reservation.participants;
+
+  // トランザクションで予約完了 + インストラクター売上入金
+  const updatedReservation = await prisma.$transaction(async (tx) => {
+    // 予約ステータスを完了に更新
+    const updated = await tx.reservation.update({
+      where: { id },
+      data: {
+        status: ReservationStatus.COMPLETED,
       },
-      instructor: {
-        include: {
-          user: {
-            select: {
-              name: true,
-              image: true,
+      include: {
+        service: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        instructor: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                image: true,
+              },
             },
           },
         },
       },
-    },
+    });
+
+    // インストラクターのウォレットに売上を入金
+    const instructorUserId = updated.instructor?.user?.id;
+    if (instructorUserId && revenueAmount > 0) {
+      // ウォレットを取得（なければ作成）
+      await tx.wallet.upsert({
+        where: { userId: instructorUserId },
+        create: { userId: instructorUserId, balance: revenueAmount },
+        update: { balance: { increment: revenueAmount } },
+      });
+
+      // 売上入金の取引記録を作成
+      await tx.pointTransaction.create({
+        data: {
+          userId: instructorUserId,
+          type: 'CHARGE' as TransactionType,
+          amount: revenueAmount,
+          method: 'service_revenue',
+          status: 'COMPLETED' as TransactionStatus,
+          reservationId: id,
+          description: `サービス売上: ${updated.service.title}（${updated.participants || 1}名）`,
+        },
+      });
+    }
+
+    return updated;
   });
 
   // 完了メール送信（非同期）

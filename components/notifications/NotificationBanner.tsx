@@ -8,30 +8,29 @@ export default function NotificationBanner() {
   const [notification, setNotification] = useState<Notification | null>(null);
 
   useEffect(() => {
+    const loadTopPriorityNotification = async () => {
+      try {
+        const notifications = await getNotifications(true); // 未読のみ
+
+        // 最優先の通知を取得（critical > high > medium > low）
+        const priorityOrder = ['critical', 'high', 'medium', 'low'];
+        let topNotification: Notification | null = null;
+
+        for (const priority of priorityOrder) {
+          const found = notifications.find((n) => n.priority === priority);
+          if (found) {
+            topNotification = found;
+            break;
+          }
+        }
+
+        setNotification(topNotification);
+      } catch (error) {
+        console.error('Load top priority notification error:', error);
+      }
+    };
     loadTopPriorityNotification();
   }, []);
-
-  const loadTopPriorityNotification = async () => {
-    try {
-      const notifications = await getNotifications(true); // 未読のみ
-      
-      // 最優先の通知を取得（critical > high > medium > low）
-      const priorityOrder = ['critical', 'high', 'medium', 'low'];
-      let topNotification: Notification | null = null;
-      
-      for (const priority of priorityOrder) {
-        const found = notifications.find((n) => n.priority === priority);
-        if (found) {
-          topNotification = found;
-          break;
-        }
-      }
-
-      setNotification(topNotification);
-    } catch (error) {
-      console.error('Load top priority notification error:', error);
-    }
-  };
 
   const handleDismiss = async () => {
     if (!notification) return;

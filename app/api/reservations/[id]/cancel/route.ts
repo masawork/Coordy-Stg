@@ -21,6 +21,7 @@ import {
   sendCancellationConfirmationEmail,
   sendCancellationNotifyInstructorEmail,
 } from '@/lib/mail/reservation';
+import { refundPaymentIntent } from '@/lib/stripe/helpers';
 
 export const dynamic = 'force-dynamic';
 
@@ -112,8 +113,17 @@ export const PATCH = withErrorHandler(async (
       },
     });
 
-    // ポイント返金: reservationId で USE 取引を特定
+    // 返金処理: reservationId で CHARGE 取引を特定し、決済方法に応じて返金
     if (reservation.userId) {
+      const chargeTransaction = await tx.pointTransaction.findFirst({
+        where: {
+          reservationId: reservation.id,
+          type: TransactionType.CHARGE,
+          status: TransactionStatus.COMPLETED,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
       const useTransaction = await tx.pointTransaction.findFirst({
         where: {
           reservationId: reservation.id,
@@ -122,30 +132,48 @@ export const PATCH = withErrorHandler(async (
         },
       });
 
-      if (useTransaction) {
-        // ウォレット残高を返金
-        const wallet = await tx.wallet.findUnique({
-          where: { userId: reservation.userId },
-        });
+      const refundAmount = useTransaction?.amount || 0;
 
-        if (wallet) {
-          await tx.wallet.update({
-            where: { userId: reservation.userId },
-            data: { balance: wallet.balance + useTransaction.amount },
-          });
+      if (refundAmount > 0) {
+        let refundMethod = 'ポイント';
 
-          // 返金トランザクションを作成
-          await tx.pointTransaction.create({
-            data: {
-              userId: reservation.userId,
-              type: TransactionType.CHARGE,
-              amount: useTransaction.amount,
-              status: TransactionStatus.COMPLETED,
-              reservationId: reservation.id,
-              description: `予約キャンセル返金: ${reservation.service.title}${reason ? ` (理由: ${reason})` : ''}`,
-            },
-          });
+        // クレジットカード決済の場合: Stripe返金を試みる
+        if (chargeTransaction?.method === 'credit' && chargeTransaction.transferId) {
+          try {
+            await refundPaymentIntent(chargeTransaction.transferId, refundAmount);
+            refundMethod = 'クレジットカード';
+          } catch (stripeError) {
+            // Stripe返金失敗時はポイント返金にフォールバック
+            console.error('Stripe refund failed, falling back to point refund:', stripeError);
+          }
         }
+
+        if (refundMethod === 'ポイント') {
+          // ポイント返金: ウォレット残高を戻す
+          const wallet = await tx.wallet.findUnique({
+            where: { userId: reservation.userId },
+          });
+
+          if (wallet) {
+            await tx.wallet.update({
+              where: { userId: reservation.userId },
+              data: { balance: wallet.balance + refundAmount },
+            });
+          }
+        }
+
+        // 返金トランザクションを記録
+        await tx.pointTransaction.create({
+          data: {
+            userId: reservation.userId,
+            type: TransactionType.CHARGE,
+            amount: refundAmount,
+            method: refundMethod === 'クレジットカード' ? 'credit_refund' : undefined,
+            status: TransactionStatus.COMPLETED,
+            reservationId: reservation.id,
+            description: `予約キャンセル返金（${refundMethod}）: ${reservation.service.title}${reason ? ` (理由: ${reason})` : ''}`,
+          },
+        });
       }
     }
 
@@ -154,7 +182,7 @@ export const PATCH = withErrorHandler(async (
 
   // キャンセルメール送信（非同期）
   const cancelledBy = isOwner ? 'user' as const : 'instructor' as const;
-  // 返金額の取得
+  // 返金情報の取得
   const refundTx = await prisma.pointTransaction.findFirst({
     where: {
       reservationId: id,
@@ -163,6 +191,7 @@ export const PATCH = withErrorHandler(async (
     },
     orderBy: { createdAt: 'desc' },
   });
+  const refundMethodLabel = refundTx?.method === 'credit_refund' ? 'クレジットカード' : 'ポイント';
 
   if (reservation.user?.email) {
     sendCancellationConfirmationEmail({
@@ -175,7 +204,7 @@ export const PATCH = withErrorHandler(async (
       cancelReason: reason,
       cancelledBy,
       refundAmount: refundTx?.amount,
-      refundMethod: 'ポイント',
+      refundMethod: refundMethodLabel,
     }).catch((err) => console.error('Failed to send cancellation email:', err));
   }
 

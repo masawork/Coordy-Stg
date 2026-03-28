@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import Button from '../common/Button';
@@ -8,13 +8,17 @@ import { getSession } from '@/lib/auth';
 
 export default function CTASection() {
   const [session, setSession] = useState<any | null>(null);
+  const mountedRef = useRef(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    mountedRef.current = true;
+    queueMicrotask(() => setMounted(true));
     const checkSession = async () => {
       const currentSession = await getSession();
-      setSession(currentSession?.user || null);
+      if (mountedRef.current) {
+        setSession(currentSession?.user || null);
+      }
     };
     checkSession();
   }, []);
