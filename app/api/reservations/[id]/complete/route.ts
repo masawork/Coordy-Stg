@@ -80,12 +80,24 @@ export const PATCH = withErrorHandler(async (
 
   // トランザクションで予約完了 + インストラクター売上入金
   const updatedReservation = await prisma.$transaction(async (tx) => {
-    // 予約ステータスを完了に更新
-    const updated = await tx.reservation.update({
-      where: { id },
+    // 楽観的ロック: ステータスがCONFIRMEDであることを保証（二重完了防止）
+    const updateResult = await tx.reservation.updateMany({
+      where: {
+        id,
+        status: ReservationStatus.CONFIRMED,
+      },
       data: {
         status: ReservationStatus.COMPLETED,
       },
+    });
+
+    if (updateResult.count === 0) {
+      throw new Error('ALREADY_COMPLETED');
+    }
+
+    // 更新後の予約を取得
+    const updated = await tx.reservation.findUniqueOrThrow({
+      where: { id },
       include: {
         service: true,
         user: {
@@ -123,12 +135,12 @@ export const PATCH = withErrorHandler(async (
       await tx.pointTransaction.create({
         data: {
           userId: instructorUserId,
-          type: 'CHARGE' as TransactionType,
+          type: TransactionType.CHARGE,
           amount: revenueAmount,
           method: 'service_revenue',
-          status: 'COMPLETED' as TransactionStatus,
+          status: TransactionStatus.COMPLETED,
           reservationId: id,
-          description: `サービス売上: ${updated.service.title}（${updated.participants || 1}名）`,
+          description: `サービス売上: ${updated.service.title}（${updated.participants}名）`,
         },
       });
     }

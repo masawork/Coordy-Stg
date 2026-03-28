@@ -3,7 +3,7 @@
  * PATCH /api/reservations/[id]/cancel
  *
  * ユーザーまたはインストラクターが予約をキャンセル
- * ポイント決済の場合は返金処理を行う
+ * ポイント決済の場合はポイント返金、クレジット決済の場合はStripe返金を行う
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -82,40 +82,30 @@ export const PATCH = withErrorHandler(async (
     return validationError('この予約はキャンセルできません');
   }
 
-  // トランザクションでキャンセル処理
-  const result = await prisma.$transaction(async (tx) => {
-    // 予約をキャンセル
-    const updatedReservation = await tx.reservation.update({
-      where: { id },
+  // --- Phase 1: DBトランザクションでキャンセル + 返金情報の取得 ---
+  const txResult = await prisma.$transaction(async (tx) => {
+    // 楽観的ロック: ステータスがまだ有効であることを保証
+    const updated = await tx.reservation.updateMany({
+      where: {
+        id,
+        status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] },
+      },
       data: {
         status: ReservationStatus.CANCELLED,
         notes: reason ? `${reservation.notes ? reservation.notes + '\n\n' : ''}キャンセル理由: ${reason}` : reservation.notes,
       },
-      include: {
-        service: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        instructor: {
-          include: {
-            user: {
-              select: {
-                name: true,
-                image: true,
-              },
-            },
-          },
-        },
-      },
     });
 
-    // 返金処理: reservationId で CHARGE 取引を特定し、決済方法に応じて返金
+    if (updated.count === 0) {
+      throw new Error('ALREADY_CANCELLED');
+    }
+
+    // 返金情報を取得
+    let chargeTransaction = null;
+    let useTransaction = null;
+
     if (reservation.userId) {
-      const chargeTransaction = await tx.pointTransaction.findFirst({
+      chargeTransaction = await tx.pointTransaction.findFirst({
         where: {
           reservationId: reservation.id,
           type: TransactionType.CHARGE,
@@ -124,74 +114,91 @@ export const PATCH = withErrorHandler(async (
         orderBy: { createdAt: 'desc' },
       });
 
-      const useTransaction = await tx.pointTransaction.findFirst({
+      useTransaction = await tx.pointTransaction.findFirst({
         where: {
           reservationId: reservation.id,
           type: TransactionType.USE,
           status: TransactionStatus.COMPLETED,
         },
       });
+    }
 
-      const refundAmount = useTransaction?.amount || 0;
+    return { chargeTransaction, useTransaction };
+  });
 
-      if (refundAmount > 0) {
-        let refundMethod = 'ポイント';
+  // --- Phase 2: Stripe返金（DB外で実行、非可逆操作） ---
+  const refundAmount = txResult.useTransaction?.amount || 0;
+  let refundMethod = 'ポイント';
+  let stripeRefundSuccess = false;
 
-        // クレジットカード決済の場合: Stripe返金を試みる
-        if (chargeTransaction?.method === 'credit' && chargeTransaction.transferId) {
-          try {
-            await refundPaymentIntent(chargeTransaction.transferId, refundAmount);
-            refundMethod = 'クレジットカード';
-          } catch (stripeError) {
-            // Stripe返金失敗時はポイント返金にフォールバック
-            console.error('Stripe refund failed, falling back to point refund:', stripeError);
-          }
+  if (refundAmount > 0 && reservation.userId) {
+    const { chargeTransaction } = txResult;
+
+    if (chargeTransaction?.method === 'credit' && chargeTransaction.transferId) {
+      // Stripe返金額はCHARGE額を上限とする（キャンペーン割引対応）
+      const stripeRefundAmount = Math.min(refundAmount, chargeTransaction.amount);
+      try {
+        await refundPaymentIntent(chargeTransaction.transferId, stripeRefundAmount);
+        refundMethod = 'クレジットカード';
+        stripeRefundSuccess = true;
+      } catch (stripeError: unknown) {
+        // 既に返金済みの場合はポイント返金にフォールバックしない
+        const errorMessage = stripeError instanceof Error ? stripeError.message : String(stripeError);
+        if (errorMessage.includes('charge_already_refunded')) {
+          console.warn('Stripe refund already processed, skipping duplicate refund');
+          refundMethod = 'クレジットカード（既返金済）';
+          stripeRefundSuccess = true; // ポイント返金をスキップ
+        } else {
+          console.error('Stripe refund failed, falling back to point refund:', stripeError);
         }
-
-        if (refundMethod === 'ポイント') {
-          // ポイント返金: ウォレット残高を戻す
-          const wallet = await tx.wallet.findUnique({
-            where: { userId: reservation.userId },
-          });
-
-          if (wallet) {
-            await tx.wallet.update({
-              where: { userId: reservation.userId },
-              data: { balance: wallet.balance + refundAmount },
-            });
-          }
-        }
-
-        // 返金トランザクションを記録
-        await tx.pointTransaction.create({
-          data: {
-            userId: reservation.userId,
-            type: TransactionType.CHARGE,
-            amount: refundAmount,
-            method: refundMethod === 'クレジットカード' ? 'credit_refund' : undefined,
-            status: TransactionStatus.COMPLETED,
-            reservationId: reservation.id,
-            description: `予約キャンセル返金（${refundMethod}）: ${reservation.service.title}${reason ? ` (理由: ${reason})` : ''}`,
-          },
-        });
       }
     }
 
-    return updatedReservation;
+    // --- Phase 3: ポイント返金 + 返金記録の作成 ---
+    await prisma.$transaction(async (tx) => {
+      if (refundMethod === 'ポイント') {
+        // ポイント返金: アトミックにウォレット残高を増加
+        await tx.wallet.update({
+          where: { userId: reservation.userId! },
+          data: { balance: { increment: refundAmount } },
+        });
+      }
+
+      // 返金トランザクションを記録
+      await tx.pointTransaction.create({
+        data: {
+          userId: reservation.userId!,
+          type: TransactionType.CHARGE,
+          amount: refundAmount,
+          method: stripeRefundSuccess ? 'credit_refund' : undefined,
+          status: TransactionStatus.COMPLETED,
+          reservationId: reservation.id,
+          description: `予約キャンセル返金（${refundMethod}）: ${reservation.service.title}${reason ? ` (理由: ${reason})` : ''}`,
+        },
+      });
+    });
+  }
+
+  // 更新後の予約を取得
+  const updatedReservation = await prisma.reservation.findUnique({
+    where: { id },
+    include: {
+      service: true,
+      user: {
+        select: { id: true, name: true, email: true },
+      },
+      instructor: {
+        include: {
+          user: {
+            select: { name: true, image: true },
+          },
+        },
+      },
+    },
   });
 
   // キャンセルメール送信（非同期）
   const cancelledBy = isOwner ? 'user' as const : 'instructor' as const;
-  // 返金情報の取得
-  const refundTx = await prisma.pointTransaction.findFirst({
-    where: {
-      reservationId: id,
-      type: TransactionType.CHARGE,
-      description: { contains: 'キャンセル返金' },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
-  const refundMethodLabel = refundTx?.method === 'credit_refund' ? 'クレジットカード' : 'ポイント';
 
   if (reservation.user?.email) {
     sendCancellationConfirmationEmail({
@@ -203,8 +210,8 @@ export const PATCH = withErrorHandler(async (
       scheduledAt: reservation.scheduledAt,
       cancelReason: reason,
       cancelledBy,
-      refundAmount: refundTx?.amount,
-      refundMethod: refundMethodLabel,
+      refundAmount: refundAmount > 0 ? refundAmount : undefined,
+      refundMethod,
     }).catch((err) => console.error('Failed to send cancellation email:', err));
   }
 
@@ -253,7 +260,7 @@ export const PATCH = withErrorHandler(async (
 
   return NextResponse.json({
     success: true,
-    reservation: result,
+    reservation: updatedReservation,
     message: '予約をキャンセルしました',
   });
 });
