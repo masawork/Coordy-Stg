@@ -148,7 +148,7 @@ export default function IdentityDocumentPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">身分証明書の提出</h1>
         <p className="mt-2 text-gray-600">
-          サービス提供を開始するには、身分証明書の提出と承認が必要です。
+          出品を開始するには、身分証明書の提出と承認が必要です。
         </p>
       </div>
 
@@ -210,7 +210,7 @@ export default function IdentityDocumentPage() {
       {instructor?.identityDocumentStatus === 'approved' && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-6">
           <p className="text-green-800 font-medium">
-            身分証明書が承認されました。サービスの作成と予約受付が可能です。
+            身分証明書が承認されました。出品と予約受付が可能です。
           </p>
         </div>
       )}

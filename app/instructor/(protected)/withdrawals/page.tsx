@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { getBankAccounts, getWithdrawalRequests, createWithdrawalRequest, BankAccount, WithdrawalRequest } from '@/lib/api/bank-client';
 import { getWallet } from '@/lib/api/wallet-client';
 import { getSession } from '@/lib/auth';
+import { handleNumericInput } from '@/lib/utils/number';
 
 const TRANSFER_FEE = 250;
 
@@ -203,12 +204,11 @@ export default function WithdrawalsPage() {
                 引き出し額（円）
               </label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => setAmount(handleNumericInput(e.target.value))}
                 placeholder="例: 10000"
-                min="1000"
-                max={balance}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                 required
               />

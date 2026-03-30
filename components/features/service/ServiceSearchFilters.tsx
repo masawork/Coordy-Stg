@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { SERVICE_CATEGORIES } from '@/lib/constants/categories';
 import { PREFECTURES } from '@/lib/constants/prefectures';
+import { handleNumericInput } from '@/lib/utils/number';
 
 const DELIVERY_TYPES = [
   { value: 'remote', label: 'オンライン' },
@@ -239,12 +240,11 @@ export function ServiceSearchFilters({ values, onChange }: ServiceSearchFiltersP
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">最低価格</label>
               <input
-                type="number"
-                min={0}
-                step={100}
+                type="text"
+                inputMode="numeric"
                 placeholder="¥0"
                 value={values.priceMin}
-                onChange={(e) => update({ priceMin: e.target.value })}
+                onChange={(e) => update({ priceMin: handleNumericInput(e.target.value) })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
               />
             </div>
@@ -253,12 +253,11 @@ export function ServiceSearchFilters({ values, onChange }: ServiceSearchFiltersP
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">最高価格</label>
               <input
-                type="number"
-                min={0}
-                step={100}
+                type="text"
+                inputMode="numeric"
                 placeholder="上限なし"
                 value={values.priceMax}
-                onChange={(e) => update({ priceMax: e.target.value })}
+                onChange={(e) => update({ priceMax: handleNumericInput(e.target.value) })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
               />
             </div>

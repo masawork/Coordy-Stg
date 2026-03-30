@@ -61,7 +61,10 @@
       "Bash(echo \"EXIT=$?\")",
       "Bash(node -e \":*)",
       "Bash(node -e \"const{execSync}=require\\(''child_process''\\);try{const o=execSync\\(''npx jest --testPathPattern=phone'',{timeout:30000,encoding:''utf8'',cwd:''/Users/sakamoto/Desktop/work/Coordy-Stg''}\\);console.log\\(o\\)}catch\\(e\\){console.log\\(e.stdout||''''\\);console.log\\(e.stderr||''''\\);console.log\\(''EXIT:'',e.status\\)}\")",
-      "Bash(node node_modules/jest-cli/bin/jest.js --testPathPattern=phone --no-cache)"
+      "Bash(node node_modules/jest-cli/bin/jest.js --testPathPattern=phone --no-cache)",
+      "Bash(npx skills:*)",
+      "Bash(gh run:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []

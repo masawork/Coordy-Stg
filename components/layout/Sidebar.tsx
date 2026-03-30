@@ -99,7 +99,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           icon: LayoutDashboard,
         },
         {
-          label: 'サービス管理',
+          label: '出品管理',
           href: `/instructor/services`,
           icon: Package,
         },

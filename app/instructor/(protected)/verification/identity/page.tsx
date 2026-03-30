@@ -417,7 +417,7 @@ export default function InstructorIdentityVerificationPage() {
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">本人確認（インストラクター）</h1>
         <p className="text-gray-600">
-          サービス提供には本人確認が必要です。書類の表・裏と補足写真を提出してください。
+          出品には本人確認が必要です。書類の表・裏と補足写真を提出してください。
         </p>
       </div>
 

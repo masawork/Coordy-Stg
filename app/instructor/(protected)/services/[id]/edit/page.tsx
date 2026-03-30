@@ -13,14 +13,17 @@ import { getService, updateService } from '@/lib/api/services';
 import { getSession } from '@/lib/auth';
 import { fetchCurrentInstructor } from '@/lib/api/instructors-client';
 import { ServiceImageUploader } from '@/components/features/service/ServiceImageUploader';
+import { handleNumericInput } from '@/lib/utils/number';
 
 const categories = [
-  'プログラミング',
-  'デザイン',
-  '語学',
-  '音楽',
-  'スポーツ',
-  'ビジネス',
+  'ファッション',
+  '電子機器・ガジェット',
+  'ハンドメイド・アート',
+  '本・雑誌',
+  'スポーツ・アウトドア',
+  'コスメ・美容',
+  '食品・飲料',
+  'インテリア・雑貨',
   'その他',
 ];
 
@@ -112,11 +115,14 @@ export default function EditServicePage() {
     }
   };
 
+  const numericFields = ['price', 'duration', 'maxParticipants'];
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
+    const sanitizedValue = numericFields.includes(name) ? handleNumericInput(value) : value;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
+      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : sanitizedValue,
     }));
   };
 
@@ -158,7 +164,7 @@ export default function EditServicePage() {
       router.push('/instructor/services');
     } catch (err: any) {
       console.error('Update service error:', err);
-      setError(err.message || 'サービスの更新に失敗しました');
+      setError(err.message || '更新に失敗しました');
     } finally {
       setSaving(false);
     }
@@ -182,8 +188,8 @@ export default function EditServicePage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">サービス編集</h1>
-          <p className="text-sm text-gray-600 mt-1">サービス情報を編集します</p>
+          <h1 className="text-2xl font-bold text-gray-900">出品内容の編集</h1>
+          <p className="text-sm text-gray-600 mt-1">商品情報を編集します</p>
         </div>
       </div>
 
@@ -196,7 +202,7 @@ export default function EditServicePage() {
 
         <div>
           <label htmlFor="title" className="block text-sm font-semibold text-gray-700 mb-2">
-            サービス名 <span className="text-red-500">*</span>
+            商品名 <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
@@ -250,13 +256,13 @@ export default function EditServicePage() {
               所要時間（分） <span className="text-red-500">*</span>
             </label>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               id="duration"
               name="duration"
               value={formData.duration}
               onChange={handleChange}
               required
-              min="1"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
             />
           </div>
@@ -317,7 +323,7 @@ export default function EditServicePage() {
               </div>
             </div>
             <p className="text-xs text-gray-500">
-              詳しい住所やビル名は上の「説明」欄に記載してください。エリア・最寄り駅はサービス一覧に表示されます。
+              詳しい住所やビル名は上の「商品説明」欄に記載してください。エリア・最寄り駅は商品一覧に表示されます。
             </p>
           </div>
         )}
@@ -327,14 +333,15 @@ export default function EditServicePage() {
             価格（円） <span className="text-red-500">*</span>
           </label>
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
             id="price"
             name="price"
             value={formData.price}
             onChange={handleChange}
             required
-            min="0"
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            placeholder="5000"
           />
         </div>
 

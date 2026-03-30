@@ -11,6 +11,7 @@ import { createCampaign, CampaignType } from '@/lib/api/campaigns';
 import { listServices } from '@/lib/api/services';
 import { getSession } from '@/lib/auth';
 import { fetchCurrentInstructor } from '@/lib/api/instructors-client';
+import { handleNumericInput } from '@/lib/utils/number';
 
 const campaignTypes: { value: CampaignType; label: string; description: string }[] = [
   { value: 'PERCENT_OFF', label: '割引率', description: '価格から指定した割合を割引' },
@@ -78,13 +79,16 @@ export default function NewCampaignPage() {
     }
   };
 
+  const numericFields = ['discountPercent', 'discountAmount', 'fixedPrice', 'earlyBirdDays', 'maxUsagePerUser', 'maxTotalUsage'];
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value, type } = e.target;
+    const sanitizedValue = numericFields.includes(name) ? handleNumericInput(value) : value;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
+      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : sanitizedValue,
     }));
   };
 
@@ -264,7 +268,7 @@ export default function NewCampaignPage() {
                   割引率 (%) <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="number"
+                  type="text" inputMode="numeric"
                   id="discountPercent"
                   name="discountPercent"
                   value={formData.discountPercent}
@@ -283,7 +287,7 @@ export default function NewCampaignPage() {
                   割引額 (円) <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="number"
+                  type="text" inputMode="numeric"
                   id="discountAmount"
                   name="discountAmount"
                   value={formData.discountAmount}
@@ -301,7 +305,7 @@ export default function NewCampaignPage() {
                   体験価格 (円) <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="number"
+                  type="text" inputMode="numeric"
                   id="fixedPrice"
                   name="fixedPrice"
                   value={formData.fixedPrice}
@@ -319,7 +323,7 @@ export default function NewCampaignPage() {
                   早期予約日数
                 </label>
                 <input
-                  type="number"
+                  type="text" inputMode="numeric"
                   id="earlyBirdDays"
                   name="earlyBirdDays"
                   value={formData.earlyBirdDays}
@@ -383,7 +387,7 @@ export default function NewCampaignPage() {
                 1人あたりの利用上限
               </label>
               <input
-                type="number"
+                type="text" inputMode="numeric"
                 id="maxUsagePerUser"
                 name="maxUsagePerUser"
                 value={formData.maxUsagePerUser}
@@ -398,7 +402,7 @@ export default function NewCampaignPage() {
                 総利用回数上限
               </label>
               <input
-                type="number"
+                type="text" inputMode="numeric"
                 id="maxTotalUsage"
                 name="maxTotalUsage"
                 value={formData.maxTotalUsage}

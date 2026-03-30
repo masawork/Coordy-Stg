@@ -177,7 +177,7 @@ export default function InstructorDashboardPage() {
               <p className="text-sm text-red-700 mb-3">却下理由: {identityRejectedReason}</p>
             )}
             <p className="text-sm text-green-700 mb-4">
-              サービスを作成するには本人確認の承認が必要です。書類を提出してください。
+              出品するには本人確認の承認が必要です。書類を提出してください。
             </p>
             <button
               onClick={() => router.push('/instructor/verification/identity')}
@@ -198,7 +198,7 @@ export default function InstructorDashboardPage() {
               </div>
             </div>
             <p className="text-sm text-orange-700 mb-4">
-              銀行口座を登録すると収益の引き出しとサービス作成が可能になります。
+              銀行口座を登録すると収益の引き出しと出品が可能になります。
             </p>
             <button
               onClick={() => router.push('/instructor/bank-accounts')}
@@ -223,14 +223,14 @@ export default function InstructorDashboardPage() {
           </div>
         </div>
 
-        {/* サービス */}
+        {/* 出品 */}
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            登録サービス
+            出品数
           </h2>
           <div className="text-center py-8">
             <p className="text-3xl font-bold text-gray-900">0</p>
-            <p className="text-gray-500 text-sm mt-2">個のサービス</p>
+            <p className="text-gray-500 text-sm mt-2">件の出品</p>
           </div>
         </div>
 
@@ -245,7 +245,7 @@ export default function InstructorDashboardPage() {
                 className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 onClick={() => router.push('/instructor/services/new')}
               >
-                新規サービス作成
+                出品する
               </button>
             ) : (
               <div>
@@ -253,10 +253,10 @@ export default function InstructorDashboardPage() {
                   disabled
                   className="w-full px-4 py-2 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed"
                 >
-                  新規サービス作成
+                  出品する
                 </button>
                 <p className="text-xs text-gray-500 mt-1">
-                  ※サービス作成には本人確認の承認と銀行口座登録が必要です
+                  ※出品には本人確認の承認と銀行口座登録が必要です
                 </p>
               </div>
             )}

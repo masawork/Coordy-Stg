@@ -14,14 +14,17 @@ import { getSession } from '@/lib/auth';
 import { fetchCurrentInstructor } from '@/lib/api/instructors-client';
 import { getBankAccounts } from '@/lib/api/bank-client';
 import { ServiceImageUploader } from '@/components/features/service/ServiceImageUploader';
+import { handleNumericInput } from '@/lib/utils/number';
 
 const categories = [
-  'プログラミング',
-  'デザイン',
-  '語学',
-  '音楽',
-  'スポーツ',
-  'ビジネス',
+  'ファッション',
+  '電子機器・ガジェット',
+  'ハンドメイド・アート',
+  '本・雑誌',
+  'スポーツ・アウトドア',
+  'コスメ・美容',
+  '食品・飲料',
+  'インテリア・雑貨',
   'その他',
 ];
 
@@ -124,11 +127,14 @@ export default function NewServicePage() {
     }
   };
 
+  const numericFields = ['price', 'duration', 'maxParticipants'];
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
+    const sanitizedValue = numericFields.includes(name) ? handleNumericInput(value) : value;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
+      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : sanitizedValue,
     }));
   };
 
@@ -157,11 +163,11 @@ export default function NewServicePage() {
     // スケジュールバリデーション
     if (formData.recurrenceType !== 'ONCE') {
       if (formData.availableDays.length === 0) {
-        setError('繰り返しサービスの場合は曜日を選択してください');
+        setError('繰り返し出品の場合は曜日を選択してください');
         return;
       }
       if (!formData.startTime || !formData.endTime) {
-        setError('繰り返しサービスの場合は開始・終了時間を入力してください');
+        setError('繰り返し出品の場合は開始・終了時間を入力してください');
         return;
       }
     }
@@ -212,7 +218,7 @@ export default function NewServicePage() {
       router.push('/instructor/services');
     } catch (err: any) {
       console.error('Create service error:', err);
-      setError(err.message || 'サービスの作成に失敗しました');
+      setError(err.message || '出品に失敗しました');
     } finally {
       setLoading(false);
     }
@@ -228,8 +234,8 @@ export default function NewServicePage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">新規サービス作成</h1>
-          <p className="text-sm text-gray-600 mt-1">新しいサービスを登録します</p>
+          <h1 className="text-2xl font-bold text-gray-900">出品する</h1>
+          <p className="text-sm text-gray-600 mt-1">新しい商品を出品します</p>
         </div>
       </div>
 
@@ -242,7 +248,7 @@ export default function NewServicePage() {
 
         <div>
           <label htmlFor="title" className="block text-sm font-semibold text-gray-700 mb-2">
-            サービス名 <span className="text-red-500">*</span>
+            商品名 <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
@@ -258,7 +264,7 @@ export default function NewServicePage() {
 
         <div>
           <label htmlFor="description" className="block text-sm font-semibold text-gray-700 mb-2">
-            説明
+            商品説明
           </label>
           <textarea
             id="description"
@@ -267,7 +273,7 @@ export default function NewServicePage() {
             onChange={handleChange}
             rows={5}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            placeholder="サービスの詳細を入力してください"
+            placeholder="商品の詳細を入力してください"
           />
         </div>
 
@@ -298,13 +304,13 @@ export default function NewServicePage() {
               所要時間（分） <span className="text-red-500">*</span>
             </label>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               id="duration"
               name="duration"
               value={formData.duration}
               onChange={handleChange}
               required
-              min="1"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               placeholder="60"
             />
@@ -367,7 +373,7 @@ export default function NewServicePage() {
               </div>
             </div>
             <p className="text-xs text-gray-500">
-              詳しい住所やビル名は上の「説明」欄に記載してください。エリア・最寄り駅はサービス一覧に表示されます。
+              詳しい住所やビル名は上の「商品説明」欄に記載してください。エリア・最寄り駅は商品一覧に表示されます。
             </p>
           </div>
         )}
@@ -496,13 +502,12 @@ export default function NewServicePage() {
                 最大参加人数
               </label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 id="maxParticipants"
                 name="maxParticipants"
                 value={formData.maxParticipants}
                 onChange={handleChange}
-                min="1"
-                max="100"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               />
               <p className="text-xs text-gray-500 mt-1">1回の開催あたりの参加可能人数</p>
@@ -515,13 +520,13 @@ export default function NewServicePage() {
             価格（円） <span className="text-red-500">*</span>
           </label>
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
             id="price"
             name="price"
             value={formData.price}
             onChange={handleChange}
             required
-            min="0"
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
             placeholder="5000"
           />
@@ -552,7 +557,7 @@ export default function NewServicePage() {
             className="bg-green-600 hover:bg-green-700"
             disabled={loading}
           >
-            {loading ? '作成中...' : 'サービスを作成'}
+            {loading ? '出品中...' : '出品する'}
           </Button>
           <Link href="/instructor/services">
             <Button type="button" variant="outline">
