@@ -13,6 +13,7 @@ import {
   notFoundError,
   forbiddenError,
   validationError,
+  conflictError,
   withErrorHandler,
 } from '@/lib/api/errors';
 import { sendAndLogWebhook, buildReservationWebhookData } from '@/lib/partner/webhook';
@@ -75,8 +76,17 @@ export const PATCH = withErrorHandler(async (
     return validationError('この予約は完了できません。ステータスがCONFIRMEDではありません。');
   }
 
-  // 売上金額を計算
-  const revenueAmount = reservation.service.price * reservation.participants;
+  // 売上金額を計算（実際の支払額を優先、取得できない場合は定価×人数）
+  const useTransaction = await prisma.pointTransaction.findFirst({
+    where: {
+      reservationId: reservation.id,
+      type: TransactionType.USE,
+      status: TransactionStatus.COMPLETED,
+    },
+  });
+  const revenueAmount = useTransaction
+    ? Math.abs(useTransaction.amount)
+    : reservation.service.price * reservation.participants;
 
   // トランザクションで予約完了 + インストラクター売上入金
   const updatedReservation = await prisma.$transaction(async (tx) => {
@@ -92,7 +102,7 @@ export const PATCH = withErrorHandler(async (
     });
 
     if (updateResult.count === 0) {
-      throw new Error('ALREADY_COMPLETED');
+      return null; // 二重完了 - トランザクション外で409を返す
     }
 
     // 更新後の予約を取得
@@ -147,6 +157,11 @@ export const PATCH = withErrorHandler(async (
 
     return updated;
   });
+
+  // 二重完了チェック（トランザクションがnullを返した場合）
+  if (updatedReservation === null) {
+    return conflictError('この予約は既に完了済みまたはCONFIRMED以外のステータスです');
+  }
 
   // 完了メール送信（非同期）
   if (updatedReservation.user?.email) {

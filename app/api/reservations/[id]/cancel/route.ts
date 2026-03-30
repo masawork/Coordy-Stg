@@ -14,6 +14,7 @@ import {
   notFoundError,
   forbiddenError,
   validationError,
+  conflictError,
   withErrorHandler,
 } from '@/lib/api/errors';
 import { sendAndLogWebhook, buildReservationWebhookData } from '@/lib/partner/webhook';
@@ -97,7 +98,7 @@ export const PATCH = withErrorHandler(async (
     });
 
     if (updated.count === 0) {
-      throw new Error('ALREADY_CANCELLED');
+      return null; // 二重キャンセル - Phase 1外で409を返す
     }
 
     // 返金情報を取得
@@ -125,6 +126,11 @@ export const PATCH = withErrorHandler(async (
 
     return { chargeTransaction, useTransaction };
   });
+
+  // 二重キャンセルチェック
+  if (txResult === null) {
+    return conflictError('この予約は既にキャンセル済みまたは完了済みです');
+  }
 
   // --- Phase 2: Stripe返金（DB外で実行、非可逆操作） ---
   const refundAmount = txResult.useTransaction?.amount || 0;
