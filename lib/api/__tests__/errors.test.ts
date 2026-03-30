@@ -257,7 +257,7 @@ describe('withErrorHandler', () => {
 
   it('should return internalError for generic errors in production', async () => {
     const originalEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
+    Object.defineProperty(process.env, 'NODE_ENV', { value: 'production', writable: true, configurable: true });
 
     const handler = async () => {
       throw new Error('Something unexpected happened');
@@ -271,12 +271,12 @@ describe('withErrorHandler', () => {
     // In production, the error message should NOT leak to the client
     expect(body.error.message).toBe('サーバーエラーが発生しました');
 
-    process.env.NODE_ENV = originalEnv;
+    Object.defineProperty(process.env, 'NODE_ENV', { value: originalEnv, writable: true, configurable: true });
   });
 
   it('should include error message in development mode', async () => {
     const originalEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'development';
+    Object.defineProperty(process.env, 'NODE_ENV', { value: 'development', writable: true, configurable: true });
 
     const handler = async () => {
       throw new Error('Debug info here');
@@ -290,7 +290,7 @@ describe('withErrorHandler', () => {
     // In development, the error message is passed as the response message
     expect(body.error.message).toBe('Debug info here');
 
-    process.env.NODE_ENV = originalEnv;
+    Object.defineProperty(process.env, 'NODE_ENV', { value: originalEnv, writable: true, configurable: true });
   });
 
   it('should log unhandled errors to console.error', async () => {
