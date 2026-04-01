@@ -69,7 +69,6 @@ export default function InstructorIdentityVerificationPage() {
         }
         await loadStatus();
       } catch (err) {
-        console.error('初期化エラー:', err);
         router.push('/login/instructor');
       }
     };
@@ -113,7 +112,6 @@ export default function InstructorIdentityVerificationPage() {
               dateOfBirthStr = date.toISOString().split('T')[0];
             }
           } catch (e) {
-            console.error('[instructor-identity] Date parsing error:', e, data.profile.dateOfBirth);
           }
         }
 
@@ -134,7 +132,6 @@ export default function InstructorIdentityVerificationPage() {
       }
 
     } catch (err) {
-      console.error('Load status error:', err);
       // エラー発生時も認証状態を確認
       const session = await getSession();
       if (!session?.user) {
@@ -163,7 +160,6 @@ export default function InstructorIdentityVerificationPage() {
         await videoRef.current.play();
       }
     } catch (err: any) {
-      console.error('Camera access error:', err);
       setError('カメラへのアクセスが拒否されました。設定を確認してください。');
       setShowCamera(false);
     }
@@ -383,7 +379,6 @@ export default function InstructorIdentityVerificationPage() {
       setSuccess(data.message || '本人確認書類を提出しました');
       await loadStatus();
     } catch (err: any) {
-      console.error('Submit error:', err);
       // エラー発生時も認証状態を確認
       const session = await getSession();
       if (!session?.user) {

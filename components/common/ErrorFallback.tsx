@@ -28,7 +28,6 @@ export default function ErrorFallback({
   backLabel,
 }: ErrorFallbackProps) {
   useEffect(() => {
-    console.error(`[${portalName}] Error:`, error);
   }, [error, portalName]);
 
   return (

@@ -23,6 +23,9 @@ export default function InstructorDashboardPage() {
   const [identityStatus, setIdentityStatus] = useState<'approved' | 'pending' | 'rejected' | 'notSubmitted'>('notSubmitted');
   const [identityRejectedReason, setIdentityRejectedReason] = useState<string | null>(null);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [serviceCount, setServiceCount] = useState(0);
+  const [todayReservationCount, setTodayReservationCount] = useState(0);
+  const [upcomingReservations, setUpcomingReservations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showRejectedModal, setShowRejectedModal] = useState(false);
   const ACK_KEY = 'instructor_rejected_ack';
@@ -75,8 +78,40 @@ export default function InstructorDashboardPage() {
             setIdentityStatus('notSubmitted');
           }
         } catch (err) {
-          console.error('本人確認ステータス取得エラー:', err);
           setIdentityStatus('notSubmitted');
+        }
+
+        // 出品数・予約数を取得
+        if (instructorData) {
+          try {
+            const [servicesRes, reservationsRes] = await Promise.all([
+              fetch(`/api/services?instructorId=${instructorData.id}&limit=1`),
+              fetch('/api/reservations?role=instructor'),
+            ]);
+            if (servicesRes.ok) {
+              const servicesData = await servicesRes.json();
+              setServiceCount(servicesData.pagination?.total || servicesData.services?.length || 0);
+            }
+            if (reservationsRes.ok) {
+              const reservationsData = await reservationsRes.json();
+              const allReservations = reservationsData.reservations || reservationsData || [];
+              // 今日の予約
+              const today = new Date().toDateString();
+              const todayRes = allReservations.filter((r: any) =>
+                new Date(r.scheduledAt).toDateString() === today &&
+                (r.status === 'CONFIRMED' || r.status === 'PENDING')
+              );
+              setTodayReservationCount(todayRes.length);
+              // 今後の予約（最大3件）
+              const upcoming = allReservations
+                .filter((r: any) => new Date(r.scheduledAt) >= new Date() && r.status !== 'CANCELLED')
+                .sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
+                .slice(0, 3);
+              setUpcomingReservations(upcoming);
+            }
+          } catch (err) {
+            // silently fail for dashboard counts
+          }
         }
 
         // 銀行口座取得
@@ -84,12 +119,10 @@ export default function InstructorDashboardPage() {
           const accounts = await getBankAccounts();
           setBankAccounts(accounts);
         } catch (err) {
-          console.error('銀行口座取得エラー:', err);
           setBankAccounts([]);
         }
       }
     } catch (error) {
-      console.error('ユーザー情報の読み込みエラー:', error);
     } finally {
       setLoading(false);
     }
@@ -156,7 +189,7 @@ export default function InstructorDashboardPage() {
           ようこそ、{user?.name || 'ゲスト'}さん！
         </h1>
         <p className="text-green-100">
-          今日も素晴らしいレッスンを提供しましょう
+          ダッシュボードで出品状況を確認しましょう
         </p>
       </div>
 
@@ -218,7 +251,7 @@ export default function InstructorDashboardPage() {
             今日の予約
           </h2>
           <div className="text-center py-8">
-            <p className="text-3xl font-bold text-gray-900">0</p>
+            <p className="text-3xl font-bold text-gray-900">{todayReservationCount}</p>
             <p className="text-gray-500 text-sm mt-2">件の予約</p>
           </div>
         </div>
@@ -229,7 +262,7 @@ export default function InstructorDashboardPage() {
             出品数
           </h2>
           <div className="text-center py-8">
-            <p className="text-3xl font-bold text-gray-900">0</p>
+            <p className="text-3xl font-bold text-gray-900">{serviceCount}</p>
             <p className="text-gray-500 text-sm mt-2">件の出品</p>
           </div>
         </div>
@@ -260,21 +293,40 @@ export default function InstructorDashboardPage() {
                 </p>
               </div>
             )}
-            <button className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+            <button
+              className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              onClick={() => router.push('/instructor/schedule')}
+            >
               スケジュール管理
             </button>
           </div>
         </div>
       </div>
 
-      {/* 今週のスケジュール（今後実装） */}
+      {/* 今後の予約 */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          今週のスケジュール
-        </h2>
-        <p className="text-gray-500">
-          スケジュール機能は今後実装予定です
-        </p>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">今後の予約</h2>
+        {upcomingReservations.length === 0 ? (
+          <p className="text-gray-500">今後の予約はありません</p>
+        ) : (
+          <div className="space-y-3">
+            {upcomingReservations.map((r: any) => (
+              <div key={r.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-900">{r.service?.title || '商品'}</p>
+                  <p className="text-sm text-gray-500">
+                    {new Date(r.scheduledAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+                <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                  r.status === 'CONFIRMED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                }`}>
+                  {r.status === 'CONFIRMED' ? '確認済み' : '確認待ち'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

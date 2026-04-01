@@ -17,6 +17,7 @@ import {
   Link2,
   Users,
 } from 'lucide-react';
+import { handleNumericInput } from '@/lib/utils/number';
 
 export default function PartnersPage() {
   const router = useRouter();
@@ -52,7 +53,6 @@ export default function PartnersPage() {
       const data = await listPartners();
       setPartners(data || []);
     } catch (err) {
-      console.error('パートナー一覧取得エラー:', err);
     } finally {
       setLoading(false);
     }
@@ -100,7 +100,6 @@ export default function PartnersPage() {
       await deletePartner(id);
       await loadPartners();
     } catch (err) {
-      console.error('削除エラー:', err);
     }
   };
 
@@ -241,12 +240,10 @@ export default function PartnersPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">手数料率（%）</label>
               <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
+                type="text"
+                inputMode="numeric"
                 value={form.commissionRate}
-                onChange={(e) => setForm({ ...form, commissionRate: Number(e.target.value) })}
+                onChange={(e) => setForm({ ...form, commissionRate: Number(handleNumericInput(e.target.value, true)) || 0 })}
                 className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
               />
             </div>

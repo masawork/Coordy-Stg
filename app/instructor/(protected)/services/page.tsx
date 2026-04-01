@@ -76,7 +76,6 @@ export default function InstructorServicesPage() {
         setBankAccounts(accounts);
         hasAccount = accounts.length > 0;
       } catch (err: any) {
-        console.error('Bank account load error:', err);
         hasAccount = false;
       }
       setHasBankAccount(hasAccount);
@@ -91,7 +90,6 @@ export default function InstructorServicesPage() {
       const myServices = await listServices({ instructorId: instructor.id });
       setServices(myServices || []);
     } catch (error) {
-      console.error('Failed to load services:', error);
       setServices([]);
     } finally {
       setLoading(false);
@@ -107,7 +105,6 @@ export default function InstructorServicesPage() {
       await deleteService(serviceId);
       await loadServices();
     } catch (error) {
-      console.error('Failed to delete service:', error);
       alert('出品の削除に失敗しました');
     }
   };

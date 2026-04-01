@@ -108,7 +108,6 @@ export default function EditServicePage() {
         setExistingImages(service.images);
       }
     } catch (error) {
-      console.error('Failed to load service:', error);
       router.push('/instructor/services');
     } finally {
       setLoading(false);
@@ -140,6 +139,15 @@ export default function EditServicePage() {
       return;
     }
 
+    // 数値バリデーション
+    if (parseInt(formData.price) < 0) {
+      setError('価格は0以上で入力してください');
+      return;
+    }
+    if (parseInt(formData.duration) < 1) {
+      setError('所要時間は1分以上で入力してください');
+      return;
+    }
     setSaving(true);
     setError('');
 
@@ -163,7 +171,6 @@ export default function EditServicePage() {
 
       router.push('/instructor/services');
     } catch (err: any) {
-      console.error('Update service error:', err);
       setError(err.message || '更新に失敗しました');
     } finally {
       setSaving(false);
@@ -260,6 +267,7 @@ export default function EditServicePage() {
               inputMode="numeric"
               id="duration"
               name="duration"
+              min="1"
               value={formData.duration}
               onChange={handleChange}
               required
@@ -337,6 +345,7 @@ export default function EditServicePage() {
             inputMode="numeric"
             id="price"
             name="price"
+            min="0"
             value={formData.price}
             onChange={handleChange}
             required

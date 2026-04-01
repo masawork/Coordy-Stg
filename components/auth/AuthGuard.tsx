@@ -41,7 +41,6 @@ export function AuthGuard({
 
         setIsAuthenticated(true);
       } catch (error) {
-        console.error('Auth check error:', error);
         router.push(redirectTo);
       } finally {
         setIsLoading(false);

@@ -65,7 +65,6 @@ export default function WalletPage() {
       );
       setPendingTransfers(pending);
     } catch (err) {
-      console.error('ウォレットデータ読み込みエラー:', err);
     } finally {
       setLoading(false);
     }
@@ -121,7 +120,6 @@ export default function WalletPage() {
       // データを再読み込み
       await loadWalletData();
     } catch (err: any) {
-      console.error('振込完了報告エラー:', err);
       setError(err.message || '振込完了報告に失敗しました。');
     } finally {
       setSubmittingTransfer(false);
@@ -180,7 +178,7 @@ export default function WalletPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">ポイントウォレット</h1>
           <p className="mt-2 text-gray-600">
-            ポイントをチャージして、サービスを予約できます
+            ポイントをチャージして、商品を購入できます
           </p>
         </div>
 

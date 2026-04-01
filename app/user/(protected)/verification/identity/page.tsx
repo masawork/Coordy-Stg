@@ -81,7 +81,6 @@ export default function IdentityVerificationPage() {
         await videoRef.current.play();
       }
     } catch (err: any) {
-      console.error('Camera access error:', err);
       setError('カメラへのアクセスが拒否されました。設定を確認してください。');
       setShowCamera(false);
     }
@@ -173,7 +172,6 @@ export default function IdentityVerificationPage() {
         }
       }
     } catch (err) {
-      console.error('Load status error:', err);
       setError('ステータスの取得に失敗しました');
     } finally {
       setLoading(false);
@@ -339,7 +337,6 @@ export default function IdentityVerificationPage() {
         router.push('/user/profile');
       }, 3000);
     } catch (err: any) {
-      console.error('Submit error:', err);
       setError(err.message || '本人確認書類の提出に失敗しました');
     } finally {
       setSubmitting(false);

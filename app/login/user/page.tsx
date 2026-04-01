@@ -81,26 +81,18 @@ export default function UserLoginPage() {
         throw new Error('ユーザーアカウントでログインしてください');
       }
 
-      console.log('✅ ユーザーログイン成功、プロフィールチェック中...');
-      
       // プロフィール完了状態をチェックしてリダイレクト
       try {
         const profileComplete = await isProfileComplete(user.id);
-        console.log('🔍 プロフィール完了チェック結果:', profileComplete);
         if (profileComplete) {
-          console.log('✅ プロフィール完了、/user にリダイレクト');
           window.location.href = '/user';
         } else {
-          console.log('⚠️ プロフィール未完了、/user/profile/setup にリダイレクト');
           window.location.href = '/user/profile/setup';
         }
-      } catch (err) {
-        console.error('❌ プロフィールチェックエラー:', err);
+      } catch {
         window.location.href = '/user/profile/setup';
       }
     } catch (err: any) {
-      console.error('Login error:', err);
-      
       // エラーメッセージを日本語化
       let friendlyMessage = 'ログインに失敗しました。時間をおいて再度お試しください。';
       
@@ -142,7 +134,7 @@ export default function UserLoginPage() {
       >
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">ユーザーログイン</h1>
-          <p className="text-gray-600">サービスを予約・利用する方のログイン</p>
+          <p className="text-gray-600">商品を購入・利用する方のログイン</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

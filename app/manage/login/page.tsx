@@ -37,7 +37,6 @@ export default function AdminLoginPage() {
         }
         if (active) setChecking(false);
       } catch (error) {
-        console.error('Session check error:', error);
         if (active) setChecking(false);
       }
     };
@@ -71,10 +70,8 @@ export default function AdminLoginPage() {
         throw new Error('管理者アカウントでログインしてください');
       }
 
-      console.log('✅ 管理者ログイン成功');
       window.location.href = '/manage/admin';
     } catch (err: any) {
-      console.error('Login error:', err);
 
       // エラーメッセージを日本語化
       let friendlyMessage = 'ログインに失敗しました。時間をおいて再度お試しください。';

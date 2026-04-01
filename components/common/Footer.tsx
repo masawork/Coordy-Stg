@@ -14,10 +14,10 @@ export default function Footer() {
           </div>
 
           <div>
-            <h4 className="font-semibold text-white mb-4">サービス</h4>
+            <h4 className="font-semibold text-white mb-4">商品</h4>
             <ul className="space-y-2 text-sm">
               <li><a href="#" className="hover:text-white transition-colors">カテゴリー一覧</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">インストラクター検索</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">出品者検索</a></li>
               <li><a href="#" className="hover:text-white transition-colors">料金プラン</a></li>
             </ul>
           </div>

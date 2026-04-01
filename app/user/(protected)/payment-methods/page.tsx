@@ -63,7 +63,6 @@ function CardRegistrationForm({ onSuccess }: { onSuccess: () => void }) {
 
       onSuccess();
     } catch (err: any) {
-      console.error('Card registration error:', err);
       setError(err.message || 'カードの登録に失敗しました');
     } finally {
       setLoading(false);
@@ -184,7 +183,6 @@ export default function PaymentMethodsPage() {
       const methods = await getPaymentMethods();
       setPaymentMethods(methods);
     } catch (err: any) {
-      console.error('Load payment methods error:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -200,7 +198,6 @@ export default function PaymentMethodsPage() {
       await deletePaymentMethod(id);
       loadPaymentMethods();
     } catch (err: any) {
-      console.error('Delete error:', err);
       alert(err.message);
     }
   };
@@ -210,7 +207,6 @@ export default function PaymentMethodsPage() {
       await setDefaultPaymentMethod(id);
       loadPaymentMethods();
     } catch (err: any) {
-      console.error('Set default error:', err);
       alert(err.message);
     }
   };

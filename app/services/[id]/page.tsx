@@ -33,7 +33,6 @@ export default function ServiceDetailPage() {
       const serviceData = await getService(serviceId);
       setService(serviceData);
     } catch (error) {
-      console.error('Failed to load service:', error);
     } finally {
       setLoading(false);
     }
@@ -47,7 +46,6 @@ export default function ServiceDetailPage() {
         setUserRole(session.user.user_metadata?.role?.toLowerCase() || '');
       }
     } catch (error) {
-      console.error('Auth check error:', error);
     }
   };
 
@@ -63,9 +61,9 @@ export default function ServiceDetailPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">サービスが見つかりません</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">商品が見つかりません</h1>
           <Link href="/services" className="text-purple-600 hover:text-purple-700">
-            サービス一覧に戻る
+            商品一覧に戻る
           </Link>
         </div>
       </div>
@@ -82,7 +80,7 @@ export default function ServiceDetailPage() {
           className="inline-flex items-center text-purple-600 hover:text-purple-700 mb-6"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          サービス一覧に戻る
+          商品一覧に戻る
         </Link>
 
         <motion.div
@@ -100,7 +98,7 @@ export default function ServiceDetailPage() {
               <div className="flex items-center gap-6 text-gray-600 mb-6">
                 <div className="flex items-center gap-2">
                   <User className="w-5 h-5" />
-                  <span>{service.instructor?.user?.name || 'インストラクター'}</span>
+                  <span>{service.instructor?.user?.name || '出品者'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="w-5 h-5" />
@@ -114,7 +112,7 @@ export default function ServiceDetailPage() {
 
             {service.description && (
               <div className="mb-8">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">サービス内容</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">商品詳細</h2>
                 <p className="text-gray-700 whitespace-pre-wrap">{service.description}</p>
               </div>
             )}
@@ -122,7 +120,7 @@ export default function ServiceDetailPage() {
             {/* インストラクター情報 */}
             {service.instructor && (
               <div className="mb-8 p-6 bg-gray-50 rounded-lg">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">インストラクター情報</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">出品者情報</h2>
                 <div className="space-y-2">
                   <p className="text-gray-700">
                     <span className="font-semibold">名前:</span> {service.instructor.user?.name}
@@ -166,7 +164,7 @@ export default function ServiceDetailPage() {
               ) : (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
                   <p className="text-yellow-800 text-sm mb-3">
-                    このサービスを予約するにはログインが必要です
+                    この商品を予約するにはログインが必要です
                   </p>
                   <div className="flex gap-2">
                     <Link href="/login/user">

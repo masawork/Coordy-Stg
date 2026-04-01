@@ -62,7 +62,6 @@ export default function AdminWithdrawalsPage() {
       const data = await response.json();
       setWithdrawals(data);
     } catch (err: any) {
-      console.error('Load withdrawals error:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -103,7 +102,6 @@ export default function AdminWithdrawalsPage() {
       setRejectedReason('');
       loadWithdrawals();
     } catch (err: any) {
-      console.error('Action error:', err);
       alert(err.message);
     } finally {
       setProcessing(false);

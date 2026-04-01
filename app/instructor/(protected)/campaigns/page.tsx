@@ -40,7 +40,6 @@ export default function InstructorCampaignsPage() {
       const myCampaigns = await listCampaigns({ instructorId: instructor.id });
       setCampaigns(myCampaigns || []);
     } catch (error) {
-      console.error('Failed to load campaigns:', error);
       setCampaigns([]);
     } finally {
       setLoading(false);
@@ -53,7 +52,6 @@ export default function InstructorCampaignsPage() {
       await deleteCampaign(id);
       setCampaigns((prev) => prev.filter((c) => c.id !== id));
     } catch (error) {
-      console.error('Delete campaign error:', error);
       alert('キャンペーンの削除に失敗しました');
     }
   };
@@ -168,7 +166,7 @@ export default function InstructorCampaignsPage() {
                         </div>
                       )}
                       {!campaign.service && (
-                        <div className="text-blue-600">対象: 全サービス</div>
+                        <div className="text-blue-600">対象: 全商品</div>
                       )}
                     </div>
 

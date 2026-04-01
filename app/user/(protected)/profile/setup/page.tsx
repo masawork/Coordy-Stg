@@ -141,17 +141,14 @@ export default function ProfileSetupPage() {
         }
       } else if (roleCheckRes.status === 404) {
         // ユーザーがまだDBに存在しない場合（通常はcallbackで作成されるが念のため）
-        console.error('User not found in database');
         setError('ユーザーがデータベースに登録されていません。ログインし直してください。');
         // ログインページへリダイレクトせず、エラーメッセージを表示
       } else {
         // 500エラーなどの場合
-        console.error('Failed to load user profile:', roleCheckRes.status);
         setError('プロフィール情報の読み込みに失敗しました。ページを再読み込みしてください。');
         // 無限ループを防ぐため、リダイレクトしない
       }
     } catch (err: any) {
-      console.error('Load profile error:', err);
       setError('プロフィール情報の読み込みに失敗しました');
     }
   };
@@ -235,7 +232,6 @@ export default function ProfileSetupPage() {
       setResendTimer(60); // 60秒間再送不可
       setStep('phone-verify');
     } catch (err: any) {
-      console.error('Send OTP error:', err);
       setError(err.message || 'SMS送信に失敗しました');
     } finally {
       setLoading(false);
@@ -275,11 +271,9 @@ export default function ProfileSetupPage() {
       // 電話番号を数字のみに正規化
       const digitsOnly = normalizePhoneNumber(formData.phoneNumber);
 
-      console.log('📱 Verifying OTP for:', formData.phoneNumber);
 
       // OTP検証API（独自実装 - セッションを維持したまま検証）
       // 電話認証が成功してからプロフィールを保存する
-      console.log('📞 Calling phone verification API...');
       const verifyResponse = await fetch('/api/verification/phone/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -295,7 +289,6 @@ export default function ProfileSetupPage() {
       }
 
       const verifyData = await verifyResponse.json();
-      console.log('✅ Phone verification response:', verifyData);
 
       // 電話認証が成功した後にプロフィールを保存
       const existingProfile = await getClientProfile(userId);
@@ -328,10 +321,8 @@ export default function ProfileSetupPage() {
       }
 
       // 完了後、ダッシュボードへリダイレクト
-      console.log('🎉 Profile setup complete! Redirecting to dashboard...');
       router.push('/user');
     } catch (err: any) {
-      console.error('❌ OTP verify error:', err);
       setError(err.message || '認証に失敗しました');
     } finally {
       setLoading(false);
@@ -363,7 +354,6 @@ export default function ProfileSetupPage() {
       setOtpCode('');
       alert('認証コードを再送信しました');
     } catch (err: any) {
-      console.error('Resend OTP error:', err);
       setError(err.message || 'SMS送信に失敗しました');
     } finally {
       setLoading(false);
@@ -381,7 +371,7 @@ export default function ProfileSetupPage() {
                 プロフィール設定
               </h1>
               <p className="text-sm text-gray-600 mb-6">
-                サービスをご利用いただくために、プロフィール情報を入力してください。
+                商品をご利用いただくために、プロフィール情報を入力してください。
               </p>
 
               {error && (

@@ -78,7 +78,7 @@ export default function ServiceDetailPage() {
       // サービス取得（instructorを含む）
       const serviceData = await getService(serviceId);
       if (!serviceData) {
-        setError('サービスが見つかりませんでした');
+        setError('商品が見つかりませんでした');
         return;
       }
       setService(serviceData);
@@ -93,7 +93,6 @@ export default function ServiceDetailPage() {
         const walletData = await getWallet(userId);
         setWallet(walletData);
       } catch (walletErr) {
-        console.error('ウォレット取得エラー:', walletErr);
         // ウォレットがなくても続行
       }
 
@@ -107,11 +106,9 @@ export default function ServiceDetailPage() {
           setSelectedPaymentMethodId(defaultCard.id);
         }
       } catch (cardErr) {
-        console.error('カード取得エラー:', cardErr);
       }
     } catch (err) {
-      console.error('サービス詳細取得エラー:', err);
-      setError('サービス情報の取得に失敗しました');
+      setError('商品情報の取得に失敗しました');
     } finally {
       setLoading(false);
     }
@@ -128,7 +125,6 @@ export default function ServiceDetailPage() {
       const data = await getServiceSchedules(serviceId, from, to);
       setSchedules(data.schedules);
     } catch (err) {
-      console.error('スケジュール取得エラー:', err);
     } finally {
       setSchedulesLoading(false);
     }
@@ -224,7 +220,6 @@ export default function ServiceDetailPage() {
       // 予約一覧ページへ遷移
       router.push('/user/reservations?success=true');
     } catch (err: any) {
-      console.error('予約エラー:', err);
       setError('予約に失敗しました。もう一度お試しください。');
     } finally {
       setReserving(false);
@@ -265,7 +260,7 @@ export default function ServiceDetailPage() {
             variant="outline"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            サービス一覧に戻る
+            商品一覧に戻る
           </Button>
         </div>
       </div>
@@ -286,7 +281,7 @@ export default function ServiceDetailPage() {
           className="mb-4"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          サービス一覧に戻る
+          商品一覧に戻る
         </Button>
 
         {/* サービス情報 */}
@@ -351,7 +346,7 @@ export default function ServiceDetailPage() {
         {instructor && (
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              クリエイター情報
+              出品者情報
             </h2>
             <div className="flex items-start gap-4">
               {instructor.profileImage && (

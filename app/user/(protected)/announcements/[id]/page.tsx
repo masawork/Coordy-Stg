@@ -23,7 +23,6 @@ export default function AnnouncementDetailPage({ params }: { params: { id: strin
       const data = await getAnnouncement(params.id);
       setAnnouncement(data);
     } catch (err: any) {
-      console.error('Load announcement error:', err);
       setError(err.message);
     } finally {
       setLoading(false);

@@ -35,7 +35,6 @@ function ReservationsContent() {
       const reservationData = await listReservations({ userId: session.user.id });
       setReservations(reservationData || []);
     } catch (err) {
-      console.error('予約一覧取得エラー:', err);
       setReservations([]);
     } finally {
       setLoading(false);
@@ -53,7 +52,6 @@ function ReservationsContent() {
       await cancelReservation(reservationId);
       await loadReservations();
     } catch (err) {
-      console.error('予約キャンセルエラー:', err);
       alert('キャンセルに失敗しました');
     } finally {
       setCancelingId(null);
@@ -108,7 +106,7 @@ function ReservationsContent() {
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
             <p className="text-green-600 font-medium">予約が完了しました！</p>
             <p className="text-green-600 text-sm mt-1">
-              クリエイターからの確認をお待ちください。
+              出品者からの確認をお待ちください。
             </p>
           </div>
         )}
@@ -129,7 +127,7 @@ function ReservationsContent() {
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">
-                      {reservation.service?.title || 'サービス'}
+                      {reservation.service?.title || '商品'}
                     </h3>
                     {getStatusBadge(reservation.status)}
                   </div>
@@ -151,13 +149,13 @@ function ReservationsContent() {
                   <div className="flex items-center gap-2 text-gray-600">
                     <Clock className="h-4 w-4" />
                     <span className="text-sm">
-                      {reservation.service?.duration || 0}分のサービス
+                      {reservation.service?.duration || 0}分
                     </span>
                   </div>
                   {reservation.instructor?.user && (
                     <div className="flex items-center gap-2 text-gray-600">
                       <span className="text-sm">
-                        インストラクター: {reservation.instructor.user.name}
+                        出品者: {reservation.instructor.user.name}
                       </span>
                     </div>
                   )}
@@ -197,7 +195,7 @@ function ReservationsContent() {
               onClick={() => router.push('/services')}
               className="bg-purple-600 hover:bg-purple-700"
             >
-              サービスを探す
+              商品を探す
             </Button>
           </div>
         )}

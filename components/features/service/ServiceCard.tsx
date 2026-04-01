@@ -55,7 +55,6 @@ export function ServiceCard({ service, linkPrefix = '/user/services' }: ServiceC
           }
         } catch (err) {
           // 未ログイン時などはエラーを無視
-          console.error('お気に入り確認エラー:', err);
         }
       }
     };
@@ -80,8 +79,14 @@ export function ServiceCard({ service, linkPrefix = '/user/services' }: ServiceC
         setIsFavorite(true);
         setFavoriteId(result?.id || null);
       }
-    } catch (err) {
-      console.error('お気に入り操作エラー:', err);
+    } catch {
+      // 失敗時はUI状態を元に戻す
+      if (isFavorite) {
+        setIsFavorite(true);
+      } else {
+        setIsFavorite(false);
+        setFavoriteId(null);
+      }
     } finally {
       setLoading(false);
     }

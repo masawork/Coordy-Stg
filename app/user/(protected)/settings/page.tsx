@@ -36,7 +36,6 @@ export default function SettingsPage() {
       const profileData = await getClientProfile(userId);
       setProfile(profileData);
     } catch (err) {
-      console.error('プロフィール取得エラー:', err);
     } finally {
       setLoading(false);
     }
@@ -52,7 +51,6 @@ export default function SettingsPage() {
       clearSession();
       router.push('/login/user');
     } catch (error) {
-      console.error('ログアウトエラー:', error);
     }
   };
 

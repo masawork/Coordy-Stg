@@ -44,7 +44,6 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
         setUser(user);
         setLoading(false);
       } catch (error) {
-        console.error('認証チェックエラー:', error);
         router.push('/manage/login?next=/manage/admin');
       }
     };

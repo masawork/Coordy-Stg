@@ -33,7 +33,6 @@ export default function PendingChargesPage() {
       const data = await listPendingCharges();
       setCharges(data || []);
     } catch (err) {
-      console.error('承認待ちチャージ取得エラー:', err);
       setCharges([]);
     } finally {
       setLoading(false);
@@ -51,7 +50,6 @@ export default function PendingChargesPage() {
       await approveCharge(transactionId);
       await loadPendingCharges();
     } catch (err: any) {
-      console.error('承認エラー:', err);
       alert(err.message || '承認に失敗しました');
     } finally {
       setProcessingId(null);
@@ -69,7 +67,6 @@ export default function PendingChargesPage() {
       await rejectCharge(transactionId);
       await loadPendingCharges();
     } catch (err) {
-      console.error('却下エラー:', err);
       alert('却下に失敗しました');
     } finally {
       setProcessingId(null);

@@ -38,7 +38,6 @@ export default function IdentityDocumentPage() {
 
       setInstructor(data);
     } catch (err: any) {
-      console.error('インストラクター情報の読み込みエラー:', err);
       setError(err.message || '情報の読み込みに失敗しました');
     } finally {
       setLoading(false);
@@ -71,8 +70,6 @@ export default function IdentityDocumentPage() {
       setUploading(true);
       setError('');
 
-      console.log('📤 身分証明書アップロード開始...');
-
       // TODO: Supabase Storageにアップロードする実装が必要
       // 現在は一時的にファイル名のみ保存
       const session = await getSession();
@@ -91,9 +88,6 @@ export default function IdentityDocumentPage() {
       // TODO: Supabase Storageにアップロード
       const s3Url = `identity-documents/${session.user.id}/${file.name}`;
 
-      console.log('✅ S3アップロード完了:', s3Url);
-      console.log('📝 インストラクター情報を更新中...');
-
       // インストラクター情報を更新
       // TODO: 身分証明書関連のフィールドはPrismaスキーマに未実装のため一時的にコメントアウト
       // await updateInstructor(instructor.id, {
@@ -101,14 +95,9 @@ export default function IdentityDocumentPage() {
       //   identityDocumentStatus: 'pending',
       //   identityDocumentSubmittedAt: new Date().toISOString(),
       // });
-      console.log('身分証明書アップロード完了（DB更新は未実装）:', s3Url);
-
-      console.log('✅ インストラクター情報の更新完了');
-
       alert('身分証明書を提出しました。審査完了までお待ちください。');
       router.push('/instructor');
     } catch (error: any) {
-      console.error('❌ アップロードエラー:', error);
       setError(error.message || 'アップロードに失敗しました');
     } finally {
       setUploading(false);

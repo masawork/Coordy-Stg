@@ -41,7 +41,6 @@ export default function InstructorAnnouncementsPage() {
       const filtered = data.filter((a) => a.authorId === session.user.id);
       setMyAnnouncements(filtered);
     } catch (err: any) {
-      console.error('Load announcements error:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -69,7 +68,6 @@ export default function InstructorAnnouncementsPage() {
       });
       loadMyAnnouncements();
     } catch (err: any) {
-      console.error('Create announcement error:', err);
       setError(err.message);
     } finally {
       setCreating(false);
@@ -83,7 +81,6 @@ export default function InstructorAnnouncementsPage() {
       await deleteAnnouncement(id);
       loadMyAnnouncements();
     } catch (err: any) {
-      console.error('Delete error:', err);
       alert(err.message);
     }
   };

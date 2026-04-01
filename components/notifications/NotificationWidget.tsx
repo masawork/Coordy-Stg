@@ -23,7 +23,6 @@ export default function NotificationWidget() {
       setNotifications(data);
       setUnreadCount(data.filter((n) => !n.isRead).length);
     } catch (error) {
-      console.error('Load notifications error:', error);
     }
   };
 
@@ -32,7 +31,6 @@ export default function NotificationWidget() {
       await markNotificationAsRead(id);
       loadNotifications();
     } catch (error) {
-      console.error('Mark as read error:', error);
     }
   };
 
@@ -41,7 +39,6 @@ export default function NotificationWidget() {
       await dismissNotification(id);
       loadNotifications();
     } catch (error) {
-      console.error('Dismiss error:', error);
     }
   };
 
@@ -51,7 +48,6 @@ export default function NotificationWidget() {
       await markAllNotificationsAsRead();
       loadNotifications();
     } catch (error) {
-      console.error('Mark all as read error:', error);
     } finally {
       setLoading(false);
     }

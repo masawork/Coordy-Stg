@@ -77,7 +77,6 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
             );
             setUser(authUser);
           } catch (err) {
-            console.error('インストラクタープロフィール取得エラー:', err);
             if (!redirected) {
               setRedirected(true);
               router.push('/instructor/profile/setup');
@@ -95,7 +94,6 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
 
         setLoading(false);
       } catch (error) {
-        console.error('認証チェックエラー:', error);
         setLoading(false);
         if (!redirected) {
           setRedirected(true);

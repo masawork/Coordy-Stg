@@ -36,7 +36,6 @@ export default function AdminAnnouncementsPage() {
       const data = await response.json();
       setAnnouncements(data);
     } catch (err: any) {
-      console.error('Load announcements error:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -64,7 +63,6 @@ export default function AdminAnnouncementsPage() {
       });
       loadAnnouncements();
     } catch (err: any) {
-      console.error('Create announcement error:', err);
       setError(err.message);
     } finally {
       setCreating(false);
@@ -78,7 +76,6 @@ export default function AdminAnnouncementsPage() {
       await publishAnnouncement(id);
       loadAnnouncements();
     } catch (err: any) {
-      console.error('Publish error:', err);
       alert(err.message);
     }
   };
@@ -90,7 +87,6 @@ export default function AdminAnnouncementsPage() {
       await deleteAnnouncement(id);
       loadAnnouncements();
     } catch (err: any) {
-      console.error('Delete error:', err);
       alert(err.message);
     }
   };

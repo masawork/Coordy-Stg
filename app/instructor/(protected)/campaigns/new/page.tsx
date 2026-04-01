@@ -75,7 +75,6 @@ export default function NewCampaignPage() {
       const myServices = await listServices({ instructorId: instructor.id });
       setServices(myServices || []);
     } catch (error) {
-      console.error('Failed to load data:', error);
     }
   };
 
@@ -135,7 +134,6 @@ export default function NewCampaignPage() {
 
       router.push('/instructor/campaigns');
     } catch (err: any) {
-      console.error('Create campaign error:', err);
       setError(err.message || 'キャンペーンの作成に失敗しました');
     } finally {
       setLoading(false);
@@ -202,7 +200,7 @@ export default function NewCampaignPage() {
 
         <div>
           <label htmlFor="serviceId" className="block text-sm font-semibold text-gray-700 mb-2">
-            対象サービス
+            対象商品
           </label>
           <select
             id="serviceId"
@@ -211,7 +209,7 @@ export default function NewCampaignPage() {
             onChange={handleChange}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
           >
-            <option value="">全サービス対象</option>
+            <option value="">全商品対象</option>
             {services.map((service) => (
               <option key={service.id} value={service.id}>
                 {service.title}
@@ -219,7 +217,7 @@ export default function NewCampaignPage() {
             ))}
           </select>
           <p className="text-xs text-gray-500 mt-1">
-            特定のサービスのみ対象にする場合は選択してください
+            特定の商品のみ対象にする場合は選択してください
           </p>
         </div>
 

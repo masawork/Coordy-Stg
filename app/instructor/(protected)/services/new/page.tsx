@@ -122,7 +122,6 @@ export default function NewServicePage() {
 
       setInstructorId(instructor.id);
     } catch (error) {
-      console.error('Failed to load instructor:', error);
       router.push('/login/instructor');
     }
   };
@@ -160,6 +159,20 @@ export default function NewServicePage() {
       setError('対面またはハイブリッドの場合は都道府県を選択してください');
       return;
     }
+    // 数値バリデーション
+    if (parseInt(formData.price) < 0) {
+      setError('価格は0以上で入力してください');
+      return;
+    }
+    if (parseInt(formData.duration) < 1) {
+      setError('所要時間は1分以上で入力してください');
+      return;
+    }
+    if (parseInt(formData.maxParticipants) < 1) {
+      setError('定員は1人以上で入力してください');
+      return;
+    }
+
     // スケジュールバリデーション
     if (formData.recurrenceType !== 'ONCE') {
       if (formData.availableDays.length === 0) {
@@ -170,6 +183,14 @@ export default function NewServicePage() {
         setError('繰り返し出品の場合は開始・終了時間を入力してください');
         return;
       }
+      if (formData.startTime >= formData.endTime) {
+        setError('終了時間は開始時間より後に設定してください');
+        return;
+      }
+    }
+    if (formData.validFrom && formData.validUntil && formData.validFrom > formData.validUntil) {
+      setError('有効期間の終了日は開始日より後に設定してください');
+      return;
     }
 
     setLoading(true);
@@ -208,16 +229,21 @@ export default function NewServicePage() {
           const imgFormData = new FormData();
           imgFormData.append('file', pendingImages[i]);
           imgFormData.append('sortOrder', String(i));
-          await fetch(`/api/services/${createdService.id}/images`, {
+          const imgRes = await fetch(`/api/services/${createdService.id}/images`, {
             method: 'POST',
             body: imgFormData,
           });
+          if (!imgRes.ok) {
+            const imgError = await imgRes.json().catch(() => ({}));
+            setError(`画像${i + 1}のアップロードに失敗しました: ${imgError.error || '不明なエラー'}`);
+            // Continue to redirect even if image upload fails -- service was already created
+            break;
+          }
         }
       }
 
       router.push('/instructor/services');
     } catch (err: any) {
-      console.error('Create service error:', err);
       setError(err.message || '出品に失敗しました');
     } finally {
       setLoading(false);
@@ -308,6 +334,7 @@ export default function NewServicePage() {
               inputMode="numeric"
               id="duration"
               name="duration"
+              min="1"
               value={formData.duration}
               onChange={handleChange}
               required
@@ -506,6 +533,7 @@ export default function NewServicePage() {
                 inputMode="numeric"
                 id="maxParticipants"
                 name="maxParticipants"
+                min="1"
                 value={formData.maxParticipants}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
@@ -524,6 +552,7 @@ export default function NewServicePage() {
             inputMode="numeric"
             id="price"
             name="price"
+            min="0"
             value={formData.price}
             onChange={handleChange}
             required

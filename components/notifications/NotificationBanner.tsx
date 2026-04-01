@@ -26,7 +26,6 @@ export default function NotificationBanner() {
 
         setNotification(topNotification);
       } catch (error) {
-        console.error('Load top priority notification error:', error);
       }
     };
     loadTopPriorityNotification();
@@ -39,7 +38,6 @@ export default function NotificationBanner() {
       await dismissNotification(notification.id);
       setNotification(null);
     } catch (error) {
-      console.error('Dismiss error:', error);
     }
   };
 
