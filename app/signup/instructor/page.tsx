@@ -89,19 +89,14 @@ export default function SignupInstructorPage() {
       // サインアップ成功後、メール認証が必要な場合は確認ページへ
       const session = await getSession();
       if (session?.user) {
-        console.log('✅ インストラクター登録成功、ログイン済み');
         window.location.href = '/instructor';
       } else {
         // メール認証が必要な場合
-        console.log('✅ インストラクター登録成功、メール認証が必要です');
         router.push(`/verify?email=${encodeURIComponent(email)}`);
       }
     } catch (err: any) {
       console.error('Signup error:', err);
-      console.error('Error details:', err.details);
-      console.error('Error message:', err.message);
-      console.error('Full error object:', JSON.stringify(err, null, 2));
-      
+
       // エラーメッセージを日本語化
       let friendlyMessage = '登録に失敗しました。';
       let errorDetails = '';
@@ -181,7 +176,7 @@ export default function SignupInstructorPage() {
       >
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">インストラクター新規登録</h1>
-          <p className="text-gray-600">サービスを提供する方の登録</p>
+          <p className="text-gray-600">商品を出品する方の登録</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

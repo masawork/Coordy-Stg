@@ -101,7 +101,6 @@ export default function SchedulesPage() {
       setCategories(uniqueCategories);
       setInstructors(uniqueInstructors);
     } catch (err: any) {
-      console.error('スケジュール取得エラー:', err);
       setError('スケジュールの取得に失敗しました');
     } finally {
       setLoading(false);
@@ -223,7 +222,7 @@ export default function SchedulesPage() {
             <CalendarDays className="h-6 w-6 text-purple-600" />
             スケジュール一覧
           </h1>
-          <p className="text-gray-600 mt-1">開催中のサービスをカレンダーで確認できます</p>
+          <p className="text-gray-600 mt-1">開催中の商品をカレンダーで確認できます</p>
         </div>
 
         {/* コントロールバー */}
@@ -315,7 +314,7 @@ export default function SchedulesPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   <User className="h-4 w-4 inline mr-1" />
-                  クリエイター
+                  出品者
                 </label>
                 <select
                   value={selectedInstructor}

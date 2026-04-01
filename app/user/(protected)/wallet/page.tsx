@@ -13,6 +13,7 @@ import {
   reportBankTransferComplete,
 } from '@/lib/api/wallet-client';
 import { Button } from '@/components/ui/button';
+import { handleNumericInput } from '@/lib/utils/number';
 import { Building2, Eye, ArrowDownCircle, ArrowUpCircle, AlertTriangle, CheckCircle2, Clock, Send, X } from 'lucide-react';
 
 export default function WalletPage() {
@@ -64,7 +65,6 @@ export default function WalletPage() {
       );
       setPendingTransfers(pending);
     } catch (err) {
-      console.error('ウォレットデータ読み込みエラー:', err);
     } finally {
       setLoading(false);
     }
@@ -120,7 +120,6 @@ export default function WalletPage() {
       // データを再読み込み
       await loadWalletData();
     } catch (err: any) {
-      console.error('振込完了報告エラー:', err);
       setError(err.message || '振込完了報告に失敗しました。');
     } finally {
       setSubmittingTransfer(false);
@@ -179,7 +178,7 @@ export default function WalletPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">ポイントウォレット</h1>
           <p className="mt-2 text-gray-600">
-            ポイントをチャージして、サービスを予約できます
+            ポイントをチャージして、商品を購入できます
           </p>
         </div>
 
@@ -219,13 +218,12 @@ export default function WalletPage() {
                   チャージ額（円）
                 </label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   id="amount"
                   value={chargeAmount}
-                  onChange={(e) => setChargeAmount(e.target.value)}
+                  onChange={(e) => setChargeAmount(handleNumericInput(e.target.value))}
                   placeholder="1000"
-                  min="1000"
-                  step="1000"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
                 <p className="text-xs text-gray-500 mt-1">最低チャージ額: 1,000円（1円 = 1ポイント）</p>

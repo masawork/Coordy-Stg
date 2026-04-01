@@ -74,7 +74,7 @@ export async function getServiceSchedules(
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || 'スケジュールの取得に失敗しました');
+    throw new Error(error.error?.message || error.error || 'スケジュールの取得に失敗しました');
   }
 
   return response.json();
@@ -106,7 +106,7 @@ export async function getSchedules(options?: {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || 'スケジュールの取得に失敗しました');
+    throw new Error(error.error?.message || error.error || 'スケジュールの取得に失敗しました');
   }
 
   return response.json();
@@ -132,7 +132,7 @@ export async function createSchedule(data: {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || 'スケジュールの作成に失敗しました');
+    throw new Error(error.error?.message || error.error || 'スケジュールの作成に失敗しました');
   }
 
   return response.json();

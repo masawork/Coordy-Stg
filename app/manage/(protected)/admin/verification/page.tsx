@@ -68,7 +68,6 @@ export default function VerificationManagementPage() {
         rejected: data.rejected,
       });
     } catch (error) {
-      console.error('Load requests error:', error);
     } finally {
       setLoading(false);
     }

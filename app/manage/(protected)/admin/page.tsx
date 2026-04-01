@@ -55,7 +55,6 @@ export default function AdminDashboardPage() {
         setUserData(userRes);
         setInstructorData(instructorRes);
       } catch (err: any) {
-        console.error(err);
         setError(err.message || 'データ取得に失敗しました');
       } finally {
         setLoading(false);
@@ -301,7 +300,7 @@ export default function AdminDashboardPage() {
     <div className="space-y-10">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">管理者ダッシュボード</h1>
-        <p className="mt-2 text-gray-600">ユーザーとインストラクターの本人確認を管理します</p>
+        <p className="mt-2 text-gray-600">ユーザーと出品者の本人確認を管理します</p>
       </div>
 
       {error && (
@@ -312,7 +311,7 @@ export default function AdminDashboardPage() {
 
       <div className="space-y-12">
         {renderSection(userData, 'ユーザー本人確認')}
-        {renderSection(instructorData, 'インストラクター本人確認')}
+        {renderSection(instructorData, '出品者本人確認')}
       </div>
     </div>
   );

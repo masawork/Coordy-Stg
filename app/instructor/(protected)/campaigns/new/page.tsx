@@ -11,6 +11,7 @@ import { createCampaign, CampaignType } from '@/lib/api/campaigns';
 import { listServices } from '@/lib/api/services';
 import { getSession } from '@/lib/auth';
 import { fetchCurrentInstructor } from '@/lib/api/instructors-client';
+import { handleNumericInput } from '@/lib/utils/number';
 
 const campaignTypes: { value: CampaignType; label: string; description: string }[] = [
   { value: 'PERCENT_OFF', label: '割引率', description: '価格から指定した割合を割引' },
@@ -74,17 +75,19 @@ export default function NewCampaignPage() {
       const myServices = await listServices({ instructorId: instructor.id });
       setServices(myServices || []);
     } catch (error) {
-      console.error('Failed to load data:', error);
     }
   };
+
+  const numericFields = ['discountPercent', 'discountAmount', 'fixedPrice', 'earlyBirdDays', 'maxUsagePerUser', 'maxTotalUsage'];
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value, type } = e.target;
+    const sanitizedValue = numericFields.includes(name) ? handleNumericInput(value) : value;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
+      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : sanitizedValue,
     }));
   };
 
@@ -131,7 +134,6 @@ export default function NewCampaignPage() {
 
       router.push('/instructor/campaigns');
     } catch (err: any) {
-      console.error('Create campaign error:', err);
       setError(err.message || 'キャンペーンの作成に失敗しました');
     } finally {
       setLoading(false);
@@ -198,7 +200,7 @@ export default function NewCampaignPage() {
 
         <div>
           <label htmlFor="serviceId" className="block text-sm font-semibold text-gray-700 mb-2">
-            対象サービス
+            対象商品
           </label>
           <select
             id="serviceId"
@@ -207,7 +209,7 @@ export default function NewCampaignPage() {
             onChange={handleChange}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
           >
-            <option value="">全サービス対象</option>
+            <option value="">全商品対象</option>
             {services.map((service) => (
               <option key={service.id} value={service.id}>
                 {service.title}
@@ -215,7 +217,7 @@ export default function NewCampaignPage() {
             ))}
           </select>
           <p className="text-xs text-gray-500 mt-1">
-            特定のサービスのみ対象にする場合は選択してください
+            特定の商品のみ対象にする場合は選択してください
           </p>
         </div>
 
@@ -264,7 +266,7 @@ export default function NewCampaignPage() {
                   割引率 (%) <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="number"
+                  type="text" inputMode="numeric"
                   id="discountPercent"
                   name="discountPercent"
                   value={formData.discountPercent}
@@ -283,7 +285,7 @@ export default function NewCampaignPage() {
                   割引額 (円) <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="number"
+                  type="text" inputMode="numeric"
                   id="discountAmount"
                   name="discountAmount"
                   value={formData.discountAmount}
@@ -301,7 +303,7 @@ export default function NewCampaignPage() {
                   体験価格 (円) <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="number"
+                  type="text" inputMode="numeric"
                   id="fixedPrice"
                   name="fixedPrice"
                   value={formData.fixedPrice}
@@ -319,7 +321,7 @@ export default function NewCampaignPage() {
                   早期予約日数
                 </label>
                 <input
-                  type="number"
+                  type="text" inputMode="numeric"
                   id="earlyBirdDays"
                   name="earlyBirdDays"
                   value={formData.earlyBirdDays}
@@ -383,7 +385,7 @@ export default function NewCampaignPage() {
                 1人あたりの利用上限
               </label>
               <input
-                type="number"
+                type="text" inputMode="numeric"
                 id="maxUsagePerUser"
                 name="maxUsagePerUser"
                 value={formData.maxUsagePerUser}
@@ -398,7 +400,7 @@ export default function NewCampaignPage() {
                 総利用回数上限
               </label>
               <input
-                type="number"
+                type="text" inputMode="numeric"
                 id="maxTotalUsage"
                 name="maxTotalUsage"
                 value={formData.maxTotalUsage}

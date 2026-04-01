@@ -4,7 +4,14 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import {
+  Elements,
+  CardNumberElement,
+  CardExpiryElement,
+  CardCvcElement,
+  useStripe,
+  useElements,
+} from '@stripe/react-stripe-js';
 import { Button } from '@/components/ui/button';
 import { getPaymentMethods, createPaymentMethod, deletePaymentMethod, setDefaultPaymentMethod, PaymentMethod } from '@/lib/api/payment-client';
 
@@ -30,8 +37,8 @@ function CardRegistrationForm({ onSuccess }: { onSuccess: () => void }) {
       return;
     }
 
-    const cardElement = elements.getElement(CardElement);
-    if (!cardElement) {
+    const cardNumberElement = elements.getElement(CardNumberElement);
+    if (!cardNumberElement) {
       return;
     }
 
@@ -41,7 +48,7 @@ function CardRegistrationForm({ onSuccess }: { onSuccess: () => void }) {
       // Stripe Payment Methodを作成
       const { error: stripeError, paymentMethod } = await stripe.createPaymentMethod({
         type: 'card',
-        card: cardElement,
+        card: cardNumberElement,
         billing_details: {
           name: cardholderName.trim(),
         },
@@ -56,7 +63,6 @@ function CardRegistrationForm({ onSuccess }: { onSuccess: () => void }) {
 
       onSuccess();
     } catch (err: any) {
-      console.error('Card registration error:', err);
       setError(err.message || 'カードの登録に失敗しました');
     } finally {
       setLoading(false);
@@ -85,24 +91,65 @@ function CardRegistrationForm({ onSuccess }: { onSuccess: () => void }) {
         <p className="mt-1 text-xs text-gray-500">カードに記載されている名前（ローマ字）</p>
       </div>
 
-      <div className="p-4 border border-gray-300 rounded-md">
-        <CardElement
-          options={{
-            hidePostalCode: true, // 日本向けサービスでは郵便番号不要
-            style: {
-              base: {
-                fontSize: '16px',
-                color: '#424770',
-                '::placeholder': {
-                  color: '#aab7c4',
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          カード番号
+        </label>
+        <div className="p-3 border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-transparent">
+          <CardNumberElement
+            options={{
+              style: {
+                base: {
+                  fontSize: '16px',
+                  color: '#424770',
+                  '::placeholder': { color: '#aab7c4' },
                 },
+                invalid: { color: '#9e2146' },
               },
-              invalid: {
-                color: '#9e2146',
-              },
-            },
-          }}
-        />
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            有効期限
+          </label>
+          <div className="p-3 border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-transparent">
+            <CardExpiryElement
+              options={{
+                style: {
+                  base: {
+                    fontSize: '16px',
+                    color: '#424770',
+                    '::placeholder': { color: '#aab7c4' },
+                  },
+                  invalid: { color: '#9e2146' },
+                },
+              }}
+            />
+          </div>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            セキュリティコード（CVC）
+          </label>
+          <div className="p-3 border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-transparent">
+            <CardCvcElement
+              options={{
+                style: {
+                  base: {
+                    fontSize: '16px',
+                    color: '#424770',
+                    '::placeholder': { color: '#aab7c4' },
+                  },
+                  invalid: { color: '#9e2146' },
+                },
+              }}
+            />
+          </div>
+        </div>
       </div>
 
       <p className="text-xs text-gray-500">
@@ -136,7 +183,6 @@ export default function PaymentMethodsPage() {
       const methods = await getPaymentMethods();
       setPaymentMethods(methods);
     } catch (err: any) {
-      console.error('Load payment methods error:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -152,7 +198,6 @@ export default function PaymentMethodsPage() {
       await deletePaymentMethod(id);
       loadPaymentMethods();
     } catch (err: any) {
-      console.error('Delete error:', err);
       alert(err.message);
     }
   };
@@ -162,7 +207,6 @@ export default function PaymentMethodsPage() {
       await setDefaultPaymentMethod(id);
       loadPaymentMethods();
     } catch (err: any) {
-      console.error('Set default error:', err);
       alert(err.message);
     }
   };

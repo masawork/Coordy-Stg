@@ -32,7 +32,7 @@ export default function AdminLoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'ログインに失敗しました');
+        throw new Error(data.error?.message || data.error || 'ログインに失敗しました');
       }
 
       // ログイン成功後、管理者かどうか確認

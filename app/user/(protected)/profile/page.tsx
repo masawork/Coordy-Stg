@@ -49,7 +49,6 @@ export default function ProfilePage() {
           }
         }
       } catch (err) {
-        console.error('check-role error:', err);
       }
       setLoading(false);
     };
@@ -61,7 +60,6 @@ export default function ProfilePage() {
       const profileData = await getClientProfile(clientId);
       setProfile(profileData);
     } catch (err) {
-      console.error('プロフィール読み込みエラー:', err);
     } finally {
       setLoading(false);
     }

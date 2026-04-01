@@ -76,22 +76,20 @@ export default function InstructorServicesPage() {
         setBankAccounts(accounts);
         hasAccount = accounts.length > 0;
       } catch (err: any) {
-        console.error('Bank account load error:', err);
         hasAccount = false;
       }
       setHasBankAccount(hasAccount);
 
       if (!approved) {
-        setPrereqError('本人確認が未承認のため、サービスを作成できません。');
+        setPrereqError('本人確認が未承認のため、出品できません。');
       } else if (!hasAccount) {
-        setPrereqError('銀行口座が未登録のため、サービスを作成できません。');
+        setPrereqError('銀行口座が未登録のため、出品できません。');
       }
 
       // 自分のサービスのみ取得
       const myServices = await listServices({ instructorId: instructor.id });
       setServices(myServices || []);
     } catch (error) {
-      console.error('Failed to load services:', error);
       setServices([]);
     } finally {
       setLoading(false);
@@ -99,7 +97,7 @@ export default function InstructorServicesPage() {
   };
 
   const handleDelete = async (serviceId: string) => {
-    if (!confirm('このサービスを削除しますか？')) {
+    if (!confirm('この出品を削除しますか？')) {
       return;
     }
 
@@ -107,8 +105,7 @@ export default function InstructorServicesPage() {
       await deleteService(serviceId);
       await loadServices();
     } catch (error) {
-      console.error('Failed to delete service:', error);
-      alert('サービスの削除に失敗しました');
+      alert('出品の削除に失敗しました');
     }
   };
 
@@ -124,8 +121,8 @@ export default function InstructorServicesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">サービス管理</h1>
-          <p className="text-sm text-gray-600 mt-1">提供するサービスを管理します</p>
+          <h1 className="text-2xl font-bold text-gray-900">出品管理</h1>
+          <p className="text-sm text-gray-600 mt-1">出品中の商品を管理します</p>
         </div>
         <Link href="/instructor/services/new">
         <Button
@@ -134,7 +131,7 @@ export default function InstructorServicesPage() {
           title={!identityApproved ? '本人確認の承認が必要です' : !hasBankAccount ? '銀行口座登録が必要です' : undefined}
         >
           <Plus className="h-4 w-4 mr-2" />
-          新規サービス作成
+          出品する
         </Button>
         </Link>
       </div>
@@ -165,15 +162,15 @@ export default function InstructorServicesPage() {
         <div className="bg-white rounded-lg shadow p-12 text-center">
           <Package className="h-16 w-16 mx-auto text-gray-300 mb-4" />
           <h2 className="text-xl font-semibold text-gray-700 mb-2">
-            サービスがまだありません
+            まだ出品がありません
           </h2>
           <p className="text-gray-500 mb-6">
-            最初のサービスを作成して、顧客への提供を開始しましょう。
+            最初の商品を出品して、販売を開始しましょう。
           </p>
           <Link href="/instructor/services/new">
           <Button className="bg-green-600 hover:bg-green-700">
             <Plus className="h-4 w-4 mr-2" />
-            サービスを作成
+            出品する
           </Button>
           </Link>
         </div>
@@ -183,7 +180,7 @@ export default function InstructorServicesPage() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  サービス名
+                  商品名
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   カテゴリ

@@ -91,7 +91,7 @@ export async function listCampaigns(filters?: {
   const res = await fetch(`/api/campaigns?${params.toString()}`, { cache: 'no-store' });
   const data = await parseJson(res);
   if (!res.ok) {
-    throw new Error(data.error || 'キャンペーン一覧の取得に失敗しました');
+    throw new Error(data.error?.message || data.error || 'キャンペーン一覧の取得に失敗しました');
   }
   return data;
 }
@@ -103,7 +103,7 @@ export async function getCampaign(id: string): Promise<Campaign> {
   const res = await fetch(`/api/campaigns/${id}`, { cache: 'no-store' });
   const data = await parseJson(res);
   if (!res.ok) {
-    throw new Error(data.error || 'キャンペーンの取得に失敗しました');
+    throw new Error(data.error?.message || data.error || 'キャンペーンの取得に失敗しました');
   }
   return data;
 }
@@ -119,7 +119,7 @@ export async function createCampaign(input: CampaignInput): Promise<Campaign> {
   });
   const data = await parseJson(res);
   if (!res.ok) {
-    throw new Error(data.error || 'キャンペーンの作成に失敗しました');
+    throw new Error(data.error?.message || data.error || 'キャンペーンの作成に失敗しました');
   }
   return data;
 }
@@ -138,7 +138,7 @@ export async function updateCampaign(
   });
   const data = await parseJson(res);
   if (!res.ok) {
-    throw new Error(data.error || 'キャンペーンの更新に失敗しました');
+    throw new Error(data.error?.message || data.error || 'キャンペーンの更新に失敗しました');
   }
   return data;
 }
@@ -150,7 +150,7 @@ export async function deleteCampaign(id: string): Promise<void> {
   const res = await fetch(`/api/campaigns/${id}`, { method: 'DELETE' });
   const data = await parseJson(res);
   if (!res.ok) {
-    throw new Error(data.error || 'キャンペーンの削除に失敗しました');
+    throw new Error(data.error?.message || data.error || 'キャンペーンの削除に失敗しました');
   }
 }
 

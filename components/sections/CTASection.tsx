@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import Button from '../common/Button';
@@ -8,13 +8,17 @@ import { getSession } from '@/lib/auth';
 
 export default function CTASection() {
   const [session, setSession] = useState<any | null>(null);
+  const mountedRef = useRef(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    mountedRef.current = true;
+    queueMicrotask(() => setMounted(true));
     const checkSession = async () => {
       const currentSession = await getSession();
-      setSession(currentSession?.user || null);
+      if (mountedRef.current) {
+        setSession(currentSession?.user || null);
+      }
     };
     checkSession();
   }, []);
@@ -26,7 +30,7 @@ export default function CTASection() {
     return '/signup/user';
   };
 
-  // サービス出品者ボタンの遷移先を決定
+  // 出品者ボタンの遷移先を決定
   const getInstructorButtonHref = () => {
     if (!mounted || !session) return '/signup/instructor';
     if (session.user_metadata?.role?.toLowerCase() === 'instructor') return '/instructor';
@@ -40,7 +44,7 @@ export default function CTASection() {
   };
 
   const getInstructorButtonText = () => {
-    return 'サービス出品者の新規登録はこちら';
+    return '出品者の新規登録はこちら';
   };
 
   return (

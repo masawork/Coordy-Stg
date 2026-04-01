@@ -66,7 +66,7 @@ export async function createPaymentMethod(paymentMethodId: string): Promise<Paym
   if (!response.ok) {
     const error = await response.json();
     console.error('Create payment method error:', error);
-    throw new Error(error.details || error.error || 'カードの登録に失敗しました');
+    throw new Error(error.error?.message || error.details || error.error || 'カードの登録に失敗しました');
   }
 
   return await response.json();
@@ -83,7 +83,7 @@ export async function deletePaymentMethod(paymentMethodId: string): Promise<void
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || 'カードの削除に失敗しました');
+    throw new Error(error.error?.message || error.error || 'カードの削除に失敗しました');
   }
 }
 
@@ -98,7 +98,7 @@ export async function setDefaultPaymentMethod(paymentMethodId: string): Promise<
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || 'デフォルトカードの設定に失敗しました');
+    throw new Error(error.error?.message || error.error || 'デフォルトカードの設定に失敗しました');
   }
 
   return await response.json();

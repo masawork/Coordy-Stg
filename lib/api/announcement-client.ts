@@ -65,7 +65,7 @@ export async function getAnnouncement(id: string): Promise<Announcement> {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || 'お知らせの取得に失敗しました');
+    throw new Error(error.error?.message || error.error || 'お知らせの取得に失敗しました');
   }
 
   return await response.json();
@@ -91,7 +91,7 @@ export async function createAnnouncement(data: {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || 'お知らせの作成に失敗しました');
+    throw new Error(error.error?.message || error.error || 'お知らせの作成に失敗しました');
   }
 
   return await response.json();
@@ -114,7 +114,7 @@ export async function updateAnnouncement(
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || 'お知らせの更新に失敗しました');
+    throw new Error(error.error?.message || error.error || 'お知らせの更新に失敗しました');
   }
 
   return await response.json();
@@ -130,7 +130,7 @@ export async function deleteAnnouncement(id: string): Promise<void> {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || 'お知らせの削除に失敗しました');
+    throw new Error(error.error?.message || error.error || 'お知らせの削除に失敗しました');
   }
 }
 
@@ -144,7 +144,7 @@ export async function publishAnnouncement(id: string): Promise<Announcement> {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || 'お知らせの公開に失敗しました');
+    throw new Error(error.error?.message || error.error || 'お知らせの公開に失敗しました');
   }
 
   return await response.json();

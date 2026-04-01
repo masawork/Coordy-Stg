@@ -48,7 +48,6 @@ export default function FavoritesPage() {
         setServices(favoriteServices);
       }
     } catch (err) {
-      console.error('お気に入り取得エラー:', err);
       setFavorites([]);
       setServices([]);
     } finally {
@@ -57,7 +56,7 @@ export default function FavoritesPage() {
   };
 
   const handleRemove = async (instructorId: string) => {
-    if (!confirm('このクリエイターをお気に入りから削除しますか？')) {
+    if (!confirm('この出品者をお気に入りから削除しますか？')) {
       return;
     }
 
@@ -70,7 +69,6 @@ export default function FavoritesPage() {
       await removeFavoriteCreator(session.user.id, instructorId);
       await loadFavorites();
     } catch (err) {
-      console.error('お気に入り削除エラー:', err);
       alert('削除に失敗しました');
     } finally {
       setRemovingId(null);
@@ -83,7 +81,7 @@ export default function FavoritesPage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">お気に入り</h1>
         <p className="mt-2 text-gray-600">
-          お気に入りのクリエイターとサービスを管理できます
+          お気に入りの出品者と商品を管理できます
         </p>
       </div>
 
@@ -97,7 +95,7 @@ export default function FavoritesPage() {
             {/* お気に入りクリエイター一覧 */}
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                お気に入りクリエイター
+                お気に入り出品者
               </h2>
 
               {favorites.length > 0 ? (
@@ -111,7 +109,7 @@ export default function FavoritesPage() {
                         <div className="flex items-start gap-3 flex-1">
                           <div className="flex-1">
                             <h3 className="font-semibold text-lg text-gray-900">
-                              {favorite.instructor?.user?.name || 'インストラクター'}
+                              {favorite.instructor?.user?.name || '出品者'}
                             </h3>
                             {favorite.instructor?.bio && (
                               <p className="text-gray-600 text-sm mt-1 line-clamp-2">
@@ -149,13 +147,13 @@ export default function FavoritesPage() {
                 <div className="text-center py-8">
                   <Heart className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                   <p className="text-gray-500 mb-4">
-                    お気に入りのクリエイターがまだいません
+                    お気に入りの出品者がまだいません
                   </p>
                   <Button
                     onClick={() => router.push('/services')}
                     className="bg-purple-600 hover:bg-purple-700"
                   >
-                    サービスを探す
+                    商品を探す
                   </Button>
                 </div>
               )}
@@ -165,7 +163,7 @@ export default function FavoritesPage() {
             {services.length > 0 && (
               <div className="bg-white rounded-lg shadow p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                  お気に入りクリエイターのサービス
+                  お気に入り出品者の商品
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {services.map((service) => (

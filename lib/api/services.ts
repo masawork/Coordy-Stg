@@ -104,7 +104,7 @@ export async function searchServices(filters?: ServiceSearchFilters): Promise<Se
   const res = await fetch(`/api/services?${params.toString()}`, { cache: 'no-store' });
   const data = await parseJson(res);
   if (!res.ok) {
-    throw new Error(data.error || 'サービス一覧の取得に失敗しました');
+    throw new Error(data.error?.message || data.error || 'サービス一覧の取得に失敗しました');
   }
   return data as ServiceSearchResult;
 }
@@ -129,7 +129,7 @@ export async function getService(id: string) {
   const res = await fetch(`/api/services/${id}`, { cache: 'no-store' });
   const data = await parseJson(res);
   if (!res.ok) {
-    throw new Error(data.error || 'サービスの取得に失敗しました');
+    throw new Error(data.error?.message || data.error || 'サービスの取得に失敗しました');
   }
   return data;
 }
@@ -145,7 +145,7 @@ export async function createService(input: ServiceInput) {
   });
   const data = await parseJson(res);
   if (!res.ok) {
-    throw new Error(data.error || 'サービスの作成に失敗しました');
+    throw new Error(data.error?.message || data.error || 'サービスの作成に失敗しました');
   }
   return data;
 }
@@ -164,7 +164,7 @@ export async function updateService(
   });
   const data = await parseJson(res);
   if (!res.ok) {
-    throw new Error(data.error || 'サービスの更新に失敗しました');
+    throw new Error(data.error?.message || data.error || 'サービスの更新に失敗しました');
   }
   return data;
 }
@@ -176,7 +176,7 @@ export async function deleteService(id: string) {
   const res = await fetch(`/api/services/${id}`, { method: 'DELETE' });
   const data = await parseJson(res);
   if (!res.ok) {
-    throw new Error(data.error || 'サービスの削除に失敗しました');
+    throw new Error(data.error?.message || data.error || 'サービスの削除に失敗しました');
   }
   return data;
 }
@@ -208,7 +208,7 @@ export async function cloneService(id: string, overrides?: CloneServiceInput) {
   });
   const data = await parseJson(res);
   if (!res.ok) {
-    throw new Error(data.error || 'サービスの複製に失敗しました');
+    throw new Error(data.error?.message || data.error || 'サービスの複製に失敗しました');
   }
   return data;
 }

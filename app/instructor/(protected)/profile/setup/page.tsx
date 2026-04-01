@@ -88,7 +88,6 @@ export default function InstructorProfileSetupPage() {
         }));
       }
     } catch (err: any) {
-      console.error('インストラクター情報の読み込みエラー:', err);
       router.push('/login/instructor');
     } finally {
       setInitialLoading(false);
@@ -127,7 +126,6 @@ export default function InstructorProfileSetupPage() {
 
       router.push('/instructor');
     } catch (err: any) {
-      console.error('インストラクタープロフィール保存エラー:', err);
       setError(err?.message || 'プロフィールの保存に失敗しました。');
     } finally {
       setLoading(false);
@@ -150,10 +148,10 @@ export default function InstructorProfileSetupPage() {
       <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-lg shadow p-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            プロフィール設定（サービス出品者）
+            プロフィール設定（出品者）
           </h1>
           <p className="text-sm text-gray-600 mb-6">
-            サービス提供に必要な基本情報を入力してください。
+            出品に必要な基本情報を入力してください。
           </p>
 
           {error && (
@@ -209,6 +207,12 @@ export default function InstructorProfileSetupPage() {
                 name="dateOfBirth"
                 value={formData.dateOfBirth}
                 onChange={handleChange}
+                onFocus={() => {
+                  if (!formData.dateOfBirth) {
+                    setFormData((prev) => ({ ...prev, dateOfBirth: '1996-01-01' }));
+                  }
+                }}
+                max={new Date().toISOString().split('T')[0]}
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
               />

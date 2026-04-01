@@ -83,7 +83,6 @@ function ServicesContent() {
         const data = await searchServices(params);
         if (!cancelled) setResult(data);
       } catch (error) {
-        console.error('Failed to load services:', error);
         if (!cancelled) setResult({ services: [], total: 0, page: 1, limit: 12, totalPages: 0 });
       } finally {
         if (!cancelled) setLoading(false);
@@ -119,8 +118,8 @@ function ServicesContent() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">サービス一覧</h1>
-          <p className="text-gray-600">様々なスキルを学べるサービスをご覧いただけます</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">商品一覧</h1>
+          <p className="text-gray-600">様々な商品をご覧いただけます</p>
         </div>
 
         <div className="mb-8">
@@ -133,7 +132,7 @@ function ServicesContent() {
           </div>
         ) : !result || result.services.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">該当するサービスが見つかりませんでした</p>
+            <p className="text-gray-500 text-lg">該当する商品が見つかりませんでした</p>
           </div>
         ) : (
           <>

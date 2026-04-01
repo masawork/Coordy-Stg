@@ -29,7 +29,7 @@ export function CategoryPlaceholder({ category, className = '' }: CategoryPlaceh
     <div className={`relative w-full h-full ${className}`}>
       <Image
         src={imageSrc}
-        alt={category || 'サービス'}
+        alt={category || '商品'}
         fill
         className="object-cover"
         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"

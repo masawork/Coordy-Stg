@@ -80,7 +80,6 @@ export default function VerificationDetailPage() {
       const data = await response.json();
       setRequest(data);
     } catch (error) {
-      console.error('Load request error:', error);
       alert('申請の取得に失敗しました');
     } finally {
       setLoading(false);
@@ -107,7 +106,6 @@ export default function VerificationDetailPage() {
       alert('本人確認を承認しました');
       router.push('/manage/admin/verification');
     } catch (error) {
-      console.error('Approve error:', error);
       alert('承認に失敗しました');
     } finally {
       setProcessing(false);
@@ -135,7 +133,6 @@ export default function VerificationDetailPage() {
       alert('本人確認を却下しました');
       router.push('/manage/admin/verification');
     } catch (error) {
-      console.error('Reject error:', error);
       alert('却下に失敗しました');
     } finally {
       setProcessing(false);

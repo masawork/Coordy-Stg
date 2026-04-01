@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { getBankAccounts, getWithdrawalRequests, createWithdrawalRequest, BankAccount, WithdrawalRequest } from '@/lib/api/bank-client';
 import { getWallet } from '@/lib/api/wallet-client';
 import { getSession } from '@/lib/auth';
+import { handleNumericInput } from '@/lib/utils/number';
 
 const TRANSFER_FEE = 250;
 
@@ -47,7 +48,6 @@ export default function WithdrawalsPage() {
         setSelectedBankAccountId(defaultAccount.id);
       }
     } catch (err: any) {
-      console.error('Load data error:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -64,6 +64,16 @@ export default function WithdrawalsPage() {
       return;
     }
 
+    if (amountNum < 1000) {
+      setError('最低引き出し額は¥1,000です');
+      return;
+    }
+
+    if (amountNum <= TRANSFER_FEE) {
+      setError(`引き出し額は振込手数料（¥${TRANSFER_FEE.toLocaleString()}）より大きい金額を入力してください`);
+      return;
+    }
+
     if (amountNum > balance) {
       setError('残高が不足しています');
       return;
@@ -74,13 +84,16 @@ export default function WithdrawalsPage() {
       return;
     }
 
+    const selectedAccount = bankAccounts.find((a) => a.id === selectedBankAccountId);
+    const confirmMsg = `以下の内容で引き出し申請を行います。\n\n引き出し額: ¥${amountNum.toLocaleString()}\n振込手数料: -¥${TRANSFER_FEE.toLocaleString()}\n実際の振込額: ¥${Math.max(0, amountNum - TRANSFER_FEE).toLocaleString()}\n振込先: ${selectedAccount?.bankName || ''} ${selectedAccount?.branchName || ''}支店\n\nよろしいですか？`;
+    if (!window.confirm(confirmMsg)) return;
+
     try {
       await createWithdrawalRequest(amountNum, selectedBankAccountId);
       setShowRequestForm(false);
       setAmount('');
       loadData();
     } catch (err: any) {
-      console.error('Create withdrawal request error:', err);
       setError(err.message);
     }
   };
@@ -203,12 +216,11 @@ export default function WithdrawalsPage() {
                 引き出し額（円）
               </label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => setAmount(handleNumericInput(e.target.value))}
                 placeholder="例: 10000"
-                min="1000"
-                max={balance}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                 required
               />

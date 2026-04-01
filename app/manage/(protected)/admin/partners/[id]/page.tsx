@@ -16,6 +16,7 @@ import {
   Calendar,
   Users,
 } from 'lucide-react';
+import { handleNumericInput } from '@/lib/utils/number';
 
 export default function PartnerDetailPage() {
   const params = useParams();
@@ -66,7 +67,6 @@ export default function PartnerDetailPage() {
         isActive: data.isActive ?? true,
       });
     } catch (err) {
-      console.error('パートナー取得エラー:', err);
     } finally {
       setLoading(false);
     }
@@ -268,12 +268,10 @@ export default function PartnerDetailPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">手数料率（%）</label>
               <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
+                type="text"
+                inputMode="numeric"
                 value={form.commissionRate}
-                onChange={(e) => setForm({ ...form, commissionRate: Number(e.target.value) })}
+                onChange={(e) => setForm({ ...form, commissionRate: Number(handleNumericInput(e.target.value, true)) || 0 })}
                 className="w-full px-3 py-2 border rounded-lg"
               />
             </div>

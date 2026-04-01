@@ -15,7 +15,7 @@ export async function getWallet(userId: string) {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'ウォレットの取得に失敗しました');
+      throw new Error(error.error?.message || error.error || 'ウォレットの取得に失敗しました');
     }
 
     return await response.json();
@@ -41,7 +41,7 @@ export async function usePoints(userId: string, amount: number, description: str
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'ポイント使用に失敗しました');
+      throw new Error(error.error?.message || error.error || 'ポイント使用に失敗しました');
     }
 
     return await response.json();
@@ -68,7 +68,7 @@ export async function chargePointsWithCard(amount: number, paymentMethodId?: str
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || 'チャージに失敗しました');
+      throw new Error(data.error?.message || data.error || 'チャージに失敗しました');
     }
 
     return data;
@@ -95,7 +95,7 @@ export async function chargePointsWithBankTransfer(amount: number) {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || '振込申請に失敗しました');
+      throw new Error(data.error?.message || data.error || '振込申請に失敗しました');
     }
 
     return data;
@@ -123,7 +123,7 @@ export async function reportBankTransferComplete(amount: number, transferCode: s
 
     if (!response.ok) {
       console.error('API Error Response:', data);
-      throw new Error(data.error || '振込完了報告に失敗しました');
+      throw new Error(data.error?.message || data.error || '振込完了報告に失敗しました');
     }
 
     return data;
@@ -145,7 +145,7 @@ export async function getTransactionHistory(userId: string) {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || '取引履歴の取得に失敗しました');
+      throw new Error(error.error?.message || error.error || '取引履歴の取得に失敗しました');
     }
 
     return await response.json();
@@ -167,7 +167,7 @@ export async function getPaymentMethods() {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'カード情報の取得に失敗しました');
+      throw new Error(error.error?.message || error.error || 'カード情報の取得に失敗しました');
     }
 
     return await response.json();

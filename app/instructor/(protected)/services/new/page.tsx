@@ -14,14 +14,17 @@ import { getSession } from '@/lib/auth';
 import { fetchCurrentInstructor } from '@/lib/api/instructors-client';
 import { getBankAccounts } from '@/lib/api/bank-client';
 import { ServiceImageUploader } from '@/components/features/service/ServiceImageUploader';
+import { handleNumericInput } from '@/lib/utils/number';
 
 const categories = [
-  'プログラミング',
-  'デザイン',
-  '語学',
-  '音楽',
-  'スポーツ',
-  'ビジネス',
+  'ファッション',
+  '電子機器・ガジェット',
+  'ハンドメイド・アート',
+  '本・雑誌',
+  'スポーツ・アウトドア',
+  'コスメ・美容',
+  '食品・飲料',
+  'インテリア・雑貨',
   'その他',
 ];
 
@@ -55,6 +58,7 @@ export default function NewServicePage() {
     isActive: true,
     deliveryType: 'remote', // remote | onsite | hybrid
     location: '',
+    locationDetail: '', // 区・最寄り駅など
     // スケジュール設定
     recurrenceType: 'ONCE',
     availableDays: [] as string[],
@@ -118,16 +122,18 @@ export default function NewServicePage() {
 
       setInstructorId(instructor.id);
     } catch (error) {
-      console.error('Failed to load instructor:', error);
       router.push('/login/instructor');
     }
   };
 
+  const numericFields = ['price', 'duration', 'maxParticipants'];
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
+    const sanitizedValue = numericFields.includes(name) ? handleNumericInput(value) : value;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
+      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : sanitizedValue,
     }));
   };
 
@@ -150,40 +156,60 @@ export default function NewServicePage() {
       return;
     }
     if ((formData.deliveryType === 'onsite' || formData.deliveryType === 'hybrid') && !formData.location.trim()) {
-      setError('対面またはハイブリッドの場合は場所を入力してください');
+      setError('対面またはハイブリッドの場合は都道府県を選択してください');
       return;
     }
+    // 数値バリデーション
+    if (parseInt(formData.price) < 0) {
+      setError('価格は0以上で入力してください');
+      return;
+    }
+    if (parseInt(formData.duration) < 1) {
+      setError('所要時間は1分以上で入力してください');
+      return;
+    }
+    if (parseInt(formData.maxParticipants) < 1) {
+      setError('定員は1人以上で入力してください');
+      return;
+    }
+
     // スケジュールバリデーション
     if (formData.recurrenceType !== 'ONCE') {
       if (formData.availableDays.length === 0) {
-        setError('繰り返しサービスの場合は曜日を選択してください');
+        setError('繰り返し出品の場合は曜日を選択してください');
         return;
       }
       if (!formData.startTime || !formData.endTime) {
-        setError('繰り返しサービスの場合は開始・終了時間を入力してください');
+        setError('繰り返し出品の場合は開始・終了時間を入力してください');
         return;
       }
+      if (formData.startTime >= formData.endTime) {
+        setError('終了時間は開始時間より後に設定してください');
+        return;
+      }
+    }
+    if (formData.validFrom && formData.validUntil && formData.validFrom > formData.validUntil) {
+      setError('有効期間の終了日は開始日より後に設定してください');
+      return;
     }
 
     setLoading(true);
     setError('');
 
     try {
-      const deliveryLabel: Record<string, string> = {
-        remote: 'リモート',
-        onsite: '対面',
-        hybrid: 'リモート＋対面',
-      };
-      const meta = `【提供形態:${deliveryLabel[formData.deliveryType]}${formData.location ? `／場所:${formData.location}` : ''}】`;
-      const description = [meta, formData.description].filter(Boolean).join('\n');
+      const locationFull = formData.location
+        ? formData.locationDetail
+          ? `${formData.location} ${formData.locationDetail}`
+          : formData.location
+        : undefined;
 
       const createdService = await createService({
         instructorId,
         title: formData.title,
-        description,
+        description: formData.description || undefined,
         category: formData.category,
         deliveryType: formData.deliveryType,
-        location: formData.location || undefined,
+        location: locationFull,
         price: parseInt(formData.price),
         duration: parseInt(formData.duration),
         isActive: formData.isActive,
@@ -203,17 +229,22 @@ export default function NewServicePage() {
           const imgFormData = new FormData();
           imgFormData.append('file', pendingImages[i]);
           imgFormData.append('sortOrder', String(i));
-          await fetch(`/api/services/${createdService.id}/images`, {
+          const imgRes = await fetch(`/api/services/${createdService.id}/images`, {
             method: 'POST',
             body: imgFormData,
           });
+          if (!imgRes.ok) {
+            const imgError = await imgRes.json().catch(() => ({}));
+            setError(`画像${i + 1}のアップロードに失敗しました: ${imgError.error || '不明なエラー'}`);
+            // Continue to redirect even if image upload fails -- service was already created
+            break;
+          }
         }
       }
 
       router.push('/instructor/services');
     } catch (err: any) {
-      console.error('Create service error:', err);
-      setError(err.message || 'サービスの作成に失敗しました');
+      setError(err.message || '出品に失敗しました');
     } finally {
       setLoading(false);
     }
@@ -229,8 +260,8 @@ export default function NewServicePage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">新規サービス作成</h1>
-          <p className="text-sm text-gray-600 mt-1">新しいサービスを登録します</p>
+          <h1 className="text-2xl font-bold text-gray-900">出品する</h1>
+          <p className="text-sm text-gray-600 mt-1">新しい商品を出品します</p>
         </div>
       </div>
 
@@ -243,7 +274,7 @@ export default function NewServicePage() {
 
         <div>
           <label htmlFor="title" className="block text-sm font-semibold text-gray-700 mb-2">
-            サービス名 <span className="text-red-500">*</span>
+            商品名 <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
@@ -259,7 +290,7 @@ export default function NewServicePage() {
 
         <div>
           <label htmlFor="description" className="block text-sm font-semibold text-gray-700 mb-2">
-            説明
+            商品説明
           </label>
           <textarea
             id="description"
@@ -268,7 +299,7 @@ export default function NewServicePage() {
             onChange={handleChange}
             rows={5}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            placeholder="サービスの詳細を入力してください"
+            placeholder="商品の詳細を入力してください"
           />
         </div>
 
@@ -299,13 +330,14 @@ export default function NewServicePage() {
               所要時間（分） <span className="text-red-500">*</span>
             </label>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               id="duration"
               name="duration"
+              min="1"
               value={formData.duration}
               onChange={handleChange}
               required
-              min="1"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               placeholder="60"
             />
@@ -330,26 +362,48 @@ export default function NewServicePage() {
           </div>
         </div>
 
-        <div>
-          <label htmlFor="location" className="block text-sm font-semibold text-gray-700 mb-2">
-            都道府県
-          </label>
-          <select
-            id="location"
-            name="location"
-            value={formData.location}
-            onChange={handleChange}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-          >
-            <option value="">選択してください</option>
-            {['北海道', '青森', '岩手', '宮城', '秋田', '山形', '福島', '茨城', '栃木', '群馬', '埼玉', '千葉', '東京', '神奈川', '新潟', '富山', '石川', '福井', '山梨', '長野', '岐阜', '静岡', '愛知', '三重', '滋賀', '京都', '大阪', '兵庫', '奈良', '和歌山', '鳥取', '島根', '岡山', '広島', '山口', '徳島', '香川', '愛媛', '高知', '福岡', '佐賀', '長崎', '熊本', '大分', '宮崎', '鹿児島', '沖縄'].map((pref) => (
-              <option key={pref} value={pref}>{pref}</option>
-            ))}
-          </select>
-          <p className="text-xs text-gray-500 mt-1">
-            サービスを提供する地域を選択してください
-          </p>
-        </div>
+        {/* 場所設定（対面・ハイブリッドの場合のみ表示） */}
+        {(formData.deliveryType === 'onsite' || formData.deliveryType === 'hybrid') && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="location" className="block text-sm font-semibold text-gray-700 mb-2">
+                  都道府県 <span className="text-red-500">*</span>
+                </label>
+                <select
+                  id="location"
+                  name="location"
+                  value={formData.location}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                >
+                  <option value="">選択してください</option>
+                  {['北海道', '青森', '岩手', '宮城', '秋田', '山形', '福島', '茨城', '栃木', '群馬', '埼玉', '千葉', '東京', '神奈川', '新潟', '富山', '石川', '福井', '山梨', '長野', '岐阜', '静岡', '愛知', '三重', '滋賀', '京都', '大阪', '兵庫', '奈良', '和歌山', '鳥取', '島根', '岡山', '広島', '山口', '徳島', '香川', '愛媛', '高知', '福岡', '佐賀', '長崎', '熊本', '大分', '宮崎', '鹿児島', '沖縄'].map((pref) => (
+                    <option key={pref} value={pref}>{pref}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="locationDetail" className="block text-sm font-semibold text-gray-700 mb-2">
+                  エリア・最寄り駅
+                </label>
+                <input
+                  type="text"
+                  id="locationDetail"
+                  name="locationDetail"
+                  value={formData.locationDetail}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="例: 渋谷区・渋谷駅徒歩5分"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-gray-500">
+              詳しい住所やビル名は上の「商品説明」欄に記載してください。エリア・最寄り駅は商品一覧に表示されます。
+            </p>
+          </div>
+        )}
 
         {/* スケジュール設定セクション */}
         <div className="border-t border-gray-200 pt-6 mt-6">
@@ -475,13 +529,13 @@ export default function NewServicePage() {
                 最大参加人数
               </label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 id="maxParticipants"
                 name="maxParticipants"
+                min="1"
                 value={formData.maxParticipants}
                 onChange={handleChange}
-                min="1"
-                max="100"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               />
               <p className="text-xs text-gray-500 mt-1">1回の開催あたりの参加可能人数</p>
@@ -494,13 +548,14 @@ export default function NewServicePage() {
             価格（円） <span className="text-red-500">*</span>
           </label>
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
             id="price"
             name="price"
+            min="0"
             value={formData.price}
             onChange={handleChange}
             required
-            min="0"
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
             placeholder="5000"
           />
@@ -531,7 +586,7 @@ export default function NewServicePage() {
             className="bg-green-600 hover:bg-green-700"
             disabled={loading}
           >
-            {loading ? '作成中...' : 'サービスを作成'}
+            {loading ? '出品中...' : '出品する'}
           </Button>
           <Link href="/instructor/services">
             <Button type="button" variant="outline">

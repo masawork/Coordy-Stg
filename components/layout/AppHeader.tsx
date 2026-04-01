@@ -37,7 +37,6 @@ export function AppHeader({ userName }: AppHeaderProps) {
             setBalance(wallet?.balance || 0);
           }
         } catch (err) {
-          console.error('残高取得エラー:', err);
         }
       }
     };
@@ -63,26 +62,22 @@ export function AppHeader({ userName }: AppHeaderProps) {
 
   const handleLogout = async () => {
     try {
-      console.log('🚪 ログアウト処理開始（AppHeader）');
       // Cognitoセッションをクリア
       await betterAuthSignOut();
-      console.log('✅ Cognitoセッション削除完了');
 
       // localStorageをクリア
       clearSession();
-      console.log('✅ localStorage削除完了');
 
       // ロールごとにリダイレクト先を分岐（管理者は管理画面へ戻す）
       const fallbackPath = role === 'admin' ? '/manage/admin' : '/';
       window.location.href = fallbackPath;
     } catch (error) {
-      console.error('❌ ログアウトエラー:', error);
     }
   };
 
   const roleLabels = {
     user: 'クライアント',
-    instructor: 'クリエイター',
+    instructor: '出品者',
     admin: '管理者',
   };
 

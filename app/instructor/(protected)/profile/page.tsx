@@ -67,7 +67,6 @@ export default function InstructorProfilePage() {
             || (!!fullName && !!address && !!dateOfBirth);
         }
       } catch (e) {
-        console.error('クライアントプロフィール取得エラー:', e);
       }
 
       const instructor = await fetchCurrentInstructor();
@@ -94,7 +93,6 @@ export default function InstructorProfilePage() {
         }
       }
     } catch (err) {
-      console.error('プロフィール読み込みエラー:', err);
     } finally {
       setLoading(false);
     }

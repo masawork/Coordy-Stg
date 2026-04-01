@@ -48,7 +48,7 @@ export async function getBankAccounts(): Promise<BankAccount[]> {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || '銀行口座情報の取得に失敗しました');
+    throw new Error(error.error?.message || error.error || '銀行口座情報の取得に失敗しました');
   }
 
   return await response.json();
@@ -76,7 +76,7 @@ export async function createBankAccount(data: {
 
   if (!response.ok) {
     const error = await response.json();
-    const message = error.error || '銀行口座の登録に失敗しました';
+    const message = error.error?.message || error.error || '銀行口座の登録に失敗しました';
     const details = error.details ? ` (${error.details})` : '';
     throw new Error(message + details);
   }
@@ -109,7 +109,7 @@ export async function updateBankAccount(
 
   if (!response.ok) {
     const error = await response.json();
-    const message = error.error || '銀行口座の更新に失敗しました';
+    const message = error.error?.message || error.error || '銀行口座の更新に失敗しました';
     const details = error.details ? ` (${error.details})` : '';
     throw new Error(message + details);
   }
@@ -127,7 +127,7 @@ export async function deleteBankAccount(id: string): Promise<void> {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || '銀行口座の削除に失敗しました');
+    throw new Error(error.error?.message || error.error || '銀行口座の削除に失敗しました');
   }
 }
 
@@ -142,7 +142,7 @@ export async function getWithdrawalRequests(): Promise<WithdrawalRequest[]> {
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || '引き出し申請の取得に失敗しました');
+    throw new Error(error.error?.message || error.error || '引き出し申請の取得に失敗しました');
   }
 
   return await response.json();
@@ -165,7 +165,7 @@ export async function createWithdrawalRequest(
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || '引き出し申請の作成に失敗しました');
+    throw new Error(error.error?.message || error.error || '引き出し申請の作成に失敗しました');
   }
 
   return await response.json();

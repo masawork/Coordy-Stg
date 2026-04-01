@@ -12,7 +12,7 @@ function ProtectedSidebarSheet() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    queueMicrotask(() => setMounted(true));
   }, []);
 
   // 管理者系の画面のみグローバルシートを表示（ユーザー/インストラクターは各レイアウトで制御）

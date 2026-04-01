@@ -35,7 +35,6 @@ export default function ActivityPage() {
       const history = await getTransactionHistory(userId);
       setTransactions(history);
     } catch (err) {
-      console.error('活動履歴取得エラー:', err);
       setTransactions([]);
     } finally {
       setLoading(false);

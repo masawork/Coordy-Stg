@@ -81,7 +81,6 @@ export default function IdentityVerificationPage() {
         await videoRef.current.play();
       }
     } catch (err: any) {
-      console.error('Camera access error:', err);
       setError('カメラへのアクセスが拒否されました。設定を確認してください。');
       setShowCamera(false);
     }
@@ -173,7 +172,6 @@ export default function IdentityVerificationPage() {
         }
       }
     } catch (err) {
-      console.error('Load status error:', err);
       setError('ステータスの取得に失敗しました');
     } finally {
       setLoading(false);
@@ -318,12 +316,15 @@ export default function IdentityVerificationPage() {
       if (!response.ok) {
         const errorData = await response.json();
         // 詳細なエラーメッセージを構築
-        let errorMsg = errorData.error || '提出に失敗しました';
-        if (errorData.details) {
-          errorMsg += `\n詳細: ${errorData.details}`;
+        const errObj = errorData.error;
+        let errorMsg = (typeof errObj === 'object' ? errObj?.message : errObj) || '提出に失敗しました';
+        const details = errObj?.details || errorData.details;
+        const code = errObj?.code || errorData.code;
+        if (details) {
+          errorMsg += `\n詳細: ${details}`;
         }
-        if (errorData.code) {
-          errorMsg += `\n(エラーコード: ${errorData.code})`;
+        if (code) {
+          errorMsg += `\n(エラーコード: ${code})`;
         }
         throw new Error(errorMsg);
       }
@@ -336,7 +337,6 @@ export default function IdentityVerificationPage() {
         router.push('/user/profile');
       }, 3000);
     } catch (err: any) {
-      console.error('Submit error:', err);
       setError(err.message || '本人確認書類の提出に失敗しました');
     } finally {
       setSubmitting(false);

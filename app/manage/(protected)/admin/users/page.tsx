@@ -29,7 +29,6 @@ export default function AdminUsersPage() {
       });
       setUsers(result.users || []);
     } catch (error) {
-      console.error('Failed to load users:', error);
       setUsers([]);
     } finally {
       setLoading(false);
@@ -46,7 +45,6 @@ export default function AdminUsersPage() {
       await updateUserRoleRemote(userId, newRole);
       await loadUsers();
     } catch (error) {
-      console.error('Failed to update role:', error);
       alert('ロールの更新に失敗しました');
     } finally {
       setUpdatingId(null);

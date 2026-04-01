@@ -56,7 +56,6 @@ export default function BankAccountsPage() {
       const accounts = await getBankAccounts();
       setBankAccounts(accounts);
     } catch (err: any) {
-      console.error('Load bank accounts error:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -135,7 +134,6 @@ export default function BankAccountsPage() {
       resetForm();
       loadBankAccounts();
     } catch (err: any) {
-      console.error(editingAccount ? 'Update bank account error:' : 'Create bank account error:', err);
       setError(err.message);
     }
   };
@@ -149,7 +147,6 @@ export default function BankAccountsPage() {
       await deleteBankAccount(id);
       loadBankAccounts();
     } catch (err: any) {
-      console.error('Delete error:', err);
       alert(err.message);
     }
   };

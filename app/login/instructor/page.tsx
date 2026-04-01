@@ -71,11 +71,8 @@ export default function InstructorLoginPage() {
         throw new Error('インストラクターアカウントでログインしてください');
       }
 
-      console.log('✅ インストラクターログイン成功');
       window.location.href = '/instructor';
     } catch (err: any) {
-      console.error('Login error:', err);
-      
       // エラーメッセージを日本語化
       let friendlyMessage = 'ログインに失敗しました。時間をおいて再度お試しください。';
       
@@ -117,7 +114,7 @@ export default function InstructorLoginPage() {
       >
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">インストラクターログイン</h1>
-          <p className="text-gray-600">サービスを提供する方のログイン</p>
+          <p className="text-gray-600">商品を出品する方のログイン</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

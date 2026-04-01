@@ -7,15 +7,17 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { ReservationStatus } from '@prisma/client';
+import { ReservationStatus, TransactionType, TransactionStatus } from '@prisma/client';
 import { getAuthInstructor } from '@/lib/api/auth';
 import {
   notFoundError,
   forbiddenError,
   validationError,
+  conflictError,
   withErrorHandler,
 } from '@/lib/api/errors';
 import { sendAndLogWebhook, buildReservationWebhookData } from '@/lib/partner/webhook';
+import { sendCompletionEmail } from '@/lib/mail/reservation';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,33 +76,107 @@ export const PATCH = withErrorHandler(async (
     return validationError('この予約は完了できません。ステータスがCONFIRMEDではありません。');
   }
 
-  // 予約を完了
-  const updatedReservation = await prisma.reservation.update({
-    where: { id },
-    data: {
-      status: ReservationStatus.COMPLETED,
+  // 売上金額を計算（実際の支払額を優先、取得できない場合は定価×人数）
+  const useTransaction = await prisma.pointTransaction.findFirst({
+    where: {
+      reservationId: reservation.id,
+      type: TransactionType.USE,
+      status: TransactionStatus.COMPLETED,
     },
-    include: {
-      service: true,
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
+  });
+  const revenueAmount = useTransaction
+    ? Math.abs(useTransaction.amount)
+    : reservation.service.price * reservation.participants;
+
+  // トランザクションで予約完了 + インストラクター売上入金
+  const updatedReservation = await prisma.$transaction(async (tx) => {
+    // 楽観的ロック: ステータスがCONFIRMEDであることを保証（二重完了防止）
+    const updateResult = await tx.reservation.updateMany({
+      where: {
+        id,
+        status: ReservationStatus.CONFIRMED,
       },
-      instructor: {
-        include: {
-          user: {
-            select: {
-              name: true,
-              image: true,
+      data: {
+        status: ReservationStatus.COMPLETED,
+      },
+    });
+
+    if (updateResult.count === 0) {
+      return null; // 二重完了 - トランザクション外で409を返す
+    }
+
+    // 更新後の予約を取得
+    const updated = await tx.reservation.findUniqueOrThrow({
+      where: { id },
+      include: {
+        service: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        instructor: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                image: true,
+              },
             },
           },
         },
       },
-    },
+    });
+
+    // インストラクターのウォレットに売上を入金
+    const instructorUserId = updated.instructor?.user?.id;
+    if (instructorUserId && revenueAmount > 0) {
+      // ウォレットを取得（なければ作成）
+      await tx.wallet.upsert({
+        where: { userId: instructorUserId },
+        create: { userId: instructorUserId, balance: revenueAmount },
+        update: { balance: { increment: revenueAmount } },
+      });
+
+      // 売上入金の取引記録を作成
+      await tx.pointTransaction.create({
+        data: {
+          userId: instructorUserId,
+          type: TransactionType.CHARGE,
+          amount: revenueAmount,
+          method: 'service_revenue',
+          status: TransactionStatus.COMPLETED,
+          reservationId: id,
+          description: `サービス売上: ${updated.service.title}（${updated.participants}名）`,
+        },
+      });
+    }
+
+    return updated;
   });
+
+  // 二重完了チェック（トランザクションがnullを返した場合）
+  if (updatedReservation === null) {
+    return conflictError('この予約は既に完了済みまたはCONFIRMED以外のステータスです');
+  }
+
+  // 完了メール送信（非同期）
+  if (updatedReservation.user?.email) {
+    sendCompletionEmail({
+      reservationId: id,
+      userName: updatedReservation.user.name || updatedReservation.user.email,
+      userEmail: updatedReservation.user.email,
+      serviceName: updatedReservation.service.title,
+      instructorName: updatedReservation.instructor?.user?.name || 'インストラクター',
+      scheduledAt: updatedReservation.scheduledAt,
+      duration: updatedReservation.service.duration,
+      price: updatedReservation.service.price * updatedReservation.participants,
+      participants: updatedReservation.participants,
+    }).catch((err) => console.error('Failed to send completion email:', err));
+  }
 
   // 外部予約の場合、パートナーにWebhook通知
   const externalReservation = await prisma.externalReservation.findUnique({

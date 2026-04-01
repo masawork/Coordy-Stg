@@ -49,7 +49,6 @@ export default function InstructorSettingsPage() {
       const data = await response.json();
       setGoogleConnected(data.connected);
     } catch (error) {
-      console.error('Google status check failed:', error);
     } finally {
       setGoogleLoading(false);
     }
@@ -72,7 +71,6 @@ export default function InstructorSettingsPage() {
         setMessage({ type: 'success', text: 'Google連携を解除しました' });
       }
     } catch (error) {
-      console.error('Google disconnect failed:', error);
       setMessage({ type: 'error', text: '連携解除に失敗しました' });
     } finally {
       setGoogleDisconnecting(false);
@@ -147,7 +145,7 @@ export default function InstructorSettingsPage() {
           </div>
           {!googleConnected && !googleLoading && (
             <p className="text-xs text-gray-400 mt-2">
-              ※ 連携するとオンラインサービス予約時にGoogle Calendarにイベントが作成され、Meet URLが自動生成されます
+              ※ 連携するとオンライン商品予約時にGoogle Calendarにイベントが作成され、Meet URLが自動生成されます
             </p>
           )}
         </div>

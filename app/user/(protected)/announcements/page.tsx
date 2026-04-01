@@ -22,7 +22,6 @@ export default function AnnouncementsPage() {
       const data = await getAnnouncements('users', 50); // 生徒向け最新50件
       setAnnouncements(data);
     } catch (err: any) {
-      console.error('Load announcements error:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -77,7 +76,7 @@ export default function AnnouncementsPage() {
                     {getPriorityBadge(announcement.priority)}
                     {announcement.author?.role === 'INSTRUCTOR' && (
                       <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded">
-                        👨‍🏫 講師より
+                        👨‍🏫 出品者より
                       </span>
                     )}
                     {announcement.author?.role === 'ADMIN' && (

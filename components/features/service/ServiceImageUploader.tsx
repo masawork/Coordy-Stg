@@ -95,7 +95,7 @@ export function ServiceImageUploader({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || '削除に失敗しました');
+        throw new Error(data.error?.message || data.error || '削除に失敗しました');
       }
 
       setUploadedImages((prev) => prev.filter((img) => img.id !== imageId));
@@ -129,7 +129,7 @@ export function ServiceImageUploader({
 
         if (!res.ok) {
           const data = await res.json();
-          throw new Error(data.error || 'アップロードに失敗しました');
+          throw new Error(data.error?.message || data.error || 'アップロードに失敗しました');
         }
 
         const image = await res.json();
@@ -151,7 +151,7 @@ export function ServiceImageUploader({
   return (
     <div className="space-y-4">
       <label className="block text-sm font-semibold text-gray-700">
-        サービス画像（最大5枚）
+        商品画像（最大5枚）
       </label>
 
       {error && (
@@ -170,7 +170,7 @@ export function ServiceImageUploader({
           >
             <img
               src={img.url}
-              alt={`サービス画像 ${index + 1}`}
+              alt={`商品画像 ${index + 1}`}
               className={`w-full object-cover ${index === 0 ? 'h-48 md:h-full' : 'h-24 md:h-28'}`}
             />
             {index === 0 && (

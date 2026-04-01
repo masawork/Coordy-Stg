@@ -48,40 +48,29 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
             if (!response.ok) {
               // 500エラーの場合はセットアップページへ（無限ループを防ぐ）
               if (response.status === 500) {
-                console.error('🚫 Layout: Server error in check-role API, redirecting to setup');
                 router.push('/user/profile/setup');
                 return;
               }
               // 404エラーの場合はログインページへ
               if (response.status === 404) {
-                console.log('🚫 Layout: User not registered with USER role, redirecting to login');
                 router.push('/login/user');
                 return;
               }
               // その他のエラーもセットアップへ
-              console.error('🚫 Layout: Unexpected error in check-role API, redirecting to setup');
               router.push('/user/profile/setup');
               return;
             }
 
             const { user: dbUser, profile } = await response.json();
-            console.log('📋 Layout: Profile check result:', {
-              hasProfile: !!profile,
-              isProfileComplete: profile?.isProfileComplete,
-              phoneVerified: profile?.phoneVerified,
-              fullName: profile?.fullName,
-            });
 
             // プロフィールが存在しないか、完了していない場合はセットアップへ
             if (!profile || !profile.isProfileComplete) {
-              console.log('🚫 Layout: Profile incomplete, redirecting to setup');
               router.push('/user/profile/setup');
               return;
             }
             setDisplayName(profile.displayName || authUser.user_metadata?.name || authUser.email || 'ユーザー');
             setUser(authUser);
           } catch (err) {
-            console.error('プロフィールチェックエラー:', err);
             // エラー時はセットアップページへ（無限ループを防ぐ）
             router.push('/user/profile/setup');
             return;
@@ -93,7 +82,6 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
 
         setLoading(false);
       } catch (error) {
-        console.error('認証チェックエラー:', error);
         setLoading(false);
         router.push('/login/user');
       }

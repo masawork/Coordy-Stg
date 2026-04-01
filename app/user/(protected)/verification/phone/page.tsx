@@ -69,7 +69,6 @@ export default function PhoneVerificationPage() {
       setPhoneNumber(profile.phoneNumber);
       setVerificationLevel(profile.verificationLevel || 0);
     } catch (err) {
-      console.error('Load profile error:', err);
       setError('プロフィールの取得に失敗しました');
     } finally {
       setLoading(false);
@@ -96,13 +95,12 @@ export default function PhoneVerificationPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'SMS送信に失敗しました');
+        throw new Error(errorData.error?.message || errorData.error || 'SMS送信に失敗しました');
       }
 
       setOtpSent(true);
       setResendTimer(60);
     } catch (err: any) {
-      console.error('Send OTP error:', err);
       setError(err.message || 'SMS送信に失敗しました');
     } finally {
       setLoading(false);
@@ -121,10 +119,8 @@ export default function PhoneVerificationPage() {
     setError('');
 
     try {
-      console.log('📱 Verifying OTP for:', phoneNumber);
 
       // OTP検証API（独自実装 - セッションを維持したまま検証）
-      console.log('📞 Calling phone verification API...');
       const verifyResponse = await fetch('/api/verification/phone/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -136,17 +132,14 @@ export default function PhoneVerificationPage() {
 
       if (!verifyResponse.ok) {
         const errorData = await verifyResponse.json();
-        throw new Error(errorData.error || '認証コードが正しくありません');
+        throw new Error(errorData.error?.message || errorData.error || '認証コードが正しくありません');
       }
 
       const verifyData = await verifyResponse.json();
-      console.log('✅ Phone verification response:', verifyData);
 
       // 完了後、ダッシュボードへリダイレクト
-      console.log('🎉 Phone verification complete! Redirecting to dashboard...');
       router.push('/user');
     } catch (err: any) {
-      console.error('❌ Verify OTP error:', err);
       setError(err.message || '認証に失敗しました');
     } finally {
       setLoading(false);
@@ -284,7 +277,7 @@ export default function PhoneVerificationPage() {
             ✨ Level 1 でできること
           </h3>
           <ul className="text-xs text-blue-800 space-y-1">
-            <li>✅ サービスの予約</li>
+            <li>✅ 商品の購入・予約</li>
             <li>✅ 決済（最大5,000円/回）</li>
             <li>✅ メッセージ送信</li>
           </ul>

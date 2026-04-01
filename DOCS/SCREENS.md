@@ -1,6 +1,6 @@
 # 画面定義書
 
-最終更新: 2025-02-08
+最終更新: 2026-03-28
 
 ## 1. 画面一覧
 
@@ -77,7 +77,7 @@
 | `/manage/admin` | 管理ダッシュボード | 本人確認統計・概要 |
 | `/manage/admin/dashboard` | ダッシュボード詳細 | |
 | `/manage/admin/users` | ユーザー管理 | ユーザー一覧・ロール変更 |
-| `/manage/admin/services` | サービス管理 | 全サービス閲覧 |
+| `/manage/admin/services` | サービス管理 | 全サービス閲覧（※現在スタブ実装） |
 | `/manage/admin/verification` | 本人確認審査一覧 | ステータスフィルタ・審査対応 |
 | `/manage/admin/verification/[id]` | 本人確認審査詳細 | 書類確認・承認/却下 |
 | `/manage/admin/identity-documents` | 身分証一覧 | |

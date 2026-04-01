@@ -27,9 +27,7 @@ export default function AdminIdentityDocumentsPage() {
         (inst: any) => inst.identityDocumentStatus === 'pending'
       );
       setInstructors(pending);
-      console.log('📋 審査待ち身分証明書:', pending.length, '件');
     } catch (error) {
-      console.error('❌ 読み込みエラー:', error);
     } finally {
       setLoading(false);
     }
@@ -47,11 +45,9 @@ export default function AdminIdentityDocumentsPage() {
       //   identityDocumentStatus: 'approved',
       //   identityDocumentApprovedAt: new Date().toISOString(),
       // });
-      console.log('身分証明書承認（DB更新は未実装）:', instructorId);
       alert('承認しました');
       await loadPendingDocuments();
     } catch (error) {
-      console.error('❌ 承認エラー:', error);
       alert('承認に失敗しました');
     } finally {
       setProcessing(false);
@@ -75,13 +71,11 @@ export default function AdminIdentityDocumentsPage() {
       //   identityDocumentStatus: 'rejected',
       //   identityDocumentRejectionReason: rejectionReason,
       // });
-      console.log('身分証明書却下（DB更新は未実装）:', instructorId, rejectionReason);
       alert('却下しました');
       setRejectionReason('');
       setSelectedInstructor(null);
       await loadPendingDocuments();
     } catch (error) {
-      console.error('❌ 却下エラー:', error);
       alert('却下に失敗しました');
     } finally {
       setProcessing(false);

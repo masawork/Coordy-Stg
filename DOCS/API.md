@@ -1,6 +1,6 @@
 # API仕様書
 
-最終更新: 2025-02-08
+最終更新: 2026-03-28
 
 ## 1. 概要
 
@@ -155,10 +155,26 @@ POST /api/admin/verification/requests/[id]/reject
 
 ### 4.1 サービス一覧
 ```
-GET /api/services?instructorId={id}&category={string}&isActive={boolean}
+GET /api/services?instructorId={id}&category={string}&isActive={boolean}&q={string}&deliveryType={string}&location={string}&priceMin={number}&priceMax={number}&sortBy={string}&page={number}&limit={number}
 ```
 - **認証**: 不要（公開）
-- **レスポンス**: `Service[]`（schedules, images含む）
+- **クエリパラメータ**:
+
+| パラメータ | 説明 | デフォルト |
+|-----------|------|-----------|
+| `instructorId` | インストラクターID絞り込み | - |
+| `category` | カテゴリ絞り込み | - |
+| `isActive` | 有効/無効フィルタ | - |
+| `q` | フリーワード検索（タイトル/説明/インストラクター名） | - |
+| `deliveryType` | remote / onsite / hybrid | - |
+| `location` | 都道府県（完全一致） | - |
+| `priceMin` | 最低価格 | - |
+| `priceMax` | 最高価格 | - |
+| `sortBy` | newest / price_asc / price_desc | newest |
+| `page` | ページ番号（1始まり） | 1 |
+| `limit` | 件数（最大50） | 12 |
+
+- **レスポンス**: `{ services: Service[], pagination: { page, limit, total, totalPages } }`（schedules, images含む）
 
 ### 4.2 サービス詳細
 ```
@@ -663,5 +679,77 @@ X-Webhook-Timestamp: UNIXタイムスタンプ
 }
 ```
 
-- タイムアウト: 10秒
-- リトライ: なし（将来対応予定）
+- タイムアウト: 10秒/リクエスト
+
+### リトライ仕様
+
+| 項目 | 値 |
+|------|-----|
+| 最大リトライ回数 | 3回（初回 + リトライ3回 = 最大4回試行） |
+| リトライ間隔 | 指数バックオフ（1秒→2秒→4秒 + ランダムジッター） |
+| 最大待機時間 | 30秒 |
+| リトライ対象 | 5xxエラー、ネットワークエラー |
+| リトライ非対象 | 2xx（成功）、4xx（クライアントエラー） |
+
+### 配信ログ
+
+全てのWebhook送信結果は `WebhookLog` テーブルに永続化される（`sendAndLogWebhook()` 関数使用）。
+
+---
+
+## 18. Webhook管理API（管理者）
+
+### 18.1 配信ログ一覧
+```
+GET /api/admin/partners/[id]/webhooks?page={number}&limit={number}&success={boolean}&event={string}
+```
+- **認証**: ADMIN
+- **クエリパラメータ**:
+  - `page`: ページ番号（デフォルト: 1）
+  - `limit`: 取得件数（デフォルト: 50、最大: 100）
+  - `success`: 成功/失敗フィルタ（true/false）
+  - `event`: イベント名フィルタ
+- **レスポンス**:
+```json
+{
+  "logs": [
+    {
+      "id": "string",
+      "partnerId": "string",
+      "reservationId": "string?",
+      "event": "reservation.created",
+      "url": "string",
+      "requestBody": "string (JSON)",
+      "statusCode": 200,
+      "success": true,
+      "attempts": 1,
+      "lastError": null,
+      "lastAttemptAt": "ISO8601",
+      "createdAt": "ISO8601"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 50,
+    "total": 100,
+    "totalPages": 2
+  }
+}
+```
+
+### 18.2 Webhook手動再送
+```
+POST /api/admin/partners/[id]/webhooks/[logId]/retry
+```
+- **認証**: ADMIN
+- **説明**: 元のWebhookLogのペイロードを使って再送信し、新しいWebhookLogを作成
+- **バリデーション**: 元のログが存在し、パートナーに紐付いていること。パートナーのwebhookUrl/webhookSecretが設定されていること
+- **レスポンス**:
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "attempts": 1,
+  "error": null
+}
+```

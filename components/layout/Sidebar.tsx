@@ -45,7 +45,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           icon: LayoutDashboard,
         },
         {
-          label: 'サービス検索',
+          label: '商品検索',
           href: `/user/services`,
           icon: ShoppingBag,
         },
@@ -91,7 +91,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         },
       ];
     } else if (role === 'instructor') {
-      // クリエイター用メニュー
+      // 出品者用メニュー
       return [
         {
           label: 'ホーム',
@@ -99,7 +99,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           icon: LayoutDashboard,
         },
         {
-          label: 'サービス管理',
+          label: '出品管理',
           href: `/instructor/services`,
           icon: Package,
         },
@@ -143,7 +143,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           icon: Users,
         },
         {
-          label: 'サービス管理',
+          label: '商品管理',
           href: `/manage/admin/services`,
           icon: Package,
         },
@@ -171,7 +171,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 
   const roleLabels = {
     user: 'クライアント',
-    instructor: 'クリエイター',
+    instructor: '出品者',
     admin: '管理者',
   };
 
@@ -182,7 +182,6 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       onNavigate?.();
       router.push('/');
     } catch (error) {
-      console.error('ログアウトエラー:', error);
     }
   };
 

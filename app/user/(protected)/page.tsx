@@ -41,8 +41,10 @@ export default function UserDashboardPage() {
     // LocalStorageから警告の表示状態を読み込む
     const savedVerificationAlert = localStorage.getItem('hideVerificationAlert');
     const savedPaymentAlert = localStorage.getItem('hidePaymentAlert');
-    if (savedVerificationAlert === 'true') setShowVerificationAlert(false);
-    if (savedPaymentAlert === 'true') setShowPaymentAlert(false);
+    queueMicrotask(() => {
+      if (savedVerificationAlert === 'true') setShowVerificationAlert(false);
+      if (savedPaymentAlert === 'true') setShowPaymentAlert(false);
+    });
   }, []);
 
   useEffect(() => {
@@ -58,12 +60,6 @@ export default function UserDashboardPage() {
           });
           if (response.ok) {
             const { profile: profileData } = await response.json();
-            console.log('📋 Dashboard - Profile data loaded:', {
-              verificationLevel: profileData?.verificationLevel,
-              phoneVerified: profileData?.phoneVerified,
-              identityVerified: profileData?.identityVerified,
-              isProfileComplete: profileData?.isProfileComplete,
-            });
             setProfile({
               verificationLevel: profileData?.verificationLevel || 0,
               phoneVerified: profileData?.phoneVerified || false,
@@ -71,7 +67,6 @@ export default function UserDashboardPage() {
             });
           }
         } catch (error) {
-          console.error('❌ Load profile error:', error);
         }
 
         // 本人確認リクエストのステータスを取得
@@ -82,7 +77,6 @@ export default function UserDashboardPage() {
             setIdentityRequestStatus(statusData.request?.status || null);
           }
         } catch (error) {
-          console.error('Load identity status error:', error);
         }
 
         // 支払い方法確認
@@ -90,7 +84,6 @@ export default function UserDashboardPage() {
           const paymentMethods = await getPaymentMethods();
           setHasPaymentMethod(paymentMethods.length > 0);
         } catch (error) {
-          console.error('Load payment methods error:', error);
         }
 
         // 通知取得
@@ -98,7 +91,6 @@ export default function UserDashboardPage() {
           const notificationsData = await getNotifications(true); // 未読のみ
           setNotifications(notificationsData.slice(0, 3)); // 最新3件
         } catch (error) {
-          console.error('Load notifications error:', error);
         }
 
         // お知らせ取得
@@ -106,7 +98,6 @@ export default function UserDashboardPage() {
           const announcementsData = await getAnnouncements('users', 5); // 生徒向け最新5件
           setAnnouncements(announcementsData);
         } catch (error) {
-          console.error('Load announcements error:', error);
         }
       }
       setLoading(false);
@@ -140,13 +131,6 @@ export default function UserDashboardPage() {
   const getVerificationLevelInfo = () => {
     if (!profile) return null;
 
-    // デバッグログ
-    console.log('📊 Verification Status:', {
-      phoneVerified: profile.phoneVerified,
-      identityVerified: profile.identityVerified,
-      verificationLevel: profile.verificationLevel,
-    });
-
     // phoneVerified と identityVerified に基づいて判定
     // 注意: プロフィール設定完了後は必ず phoneVerified = true (Level 1)
     if (profile.identityVerified) {
@@ -154,7 +138,7 @@ export default function UserDashboardPage() {
       return {
         level: 'Level 2',
         title: '本人確認済み',
-        description: 'すべてのサービスをご利用いただけます',
+        description: 'すべての機能をご利用いただけます',
         subDescription: 'キャンセルポリシー: 30分前まで無料',
         action: null,
         actionUrl: null,
@@ -178,7 +162,7 @@ export default function UserDashboardPage() {
         : {
             level: 'Level 1',
             title: '電話番号認証済み',
-            description: '基本的なサービスをご利用いただけます',
+            description: '基本的な機能をご利用いただけます',
             subDescription: 'キャンセルポリシー: 1時間前まで無料',
             action: '本人確認書類を提出',
             actionUrl: '/user/verification/identity',
@@ -190,7 +174,7 @@ export default function UserDashboardPage() {
       return {
         level: 'Level 0',
         title: '未認証',
-        description: '電話番号認証を完了して、サービスを利用できるようにしましょう',
+        description: '電話番号認証を完了して、商品を購入できるようにしましょう',
         subDescription: '',
         action: '電話番号を認証',
         actionUrl: '/user/verification/phone',
@@ -215,7 +199,7 @@ export default function UserDashboardPage() {
             <div className="flex-1">
               <h3 className="font-bold text-red-800">電話番号が未認証です</h3>
               <p className="text-sm text-red-700">
-                サービスを利用するには、電話番号認証を完了してください。
+                商品を購入するには、電話番号認証を完了してください。
               </p>
             </div>
             <button
@@ -316,7 +300,7 @@ export default function UserDashboardPage() {
               <div className="flex-1">
                 <h3 className="text-lg font-bold mb-2">すべての設定が完了しています！</h3>
                 <p className="text-sm opacity-90">
-                  すべての機能をご利用いただけます。素敵なレッスンをお楽しみください！
+                  すべての機能をご利用いただけます。素敵な商品をお楽しみください！
                 </p>
               </div>
             </div>
@@ -384,7 +368,7 @@ export default function UserDashboardPage() {
           <div className="text-center py-8">
             <p className="text-gray-500 text-sm">現在、お知らせはありません</p>
             <p className="text-xs text-gray-400 mt-2">
-              管理者や講師からのお知らせがここに表示されます
+              管理者や出品者からのお知らせがここに表示されます
             </p>
           </div>
         ) : (
@@ -405,7 +389,7 @@ export default function UserDashboardPage() {
                       )}
                       {announcement.author?.role === 'INSTRUCTOR' && (
                         <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-semibold rounded">
-                          講師より
+                          出品者より
                         </span>
                       )}
                       <p className="font-semibold text-gray-900 text-sm">
@@ -456,7 +440,7 @@ export default function UserDashboardPage() {
         {/* お気に入りカード */}
         <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">⭐ お気に入り</h3>
-          <p className="text-gray-600 text-sm mb-4">お気に入りのクリエイター</p>
+          <p className="text-gray-600 text-sm mb-4">お気に入りの出品者</p>
           <button
             onClick={() => router.push('/user/favorites')}
             className="text-purple-600 hover:text-purple-700 text-sm font-medium"
@@ -469,14 +453,14 @@ export default function UserDashboardPage() {
       {/* サービス検索 */}
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          🔍 サービスを探す
+          🔍 商品を探す
         </h2>
         <div className="flex gap-4">
           <button
             onClick={() => router.push('/services')}
             className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors shadow-md hover:shadow-lg"
           >
-            サービス一覧を見る
+            商品一覧を見る
           </button>
         </div>
       </div>

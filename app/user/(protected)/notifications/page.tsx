@@ -23,7 +23,6 @@ export default function NotificationsPage() {
       const data = await getNotifications(filter === 'unread');
       setNotifications(data);
     } catch (err: any) {
-      console.error('Load notifications error:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -35,7 +34,6 @@ export default function NotificationsPage() {
       await markNotificationAsRead(id);
       loadNotifications();
     } catch (err: any) {
-      console.error('Mark as read error:', err);
       alert(err.message);
     }
   };
@@ -45,7 +43,6 @@ export default function NotificationsPage() {
       await dismissNotification(id);
       loadNotifications();
     } catch (err: any) {
-      console.error('Dismiss error:', err);
       alert(err.message);
     }
   };
@@ -55,7 +52,6 @@ export default function NotificationsPage() {
       await markAllNotificationsAsRead();
       loadNotifications();
     } catch (err: any) {
-      console.error('Mark all as read error:', err);
       alert(err.message);
     }
   };

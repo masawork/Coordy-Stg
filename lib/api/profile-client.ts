@@ -30,7 +30,7 @@ export async function getClientProfile(userId: string) {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'プロフィールの取得に失敗しました');
+      throw new Error(error.error?.message || error.error || 'プロフィールの取得に失敗しました');
     }
 
     return await response.json();
@@ -56,7 +56,7 @@ export async function createClientProfile(input: ClientProfileInput) {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'プロフィールの作成に失敗しました');
+      throw new Error(error.error?.message || error.error || 'プロフィールの作成に失敗しました');
     }
 
     return await response.json();
@@ -85,7 +85,7 @@ export async function updateClientProfile(
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'プロフィールの更新に失敗しました');
+      throw new Error(error.error?.message || error.error || 'プロフィールの更新に失敗しました');
     }
 
     return await response.json();
@@ -138,7 +138,7 @@ export async function getProfile(userId?: string) {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'プロフィールの取得に失敗しました');
+      throw new Error(error.error?.message || error.error || 'プロフィールの取得に失敗しました');
     }
 
     return await response.json();
