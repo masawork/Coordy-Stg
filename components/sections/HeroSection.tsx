@@ -110,7 +110,7 @@ export default function HeroSection({ isInstructor, setIsInstructor }: HeroSecti
                         transition={{ type: 'spring', duration: 0.5 }}
                       />
                     )}
-                    <span className="relative z-10">🧘‍♂️ インストラクターになる</span>
+                    <span className="relative z-10">🧘‍♂️ 出品者になる</span>
                   </button>
                 </div>
               </div>
@@ -251,7 +251,7 @@ export default function HeroSection({ isInstructor, setIsInstructor }: HeroSecti
                   <div className="flex flex-col sm:flex-row gap-4 items-start">
                     <Link href={getUserButtonHref()}>
                       <button className="group relative px-10 py-4 bg-white text-amber-600 font-bold text-lg rounded-full shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 overflow-hidden">
-                        <span className="relative z-10">0円でインストラクター登録</span>
+                        <span className="relative z-10">0円で出品者登録</span>
                         <div className="absolute inset-0 bg-gradient-to-r from-amber-400 to-orange-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                       </button>
                     </Link>

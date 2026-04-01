@@ -13,7 +13,7 @@ export default function UserBenefits() {
     {
       icon: <FaLightbulb className="text-4xl text-pink-600" />,
       title: '多様な選択肢',
-      description: '様々な分野のサービス出品者から、あなたに合った人を選べます',
+      description: '様々な分野の出品者から、あなたに合った人を選べます',
     },
     {
       icon: <FaClock className="text-4xl text-orange-600" />,
@@ -23,7 +23,7 @@ export default function UserBenefits() {
     {
       icon: <FaHandshake className="text-4xl text-blue-600" />,
       title: '直接つながる安心感',
-      description: 'サービス出品者と直接やり取り。質問や相談もしやすい環境',
+      description: '出品者と直接やり取り。質問や相談もしやすい環境',
     },
     {
       icon: <FaMapMarkerAlt className="text-4xl text-green-600" />,

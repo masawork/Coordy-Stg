@@ -61,6 +61,8 @@ export function ServiceCard({ service, linkPrefix = '/user/services' }: ServiceC
     checkFavorite();
   }, [service.instructorId]);
 
+  const [favoriteError, setFavoriteError] = useState(false);
+
   const handleFavoriteToggle = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -68,25 +70,28 @@ export function ServiceCard({ service, linkPrefix = '/user/services' }: ServiceC
     if (!service.instructorId) return;
 
     setLoading(true);
+    setFavoriteError(false);
+
+    const wasFavorite = isFavorite;
+    const prevFavoriteId = favoriteId;
+
+    // 楽観的更新
+    setIsFavorite(!wasFavorite);
+    if (wasFavorite) setFavoriteId(null);
 
     try {
-      if (isFavorite && favoriteId) {
-        await removeFavoriteCreator(favoriteId);
-        setIsFavorite(false);
-        setFavoriteId(null);
+      if (wasFavorite && prevFavoriteId) {
+        await removeFavoriteCreator(prevFavoriteId);
       } else {
         const result = await addFavoriteCreator(service.instructorId);
-        setIsFavorite(true);
         setFavoriteId(result?.id || null);
       }
     } catch {
       // 失敗時はUI状態を元に戻す
-      if (isFavorite) {
-        setIsFavorite(true);
-      } else {
-        setIsFavorite(false);
-        setFavoriteId(null);
-      }
+      setIsFavorite(wasFavorite);
+      setFavoriteId(prevFavoriteId);
+      setFavoriteError(true);
+      setTimeout(() => setFavoriteError(false), 2000);
     } finally {
       setLoading(false);
     }
@@ -116,17 +121,22 @@ export function ServiceCard({ service, linkPrefix = '/user/services' }: ServiceC
 
           {/* お気に入りボタン */}
           {service.instructorId && (
-            <button
-              onClick={handleFavoriteToggle}
-              disabled={loading}
-              className={`absolute top-2 right-2 p-2 rounded-full transition-all ${
-                isFavorite
-                  ? 'bg-red-500 text-white hover:bg-red-600'
-                  : 'bg-white/90 text-gray-600 hover:text-red-500'
-              } shadow-md`}
-            >
-              <Heart className={`h-4 w-4 ${isFavorite ? 'fill-current' : ''}`} />
-            </button>
+            <div className="absolute top-2 right-2">
+              <button
+                onClick={handleFavoriteToggle}
+                disabled={loading}
+                className={`p-2 rounded-full transition-all ${
+                  favoriteError
+                    ? 'bg-red-100 text-red-600 ring-2 ring-red-300'
+                    : isFavorite
+                      ? 'bg-red-500 text-white hover:bg-red-600'
+                      : 'bg-white/90 text-gray-600 hover:text-red-500'
+                } shadow-md`}
+                title={favoriteError ? '操作に失敗しました' : isFavorite ? 'お気に入り解除' : 'お気に入り登録'}
+              >
+                <Heart className={`h-4 w-4 ${isFavorite ? 'fill-current' : ''}`} />
+              </button>
+            </div>
           )}
         </div>
       </Link>

@@ -148,10 +148,10 @@ export default function InstructorProfileSetupPage() {
       <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-lg shadow p-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            プロフィール設定（サービス出品者）
+            プロフィール設定（出品者）
           </h1>
           <p className="text-sm text-gray-600 mb-6">
-            サービス提供に必要な基本情報を入力してください。
+            出品に必要な基本情報を入力してください。
           </p>
 
           {error && (

@@ -30,7 +30,7 @@ export default function CTASection() {
     return '/signup/user';
   };
 
-  // サービス出品者ボタンの遷移先を決定
+  // 出品者ボタンの遷移先を決定
   const getInstructorButtonHref = () => {
     if (!mounted || !session) return '/signup/instructor';
     if (session.user_metadata?.role?.toLowerCase() === 'instructor') return '/instructor';
@@ -44,7 +44,7 @@ export default function CTASection() {
   };
 
   const getInstructorButtonText = () => {
-    return 'サービス出品者の新規登録はこちら';
+    return '出品者の新規登録はこちら';
   };
 
   return (
