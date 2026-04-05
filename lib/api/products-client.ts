@@ -117,6 +117,7 @@ export async function createProduct(data: {
   sku?: string;
   weight?: number;
   shippingFee?: number;
+  status?: string;
 }): Promise<Product> {
   try {
     const response = await fetch('/api/products', {

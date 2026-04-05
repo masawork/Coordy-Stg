@@ -7,6 +7,7 @@ export interface CartProduct {
   name: string;
   price: number;
   stock: number;
+  trackStock: boolean;
   shippingFee: number;
   images?: Array<{
     url: string;
@@ -28,6 +29,9 @@ export interface CartItem {
 export interface Cart {
   id: string;
   items: CartItem[];
+  subtotal: number;
+  shippingTotal: number;
+  totalAmount: number;
 }
 
 /**
