@@ -19,7 +19,7 @@ export async function cleanupExpiredCharges() {
     }
 
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Cleanup expired charges error:', error);
     // エラーは握りつぶす（バックグラウンド処理のため）
     return { success: false, expiredCount: 0 };
@@ -42,7 +42,7 @@ export async function listPendingCharges() {
     }
 
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('List pending charges error:', error);
     throw error;
   }
@@ -64,7 +64,7 @@ export async function approveCharge(transactionId: string) {
     }
 
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Approve charge error:', error);
     throw error;
   }
@@ -90,7 +90,7 @@ export async function rejectCharge(transactionId: string, reason?: string) {
     }
 
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Reject charge error:', error);
     throw error;
   }
@@ -112,67 +112,9 @@ export async function getAdminStats() {
     }
 
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Get admin stats error:', error);
     throw error;
   }
 }
 
-/**
- * ユーザー一覧取得
- */
-export async function listUsers(filters?: {
-  role?: string;
-  search?: string;
-  limit?: number;
-  offset?: number;
-}) {
-  try {
-    const params = new URLSearchParams();
-    if (filters?.role) params.append('role', filters.role);
-    if (filters?.search) params.append('search', filters.search);
-    if (filters?.limit) params.append('limit', String(filters.limit));
-    if (filters?.offset) params.append('offset', String(filters.offset));
-
-    const response = await fetch(`/api/admin/users?${params.toString()}`, {
-      method: 'GET',
-      credentials: 'include',
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error?.message || error.error || 'ユーザー一覧の取得に失敗しました');
-    }
-
-    return await response.json();
-  } catch (error: any) {
-    console.error('List users error:', error);
-    throw error;
-  }
-}
-
-/**
- * ユーザーロール更新
- */
-export async function updateUserRole(userId: string, role: string) {
-  try {
-    const response = await fetch(`/api/admin/users/${userId}/role`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify({ role }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error?.message || error.error || 'ロールの更新に失敗しました');
-    }
-
-    return await response.json();
-  } catch (error: any) {
-    console.error('Update user role error:', error);
-    throw error;
-  }
-}

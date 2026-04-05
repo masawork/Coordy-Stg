@@ -89,7 +89,7 @@ export const GET = withErrorHandler(async (
   }));
 
   // 繰り返しサービスからスケジュールを生成
-  const generatedSchedules: any[] = [];
+  const generatedSchedules: Record<string, unknown>[] = [];
 
   if (service.recurrenceType !== 'ONCE' && service.startTime && service.availableDays.length > 0) {
     const currentDate = new Date(fromDate);
@@ -136,9 +136,13 @@ export const GET = withErrorHandler(async (
 
   // 結合してソート
   const allSchedules = [...customSchedules, ...generatedSchedules].sort((a, b) => {
-    const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime();
+    const aDate = a.date instanceof Date ? a.date : new Date(a.date as string | number);
+    const bDate = b.date instanceof Date ? b.date : new Date(b.date as string | number);
+    const dateCompare = aDate.getTime() - bDate.getTime();
     if (dateCompare !== 0) return dateCompare;
-    return a.startTime.localeCompare(b.startTime);
+    const aStartTime = String(a.startTime || '');
+    const bStartTime = String(b.startTime || '');
+    return aStartTime.localeCompare(bStartTime);
   });
 
   return NextResponse.json({

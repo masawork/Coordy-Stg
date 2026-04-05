@@ -6,24 +6,42 @@ import { withErrorHandler, unauthorizedError, forbiddenError, validationError } 
 export const dynamic = 'force-dynamic';
 
 /**
- * お知らせ一覧取得（ユーザー用）
- * 公開済みで有効期限内のものを取得
+ * お知らせ一覧取得
+ * 一般ユーザー: 公開済みで有効期限内のものを取得
+ * 管理者: 下書き含む全てのお知らせを取得
  */
 export const GET = withErrorHandler(async (request: NextRequest) => {
   const { searchParams } = new URL(request.url);
   const target = searchParams.get('target') || 'all'; // all, users, instructors
   const limit = parseInt(searchParams.get('limit') || '10');
+  const includeDrafts = searchParams.get('include_drafts') === 'true';
 
-  const where: any = {
-    isPublished: true,
-    publishedAt: {
-      lte: new Date(),
-    },
-    OR: [
+  // include_draftsが指定されている場合、管理者権限を確認
+  let isAdmin = false;
+  if (includeDrafts) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const dbUser = await prisma.user.findFirst({
+        where: { authId: user.id },
+      });
+      if (dbUser?.role === 'ADMIN') {
+        isAdmin = true;
+      }
+    }
+  }
+
+  const where: Record<string, unknown> = {};
+
+  if (!isAdmin) {
+    // 一般ユーザー: 公開済みのみ
+    where.isPublished = true;
+    where.publishedAt = { lte: new Date() };
+    where.OR = [
       { expiresAt: null }, // 期限なし
       { expiresAt: { gt: new Date() } }, // 有効期限内
-    ],
-  };
+    ];
+  }
 
   // ターゲット絞り込み
   if (target !== 'all') {

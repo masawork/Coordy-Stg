@@ -51,12 +51,13 @@ export async function addFavoriteCreator(userId: string, instructorId: string) {
     });
 
     return favorite;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Add favorite creator error:', error);
-    if (error.code === 'P2002') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
       throw new Error('既にお気に入りに登録されています');
     }
-    throw new Error(`お気に入り追加に失敗しました: ${error.message}`);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`お気に入り追加に失敗しました: ${message}`);
   }
 }
 
@@ -73,9 +74,10 @@ export async function removeFavoriteCreator(userId: string, instructorId: string
     });
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Remove favorite creator error:', error);
-    throw new Error(`お気に入り削除に失敗しました: ${error.message}`);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`お気に入り削除に失敗しました: ${message}`);
   }
 }
 

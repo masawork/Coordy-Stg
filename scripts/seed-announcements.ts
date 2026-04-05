@@ -41,7 +41,7 @@ async function main() {
       target: 'users',
       priority: 'medium',
       title: '新規講師が加わりました！',
-      content: 'この度、経験豊富なヨガインストラクター3名が新たに加わりました。\n\n【新規講師】\n・田中先生（ハタヨガ専門）\n・佐藤先生（パワーヨガ専門）\n・鈴木先生（リストラティブヨガ専門）\n\nぜひレッスンをご予約ください！',
+      content: 'この度、経験豊富なヨガサービス提供者3名が新たに加わりました。\n\n【新規講師】\n・田中先生（ハタヨガ専門）\n・佐藤先生（パワーヨガ専門）\n・鈴木先生（リストラティブヨガ専門）\n\nぜひレッスンをご予約ください！',
       isPublished: true,
       publishedAt: new Date(),
       expiresAt: null,

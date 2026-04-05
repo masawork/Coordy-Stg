@@ -87,7 +87,7 @@ export default function InstructorProfileSetupPage() {
           specialties: (instructor.specialties || []).join(', '),
         }));
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('インストラクター情報の読み込みエラー:', err);
       router.push('/login/instructor');
     } finally {
@@ -126,9 +126,10 @@ export default function InstructorProfileSetupPage() {
       });
 
       router.push('/instructor');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('インストラクタープロフィール保存エラー:', err);
-      setError(err?.message || 'プロフィールの保存に失敗しました。');
+      const message = err instanceof Error ? err.message : 'プロフィールの保存に失敗しました。';
+      setError(message);
     } finally {
       setLoading(false);
     }

@@ -17,7 +17,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   const isActiveParam = searchParams.get('isActive');
   const isActive = isActiveParam === null ? undefined : isActiveParam === 'true';
 
-  const where: any = {};
+  const where: Record<string, unknown> = {};
   if (instructorId) where.instructorId = instructorId;
   if (serviceId) where.serviceId = serviceId;
   if (isActive !== undefined) where.isActive = isActive;

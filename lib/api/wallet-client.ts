@@ -19,7 +19,7 @@ export async function getWallet(userId: string) {
     }
 
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Get wallet error:', error);
     throw error;
   }
@@ -45,7 +45,7 @@ export async function usePoints(userId: string, amount: number, description: str
     }
 
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Use points error:', error);
     throw error;
   }
@@ -72,7 +72,7 @@ export async function chargePointsWithCard(amount: number, paymentMethodId?: str
     }
 
     return data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Charge with card error:', error);
     throw error;
   }
@@ -99,7 +99,7 @@ export async function chargePointsWithBankTransfer(amount: number) {
     }
 
     return data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Bank transfer charge error:', error);
     throw error;
   }
@@ -127,7 +127,7 @@ export async function reportBankTransferComplete(amount: number, transferCode: s
     }
 
     return data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Report bank transfer complete error:', error);
     throw error;
   }
@@ -149,7 +149,7 @@ export async function getTransactionHistory(userId: string) {
     }
 
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Get transaction history error:', error);
     throw error;
   }
@@ -171,7 +171,7 @@ export async function getPaymentMethods() {
     }
 
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Get payment methods error:', error);
     throw error;
   }

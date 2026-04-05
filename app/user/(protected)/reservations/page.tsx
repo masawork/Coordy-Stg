@@ -7,10 +7,10 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getSession } from '@/lib/auth';
-import { listReservations, cancelReservation } from '@/lib/api/reservations';
 import { Button } from '@/components/ui/button';
 import { Calendar, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
-import { ReservationStatus } from '@prisma/client';
+
+type ReservationStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
 
 function ReservationsContent() {
   const router = useRouter();
@@ -32,8 +32,16 @@ function ReservationsContent() {
         return;
       }
 
-      const reservationData = await listReservations({ userId: session.user.id });
-      setReservations(reservationData || []);
+      const response = await fetch('/api/reservations', {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('予約一覧の取得に失敗しました');
+      }
+
+      const data = await response.json();
+      setReservations(data || []);
     } catch (err) {
       console.error('予約一覧取得エラー:', err);
       setReservations([]);
@@ -50,11 +58,22 @@ function ReservationsContent() {
     setCancelingId(reservationId);
 
     try {
-      await cancelReservation(reservationId);
+      const response = await fetch(`/api/reservations/${reservationId}/cancel`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ reason: '' }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error?.message || data.error || 'キャンセルに失敗しました');
+      }
+
       await loadReservations();
     } catch (err) {
       console.error('予約キャンセルエラー:', err);
-      alert('キャンセルに失敗しました');
+      alert(err instanceof Error ? err.message : 'キャンセルに失敗しました');
     } finally {
       setCancelingId(null);
     }
@@ -68,6 +87,7 @@ function ReservationsContent() {
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+      timeZone: 'Asia/Tokyo',
     });
   };
 
@@ -108,7 +128,7 @@ function ReservationsContent() {
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
             <p className="text-green-600 font-medium">予約が完了しました！</p>
             <p className="text-green-600 text-sm mt-1">
-              クリエイターからの確認をお待ちください。
+              サービス提供者からの確認をお待ちください。
             </p>
           </div>
         )}
@@ -157,7 +177,7 @@ function ReservationsContent() {
                   {reservation.instructor?.user && (
                     <div className="flex items-center gap-2 text-gray-600">
                       <span className="text-sm">
-                        インストラクター: {reservation.instructor.user.name}
+                        サービス提供者: {reservation.instructor.user.name}
                       </span>
                     </div>
                   )}
@@ -173,7 +193,7 @@ function ReservationsContent() {
                 )}
 
                 {/* アクション */}
-                {(reservation.status === ReservationStatus.PENDING || reservation.status === ReservationStatus.CONFIRMED) && (
+                {(reservation.status === 'PENDING' || reservation.status === 'CONFIRMED') && (
                   <div className="flex gap-2">
                     <Button
                       onClick={() => handleCancel(reservation.id)}

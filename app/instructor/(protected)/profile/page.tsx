@@ -58,8 +58,9 @@ export default function InstructorProfilePage() {
             const dob = typeof profile.dateOfBirth === 'string'
               ? new Date(profile.dateOfBirth)
               : profile.dateOfBirth;
-            if (!isNaN(new Date(dob as any).getTime())) {
-              dateOfBirth = new Date(dob as any).toISOString().split('T')[0];
+            const dobDate = dob instanceof Date ? dob : new Date(String(dob));
+            if (!isNaN(dobDate.getTime())) {
+              dateOfBirth = dobDate.toISOString().split('T')[0];
             }
           }
           // isProfileComplete がある場合はそれを優先、なければ必須項目有無で判定

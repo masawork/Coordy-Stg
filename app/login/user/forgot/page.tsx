@@ -28,17 +28,17 @@ export default function ForgotPasswordPage() {
     try {
       await forgotPassword(email);
       setSuccess(true);
-    } catch (err: any) {
+    } catch (err: unknown) { const message = err instanceof Error ? err.message : '不明なエラー';
       console.error('Forgot password error:', err);
       
       let friendlyMessage = 'パスワードリセットメールの送信に失敗しました。';
       
-      if (err.message?.includes('not found') || err.message?.includes('登録')) {
+      if (message?.includes('not found') || message?.includes('登録')) {
         friendlyMessage = 'このメールアドレスは登録されていません';
-      } else if (err.message?.includes('network') || err.message?.includes('Network')) {
+      } else if (message?.includes('network') || message?.includes('Network')) {
         friendlyMessage = 'ネットワークエラーが発生しました。インターネット接続を確認してください。';
-      } else if (err.message) {
-        friendlyMessage = err.message;
+      } else if (message) {
+        friendlyMessage = message;
       }
 
       setError(friendlyMessage);

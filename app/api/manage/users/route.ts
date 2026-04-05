@@ -18,7 +18,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   const limit = Number(searchParams.get('limit') || '50');
   const offset = Number(searchParams.get('offset') || '0');
 
-  const where: any = {};
+  const where: Record<string, unknown> = {};
   if (role) where.role = role;
   if (search) {
     where.OR = [

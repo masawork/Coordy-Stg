@@ -21,6 +21,7 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any | null>(null);
   const [displayName, setDisplayName] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [redirected, setRedirected] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -29,6 +30,7 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        setAuthError(null);
         const session = await getSession();
 
         if (!session?.user) {
@@ -50,11 +52,18 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
             });
 
             if (!response.ok) {
-              // このロールでユーザーが登録されていない
-              if (!redirected) {
-                setRedirected(true);
-                router.push('/login/instructor');
+              // 401/404: このロールでユーザーが登録されていない → ログインへ
+              if (response.status === 401 || response.status === 404) {
+                if (!redirected) {
+                  setRedirected(true);
+                  router.push('/login/instructor');
+                }
+                return;
               }
+              // 500等サーバーエラー → エラー画面表示（無限リダイレクト防止）
+              console.error('Layout: check-role API error:', response.status);
+              setLoading(false);
+              setAuthError('サーバーとの通信でエラーが発生しました。しばらくしてから再度お試しください。');
               return;
             }
 
@@ -73,22 +82,21 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
               profile?.displayName
                 || authUser.user_metadata?.name
                 || authUser.email
-                || 'インストラクター'
+                || 'サービス提供者'
             );
             setUser(authUser);
           } catch (err) {
             console.error('インストラクタープロフィール取得エラー:', err);
-            if (!redirected) {
-              setRedirected(true);
-              router.push('/instructor/profile/setup');
-            }
+            // ネットワークエラー → エラー画面表示（無限リダイレクト防止）
+            setLoading(false);
+            setAuthError('ネットワークエラーが発生しました。接続を確認して再度お試しください。');
             return;
           }
         } else {
           setDisplayName(
             authUser.user_metadata?.name
               || authUser.email
-              || 'インストラクター'
+              || 'サービス提供者'
           );
           setUser(authUser);
         }
@@ -113,6 +121,34 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">読み込み中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (authError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="bg-white rounded-lg shadow-lg p-8">
+            <div className="text-red-500 text-4xl mb-4">⚠️</div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">エラーが発生しました</h2>
+            <p className="text-gray-600 mb-6">{authError}</p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+              >
+                再読み込み
+              </button>
+              <button
+                onClick={() => router.push('/login/instructor')}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm"
+              >
+                ログインページへ
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );

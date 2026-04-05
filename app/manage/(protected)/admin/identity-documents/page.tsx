@@ -3,94 +3,93 @@
 // 動的レンダリングを強制（React 19 + Next.js 16）
 export const dynamic = 'force-dynamic';
 
-
 import { useState, useEffect } from 'react';
-import { listInstructors, updateInstructor } from '@/lib/api/instructors';
+import { useRouter } from 'next/navigation';
+
+interface IdentityRequest {
+  id: string;
+  documentType: string;
+  documentFrontUrl: string | null;
+  documentBackUrl: string | null;
+  status: string;
+  rejectedReason: string | null;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  };
+}
 
 export default function AdminIdentityDocumentsPage() {
-  const [instructors, setInstructors] = useState<any[]>([]);
+  const router = useRouter();
+  const [requests, setRequests] = useState<IdentityRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedInstructor, setSelectedInstructor] = useState<any>(null);
-  const [rejectionReason, setRejectionReason] = useState('');
-  const [processing, setProcessing] = useState(false);
+  const [roleFilter, setRoleFilter] = useState<'all' | 'USER' | 'INSTRUCTOR'>('INSTRUCTOR');
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    loadPendingDocuments();
-  }, []);
+    loadDocuments();
+  }, [roleFilter]);
 
-  const loadPendingDocuments = async () => {
+  const loadDocuments = async () => {
     try {
       setLoading(true);
-      const allInstructors = await listInstructors();
-      // pending ステータスのみ表示
-      const pending = allInstructors.filter(
-        (inst: any) => inst.identityDocumentStatus === 'pending'
-      );
-      setInstructors(pending);
-      console.log('📋 審査待ち身分証明書:', pending.length, '件');
-    } catch (error) {
-      console.error('❌ 読み込みエラー:', error);
+      setError('');
+      const params = new URLSearchParams();
+      if (roleFilter !== 'all') {
+        params.set('role', roleFilter);
+      }
+      const response = await fetch(`/api/manage/identity-requests?${params.toString()}`, {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('身分証一覧の取得に失敗しました');
+      }
+
+      const data = await response.json();
+      setRequests(data.requests || data || []);
+    } catch (err) {
+      console.error('読み込みエラー:', err);
+      setError(err instanceof Error ? err.message : '読み込みに失敗しました');
+      setRequests([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleApprove = async (instructorId: string) => {
-    if (!confirm('この身分証明書を承認しますか？')) {
-      return;
-    }
-
-    try {
-      setProcessing(true);
-      // TODO: identityDocumentStatusとidentityDocumentApprovedAtはPrismaスキーマに未実装のため一時的にコメントアウト
-      // await updateInstructor(instructorId, {
-      //   identityDocumentStatus: 'approved',
-      //   identityDocumentApprovedAt: new Date().toISOString(),
-      // });
-      console.log('身分証明書承認（DB更新は未実装）:', instructorId);
-      alert('承認しました');
-      await loadPendingDocuments();
-    } catch (error) {
-      console.error('❌ 承認エラー:', error);
-      alert('承認に失敗しました');
-    } finally {
-      setProcessing(false);
-    }
+  const getStatusBadge = (status: string) => {
+    const styles: Record<string, string> = {
+      PENDING: 'bg-yellow-100 text-yellow-800',
+      APPROVED: 'bg-green-100 text-green-800',
+      REJECTED: 'bg-red-100 text-red-800',
+    };
+    const labels: Record<string, string> = {
+      PENDING: '審査中',
+      APPROVED: '承認済み',
+      REJECTED: '却下',
+    };
+    return (
+      <span className={`px-3 py-1 rounded-full text-sm font-medium ${styles[status] || 'bg-gray-100 text-gray-800'}`}>
+        {labels[status] || status}
+      </span>
+    );
   };
 
-  const handleReject = async (instructorId: string) => {
-    if (!rejectionReason.trim()) {
-      alert('却下理由を入力してください');
-      return;
-    }
-
-    if (!confirm('この身分証明書を却下しますか？')) {
-      return;
-    }
-
-    try {
-      setProcessing(true);
-      // TODO: identityDocumentStatusとidentityDocumentRejectionReasonはPrismaスキーマに未実装のため一時的にコメントアウト
-      // await updateInstructor(instructorId, {
-      //   identityDocumentStatus: 'rejected',
-      //   identityDocumentRejectionReason: rejectionReason,
-      // });
-      console.log('身分証明書却下（DB更新は未実装）:', instructorId, rejectionReason);
-      alert('却下しました');
-      setRejectionReason('');
-      setSelectedInstructor(null);
-      await loadPendingDocuments();
-    } catch (error) {
-      console.error('❌ 却下エラー:', error);
-      alert('却下に失敗しました');
-    } finally {
-      setProcessing(false);
-    }
+  const getDocTypeName = (type: string) => {
+    const names: Record<string, string> = {
+      DRIVERS_LICENSE: '運転免許証',
+      MY_NUMBER: 'マイナンバーカード',
+      PASSPORT: 'パスポート',
+    };
+    return names[type] || type;
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">読み込み中...</p>
@@ -100,118 +99,103 @@ export default function AdminIdentityDocumentsPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">身分証明書審査</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">身分証明書一覧</h1>
+          <p className="text-sm text-gray-600 mt-1">提出された身分証明書を確認します</p>
+        </div>
         <button
-          onClick={loadPendingDocuments}
+          onClick={loadDocuments}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           再読み込み
         </button>
       </div>
 
-      {instructors.length === 0 ? (
+      {/* ロールフィルタ */}
+      <div className="flex gap-2">
+        {(['all', 'INSTRUCTOR', 'USER'] as const).map((role) => (
+          <button
+            key={role}
+            onClick={() => setRoleFilter(role)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              roleFilter === role
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            {role === 'all' ? '全て' : role === 'USER' ? 'ユーザー' : 'サービス提供者'}
+          </button>
+        ))}
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-600">{error}</p>
+        </div>
+      )}
+
+      {requests.length === 0 ? (
         <div className="bg-white rounded-lg shadow p-12 text-center">
-          <p className="text-gray-500">審査待ちの書類はありません</p>
+          <p className="text-gray-500">該当する書類はありません</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6">
-          {instructors.map((instructor) => (
-            <div key={instructor.id} className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    {instructor.displayName || '名前未設定'}
-                  </h2>
-                  <p className="text-sm text-gray-500 mt-1">
-                    ユーザーID: {instructor.userId}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    提出日: {instructor.identityDocumentSubmittedAt
-                      ? new Date(instructor.identityDocumentSubmittedAt).toLocaleString('ja-JP')
-                      : '不明'}
-                  </p>
-                </div>
-                <span className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
-                  審査中
-                </span>
-              </div>
-
-              {/* 画像プレビュー */}
-              <div className="mb-4">
-                {instructor.identityDocumentUrl ? (
-                  <>
-                    <p className="text-sm font-medium text-gray-700 mb-2">身分証明書:</p>
-                    {instructor.identityDocumentUrl.endsWith('.pdf') ? (
-                      <a
-                        href={instructor.identityDocumentUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">名前</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">メール</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ロール</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">書類種別</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">提出日</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ステータス</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {requests.map((req) => (
+                <tr key={req.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {req.user?.name || '不明'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {req.user?.email || '不明'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {req.user?.role === 'INSTRUCTOR' ? 'サービス提供者' : 'ユーザー'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {getDocTypeName(req.documentType)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {new Date(req.createdAt).toLocaleDateString('ja-JP')}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {getStatusBadge(req.status)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {req.status === 'PENDING' ? (
+                      <button
+                        onClick={() => router.push(`/manage/admin/verification/${req.id}`)}
+                        className="text-blue-600 hover:text-blue-800 font-medium"
                       >
-                        PDFを開く
-                      </a>
+                        審査する →
+                      </button>
                     ) : (
-                      <img
-                        src={instructor.identityDocumentUrl}
-                        alt="身分証明書"
-                        className="max-w-full h-auto rounded-lg border"
-                      />
+                      <button
+                        onClick={() => router.push(`/manage/admin/verification/${req.id}`)}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        詳細
+                      </button>
                     )}
-                  </>
-                ) : (
-                  <p className="text-sm text-gray-500">画像がアップロードされていません</p>
-                )}
-              </div>
-
-              {/* アクションボタン */}
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setSelectedInstructor(instructor)}
-                  disabled={processing}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                >
-                  却下する
-                </button>
-              </div>
-
-              {/* 却下理由入力モーダル */}
-              {selectedInstructor?.id === instructor.id && (
-                <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    却下理由
-                  </label>
-                  <textarea
-                    value={rejectionReason}
-                    onChange={(e) => setRejectionReason(e.target.value)}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
-                    placeholder="却下理由を入力してください（例: 画像が不鮮明です、別の身分証明書を提出してください）"
-                  />
-                  <div className="flex gap-2 mt-2">
-                    <button
-                      onClick={() => handleReject(instructor.id)}
-                      disabled={processing}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                    >
-                      確定
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedInstructor(null);
-                        setRejectionReason('');
-                      }}
-                      disabled={processing}
-                      className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 disabled:bg-gray-200 disabled:cursor-not-allowed transition-colors"
-                    >
-                      キャンセル
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

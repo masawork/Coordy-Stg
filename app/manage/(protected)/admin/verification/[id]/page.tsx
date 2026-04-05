@@ -1,12 +1,15 @@
 /**
  * 本人確認書類 確認ページ（管理者用）
+ * - ユーザー情報・提出書類の確認
+ * - Web検索結果の表示（名前で検索）
+ * - 承認/却下アクション
  */
 
 'use client';
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 
@@ -30,6 +33,7 @@ interface VerificationRequest {
     id: string;
     name: string;
     email: string;
+    role: string;
     clientProfile: {
       fullName: string | null;
       phoneNumber: string | null;
@@ -47,6 +51,21 @@ interface VerificationRequest {
   } | null;
 }
 
+interface SearchResult {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
+interface WebSearchResponse {
+  results: SearchResult[];
+  searchLinks: {
+    google: string;
+    googleNews: string;
+  };
+  note?: string;
+}
+
 export default function VerificationDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -58,6 +77,11 @@ export default function VerificationDetailPage() {
   const [rejectedReason, setRejectedReason] = useState('');
   const [adminNote, setAdminNote] = useState('');
   const [processing, setProcessing] = useState(false);
+
+  // Web検索関連
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<WebSearchResponse | null>(null);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     loadRequest();
@@ -79,6 +103,11 @@ export default function VerificationDetailPage() {
 
       const data = await response.json();
       setRequest(data);
+
+      // 書類の氏名をデフォルト検索クエリに設定
+      if (data.fullName) {
+        setSearchQuery(data.fullName);
+      }
     } catch (error) {
       console.error('Load request error:', error);
       alert('申請の取得に失敗しました');
@@ -86,6 +115,26 @@ export default function VerificationDetailPage() {
       setLoading(false);
     }
   };
+
+  const handleWebSearch = useCallback(async (query?: string) => {
+    const q = query || searchQuery;
+    if (!q.trim()) return;
+
+    try {
+      setSearching(true);
+      const response = await fetch(
+        `/api/admin/verification/web-search?q=${encodeURIComponent(q)}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setSearchResults(data);
+      }
+    } catch (error) {
+      console.error('Web search error:', error);
+    } finally {
+      setSearching(false);
+    }
+  }, [searchQuery]);
 
   const handleApprove = async () => {
     if (!confirm('この本人確認書類を承認しますか？')) {
@@ -156,6 +205,19 @@ export default function VerificationDetailPage() {
     }
   };
 
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'USER':
+        return 'ユーザー';
+      case 'INSTRUCTOR':
+        return 'サービス提供者';
+      case 'ADMIN':
+        return '管理者';
+      default:
+        return role;
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -180,7 +242,7 @@ export default function VerificationDetailPage() {
   const isPending = request.status === 'pending';
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-4 py-8">
       {/* ヘッダー */}
       <div className="mb-6">
         <button
@@ -190,7 +252,7 @@ export default function VerificationDetailPage() {
           ← 一覧に戻る
         </button>
         <h1 className="text-3xl font-bold text-gray-900">
-          📄 本人確認書類の確認
+          本人確認書類の確認
         </h1>
       </div>
 
@@ -199,55 +261,201 @@ export default function VerificationDetailPage() {
         <div className="space-y-6">
           {/* ユーザー情報 */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">👤 ユーザー情報</h2>
-            <div className="space-y-2 text-sm">
-              <p>
-                <span className="font-semibold">氏名:</span> {request.user.name}
-              </p>
-              <p>
-                <span className="font-semibold">メール:</span> {request.user.email}
-              </p>
-              <p>
-                <span className="font-semibold">電話番号:</span>{' '}
-                {request.user.clientProfile?.phoneNumber || '未登録'}
-                {request.user.clientProfile?.phoneVerified && ' ✅'}
-              </p>
-              <p>
-                <span className="font-semibold">現在の認証レベル:</span> Level{' '}
-                {request.user.clientProfile?.verificationLevel || 0}
-              </p>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">ユーザー情報</h2>
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <span className="font-semibold text-gray-500">アカウント名</span>
+                  <p className="text-gray-900">{request.user.name}</p>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-500">ロール</span>
+                  <p className="text-gray-900">{getRoleLabel(request.user.role)}</p>
+                </div>
+              </div>
+              <div>
+                <span className="font-semibold text-gray-500">メールアドレス</span>
+                <p className="text-gray-900">{request.user.email}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <span className="font-semibold text-gray-500">電話番号</span>
+                  <p className="text-gray-900">
+                    {request.user.clientProfile?.phoneNumber || '未登録'}
+                    {request.user.clientProfile?.phoneVerified && (
+                      <span className="ml-1 text-green-600 text-xs">認証済</span>
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-500">認証レベル</span>
+                  <p className="text-gray-900">
+                    Level {request.user.clientProfile?.verificationLevel || 0}
+                    {request.user.clientProfile?.identityVerified && (
+                      <span className="ml-1 text-green-600 text-xs">本人確認済</span>
+                    )}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* 提出書類情報 */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">📋 提出書類情報</h2>
-            <div className="space-y-2 text-sm">
-              <p>
-                <span className="font-semibold">書類種類:</span>{' '}
-                {getDocumentTypeLabel(request.documentType)}
-              </p>
-              <p>
-                <span className="font-semibold">提出日時:</span>{' '}
-                {new Date(request.createdAt).toLocaleString('ja-JP')}
-              </p>
-              <hr className="my-3" />
-              <p>
-                <span className="font-semibold">氏名（書類）:</span> {request.fullName}
-              </p>
-              <p>
-                <span className="font-semibold">生年月日:</span>{' '}
-                {new Date(request.dateOfBirth).toLocaleDateString('ja-JP')}
-              </p>
-              <p>
-                <span className="font-semibold">住所:</span> {request.address}
-              </p>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">提出書類情報</h2>
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <span className="font-semibold text-gray-500">書類種類</span>
+                  <p className="text-gray-900">{getDocumentTypeLabel(request.documentType)}</p>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-500">提出日時</span>
+                  <p className="text-gray-900">{new Date(request.createdAt).toLocaleString('ja-JP')}</p>
+                </div>
+              </div>
+              <hr className="my-2" />
+              <div>
+                <span className="font-semibold text-gray-500">氏名（書類記載）</span>
+                <p className="text-gray-900 text-base font-semibold">{request.fullName}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <span className="font-semibold text-gray-500">生年月日</span>
+                  <p className="text-gray-900">
+                    {new Date(request.dateOfBirth).toLocaleDateString('ja-JP')}
+                  </p>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-500">住所</span>
+                  <p className="text-gray-900">{request.address}</p>
+                </div>
+              </div>
+
+              {/* アカウント名と書類氏名の一致チェック */}
+              {request.fullName !== request.user.name && (
+                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-300 rounded-lg">
+                  <p className="text-yellow-800 text-xs font-semibold">
+                    注意: アカウント名「{request.user.name}」と書類氏名「{request.fullName}」が異なります
+                  </p>
+                </div>
+              )}
             </div>
+          </div>
+
+          {/* Web検索セクション */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Web検索（身元調査）</h2>
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleWebSearch()}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                placeholder="名前・メール等で検索..."
+              />
+              <button
+                onClick={() => handleWebSearch()}
+                disabled={searching || !searchQuery.trim()}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 transition-colors text-sm whitespace-nowrap"
+              >
+                {searching ? '検索中...' : '検索'}
+              </button>
+            </div>
+
+            {/* クイック検索ボタン */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              <button
+                onClick={() => {
+                  setSearchQuery(request.fullName);
+                  handleWebSearch(request.fullName);
+                }}
+                className="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs transition-colors"
+              >
+                書類氏名で検索
+              </button>
+              <button
+                onClick={() => {
+                  const q = `${request.fullName} ${request.address.split(/[都道府県]/)[0] || ''}`;
+                  setSearchQuery(q.trim());
+                  handleWebSearch(q.trim());
+                }}
+                className="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs transition-colors"
+              >
+                氏名+地域で検索
+              </button>
+              <button
+                onClick={() => {
+                  setSearchQuery(request.user.email);
+                  handleWebSearch(request.user.email);
+                }}
+                className="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs transition-colors"
+              >
+                メールで検索
+              </button>
+            </div>
+
+            {/* 検索結果 */}
+            {searchResults && (
+              <div className="space-y-3">
+                {searchResults.note && (
+                  <p className="text-xs text-gray-500 italic">{searchResults.note}</p>
+                )}
+
+                {searchResults.results.length > 0 ? (
+                  <div className="space-y-3">
+                    {searchResults.results.map((result, idx) => (
+                      <div key={idx} className="p-3 bg-gray-50 rounded-lg border">
+                        <a
+                          href={result.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                          {result.title}
+                        </a>
+                        <p className="text-xs text-green-700 truncate mt-0.5">{result.url}</p>
+                        <p className="text-xs text-gray-600 mt-1 line-clamp-2">{result.snippet}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">API検索結果はありません。下記のリンクから直接検索できます。</p>
+                )}
+
+                {/* 外部検索リンク */}
+                <div className="flex gap-2 pt-2 border-t">
+                  <a
+                    href={searchResults.searchLinks.google}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded text-xs hover:bg-blue-100 transition-colors"
+                  >
+                    Google で検索
+                  </a>
+                  <a
+                    href={searchResults.searchLinks.googleNews}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded text-xs hover:bg-blue-100 transition-colors"
+                  >
+                    Google ニュースで検索
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {!searchResults && (
+              <p className="text-xs text-gray-400">
+                「検索」ボタンを押すと、申請者の名前等でWeb検索を実行します。
+              </p>
+            )}
           </div>
 
           {/* 管理者メモ */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">📝 管理者メモ（任意）</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">管理者メモ（任意）</h2>
             <textarea
               value={adminNote}
               onChange={(e) => setAdminNote(e.target.value)}
@@ -263,7 +471,7 @@ export default function VerificationDetailPage() {
         <div className="space-y-6">
           {/* 表面画像 */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">📸 表面</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">表面</h2>
             <div className="border-2 border-gray-300 rounded-lg overflow-hidden">
               <img
                 src={request.documentFrontUrl}
@@ -276,14 +484,14 @@ export default function VerificationDetailPage() {
                 onClick={() => window.open(request.documentFrontUrl, '_blank')}
                 className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
               >
-                🔍 拡大表示
+                拡大表示
               </button>
               <a
                 href={request.documentFrontUrl}
                 download
                 className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
               >
-                ⬇️ ダウンロード
+                ダウンロード
               </a>
             </div>
           </div>
@@ -291,7 +499,7 @@ export default function VerificationDetailPage() {
           {/* 裏面画像 */}
           {request.documentBackUrl && (
             <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">📸 裏面</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">裏面</h2>
               <div className="border-2 border-gray-300 rounded-lg overflow-hidden">
                 <img
                   src={request.documentBackUrl}
@@ -304,14 +512,14 @@ export default function VerificationDetailPage() {
                   onClick={() => window.open(request.documentBackUrl!, '_blank')}
                   className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
                 >
-                  🔍 拡大表示
+                  拡大表示
                 </button>
                 <a
                   href={request.documentBackUrl}
                   download
                   className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
                 >
-                  ⬇️ ダウンロード
+                  ダウンロード
                 </a>
               </div>
             </div>
@@ -320,7 +528,7 @@ export default function VerificationDetailPage() {
           {/* 補足画像 */}
           {request.additionalImages && request.additionalImages.length > 0 && (
             <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">📎 補足写真</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">補足写真</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {request.additionalImages.map((url, idx) => (
                   <div key={idx} className="border rounded-lg overflow-hidden relative">
@@ -331,14 +539,14 @@ export default function VerificationDetailPage() {
                         onClick={() => window.open(url, '_blank')}
                         className="px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700"
                       >
-                        🔍
+                        拡大
                       </button>
                       <a
                         href={url}
                         download
                         className="px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700"
                       >
-                        ⬇️
+                        DL
                       </a>
                     </div>
                   </div>
@@ -358,14 +566,14 @@ export default function VerificationDetailPage() {
               disabled={processing}
               className="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-colors font-semibold"
             >
-              {processing ? '処理中...' : '✅ 承認する'}
+              {processing ? '処理中...' : '承認する'}
             </button>
             <button
               onClick={() => setShowRejectModal(true)}
               disabled={processing}
               className="px-8 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 transition-colors font-semibold"
             >
-              ❌ 却下する
+              却下する
             </button>
           </div>
         </div>
@@ -377,7 +585,7 @@ export default function VerificationDetailPage() {
           <div className="text-center">
             {request.status === 'approved' && (
               <div className="text-green-600">
-                <p className="text-2xl font-bold mb-2">✅ 承認済み</p>
+                <p className="text-2xl font-bold mb-2">承認済み</p>
                 <p className="text-sm">
                   承認日時: {new Date(request.reviewedAt!).toLocaleString('ja-JP')}
                 </p>
@@ -388,7 +596,7 @@ export default function VerificationDetailPage() {
             )}
             {request.status === 'rejected' && (
               <div className="text-red-600">
-                <p className="text-2xl font-bold mb-2">❌ 却下済み</p>
+                <p className="text-2xl font-bold mb-2">却下済み</p>
                 <p className="text-sm">
                   却下日時: {new Date(request.reviewedAt!).toLocaleString('ja-JP')}
                 </p>
@@ -443,7 +651,7 @@ export default function VerificationDetailPage() {
                   }
                   className="w-full text-left px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
                 >
-                  • 書類の鮮明度が不足
+                  書類の鮮明度が不足
                 </button>
                 <button
                   onClick={() =>
@@ -451,7 +659,7 @@ export default function VerificationDetailPage() {
                   }
                   className="w-full text-left px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
                 >
-                  • 氏名の不一致
+                  氏名の不一致
                 </button>
                 <button
                   onClick={() =>
@@ -459,7 +667,7 @@ export default function VerificationDetailPage() {
                   }
                   className="w-full text-left px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
                 >
-                  • 有効期限切れ
+                  有効期限切れ
                 </button>
                 <button
                   onClick={() =>
@@ -467,7 +675,7 @@ export default function VerificationDetailPage() {
                   }
                   className="w-full text-left px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
                 >
-                  • 書類の一部が欠けている
+                  書類の一部が欠けている
                 </button>
                 <button
                   onClick={() =>
@@ -475,7 +683,7 @@ export default function VerificationDetailPage() {
                   }
                   className="w-full text-left px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
                 >
-                  • 裏面画像が不足
+                  裏面画像が不足
                 </button>
               </div>
             </div>

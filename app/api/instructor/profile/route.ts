@@ -55,13 +55,13 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   });
 
   if (!dbUser) {
-    return notFoundError('インストラクター');
+    return notFoundError('サービス提供者');
   }
 
   const body = await req.json();
   const bio: string | undefined = body.bio ?? undefined;
   const specialties: string[] = Array.isArray(body.specialties)
-    ? body.specialties.filter((s: any) => typeof s === 'string' && s.trim().length > 0)
+    ? body.specialties.filter((s: string) => typeof s === 'string' && s.trim().length > 0)
     : [];
   const hourlyRate: number | null =
     typeof body.hourlyRate === 'number'

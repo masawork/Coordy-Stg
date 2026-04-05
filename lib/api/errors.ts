@@ -3,7 +3,7 @@
  * Issue #8: APIエラーレスポンス形式の統一
  *
  * すべてのAPIエラーは以下の形式で返される:
- * { error: { code: string, message: string, details?: any } }
+ * { error: { code: string, message: string, details?: Record<string, unknown> } }
  */
 
 import { NextResponse } from 'next/server';
@@ -30,7 +30,7 @@ export interface ApiErrorResponse {
   error: {
     code: ErrorCodeType;
     message: string;
-    details?: any;
+    details?: Record<string, unknown>;
   };
 }
 
@@ -41,7 +41,7 @@ function createErrorResponse(
   code: ErrorCodeType,
   message: string,
   status: number,
-  details?: any
+  details?: Record<string, unknown>
 ): NextResponse<ApiErrorResponse> {
   return NextResponse.json(
     {
@@ -120,27 +120,28 @@ export function internalError(message: string = 'サーバーエラーが発生�
  * エラーハンドラーラッパー
  * 未処理の例外をキャッチしてinternalErrorを返す
  */
-export function withErrorHandler<T extends any[]>(
+export function withErrorHandler<T extends unknown[]>(
   handler: (...args: T) => Promise<NextResponse>
 ) {
   return async (...args: T): Promise<NextResponse> => {
     try {
       return await handler(...args);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Unhandled API error:', error);
 
       // Stripe固有のエラー処理
-      if (error.type === 'StripeCardError') {
+      if (error instanceof Error && 'type' in error && (error as { type: string }).type === 'StripeCardError') {
         return validationError(`カード決済に失敗しました: ${error.message}`);
       }
 
       // Prisma固有のエラー処理
-      if (error.code === 'P2025') {
+      if (error instanceof Error && 'code' in error && (error as { code: string }).code === 'P2025') {
         return notFoundError();
       }
 
       // その他の予期しないエラー
-      const details = process.env.NODE_ENV === 'development' ? error.message : undefined;
+      const message = error instanceof Error ? error.message : undefined;
+      const details = process.env.NODE_ENV === 'development' ? message : undefined;
       return internalError(details);
     }
   };
@@ -150,6 +151,6 @@ export function withErrorHandler<T extends any[]>(
  * 型ガード: NextResponseかどうかを判定
  * authヘルパーの結果がエラーレスポンスかどうかを判定するために使用
  */
-export function isErrorResponse(result: any): result is NextResponse {
+export function isErrorResponse(result: unknown): result is NextResponse {
   return result instanceof NextResponse;
 }

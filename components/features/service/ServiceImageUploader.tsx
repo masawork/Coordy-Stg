@@ -100,8 +100,9 @@ export function ServiceImageUploader({
 
       setUploadedImages((prev) => prev.filter((img) => img.id !== imageId));
       onImageDeleted?.(imageId);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '不明なエラー';
+      setError(message);
     } finally {
       setUploading(false);
     }
@@ -141,8 +142,9 @@ export function ServiceImageUploader({
       previews.forEach((p) => URL.revokeObjectURL(p));
       setPreviews([]);
       onImagesChange?.([]);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '不明なエラー';
+      setError(message);
     } finally {
       setUploading(false);
     }

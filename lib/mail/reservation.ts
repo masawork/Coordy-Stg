@@ -139,7 +139,7 @@ export async function sendReservationConfirmationEmail(
             <h3 style="margin-top: 0; color: #333;">予約詳細</h3>
             <p style="margin: 4px 0;"><strong>予約ID:</strong> ${escapeHtml(data.reservationId)}</p>
             <p style="margin: 4px 0;"><strong>サービス名:</strong> ${safeServiceName}</p>
-            <p style="margin: 4px 0;"><strong>インストラクター:</strong> ${safeInstructorName}</p>
+            <p style="margin: 4px 0;"><strong>サービス提供者:</strong> ${safeInstructorName}</p>
             <p style="margin: 4px 0;"><strong>日時:</strong> ${dateTimeText}</p>
             <p style="margin: 4px 0;"><strong>所要時間:</strong> ${data.duration}分</p>
             ${locationHtml}
@@ -267,7 +267,7 @@ export async function sendCancellationConfirmationEmail(
         cancelledByText = 'あなた';
         break;
       case 'instructor':
-        cancelledByText = 'インストラクター';
+        cancelledByText = 'サービス提供者';
         break;
       case 'admin':
         cancelledByText = '管理者';
@@ -287,7 +287,7 @@ export async function sendCancellationConfirmationEmail(
             <h3 style="margin-top: 0; color: #333;">キャンセル詳細</h3>
             <p style="margin: 4px 0;"><strong>予約ID:</strong> ${escapeHtml(data.reservationId)}</p>
             <p style="margin: 4px 0;"><strong>サービス名:</strong> ${safeServiceName}</p>
-            <p style="margin: 4px 0;"><strong>インストラクター:</strong> ${safeInstructorName}</p>
+            <p style="margin: 4px 0;"><strong>サービス提供者:</strong> ${safeInstructorName}</p>
             <p style="margin: 4px 0;"><strong>日時:</strong> ${dateTimeText}</p>
             <p style="margin: 4px 0;"><strong>キャンセル者:</strong> ${cancelledByText}</p>
             ${cancelReasonHtml}
@@ -440,7 +440,7 @@ export async function sendReminderEmail(
             <h3 style="margin-top: 0; color: #e65100;">予約リマインダー</h3>
             <p style="margin: 4px 0;"><strong>予約ID:</strong> ${escapeHtml(data.reservationId)}</p>
             <p style="margin: 4px 0;"><strong>サービス名:</strong> ${safeServiceName}</p>
-            <p style="margin: 4px 0;"><strong>インストラクター:</strong> ${safeInstructorName}</p>
+            <p style="margin: 4px 0;"><strong>サービス提供者:</strong> ${safeInstructorName}</p>
             <p style="margin: 4px 0;"><strong>日時:</strong> ${dateTimeText}</p>
             <p style="margin: 4px 0;"><strong>所要時間:</strong> ${data.duration}分</p>
             ${locationHtml}
@@ -557,7 +557,7 @@ export async function sendCompletionEmail(
             <h3 style="margin-top: 0; color: #333;">完了サービス</h3>
             <p style="margin: 4px 0;"><strong>予約ID:</strong> ${escapeHtml(data.reservationId)}</p>
             <p style="margin: 4px 0;"><strong>サービス名:</strong> ${safeServiceName}</p>
-            <p style="margin: 4px 0;"><strong>インストラクター:</strong> ${safeInstructorName}</p>
+            <p style="margin: 4px 0;"><strong>サービス提供者:</strong> ${safeInstructorName}</p>
             <p style="margin: 4px 0;"><strong>日時:</strong> ${dateTimeText}</p>
             <p style="margin: 4px 0;"><strong>参加人数:</strong> ${data.participants}名</p>
             <p style="margin: 4px 0;"><strong>料金:</strong> ${priceText}</p>

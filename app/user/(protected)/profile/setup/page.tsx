@@ -150,9 +150,10 @@ export default function ProfileSetupPage() {
         setError('プロフィール情報の読み込みに失敗しました。ページを再読み込みしてください。');
         // 無限ループを防ぐため、リダイレクトしない
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Load profile error:', err);
-      setError('プロフィール情報の読み込みに失敗しました');
+      const message = err instanceof Error ? err.message : 'プロフィール情報の読み込みに失敗しました';
+      setError(message);
     }
   };
 
@@ -234,9 +235,10 @@ export default function ProfileSetupPage() {
       setOtpSent(true);
       setResendTimer(60); // 60秒間再送不可
       setStep('phone-verify');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Send OTP error:', err);
-      setError(err.message || 'SMS送信に失敗しました');
+      const message = err instanceof Error ? err.message : 'SMS送信に失敗しました';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -284,14 +286,23 @@ export default function ProfileSetupPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          phoneNumber: formData.phoneNumber,
+          phoneNumber: normalizePhoneNumber(formData.phoneNumber),
           otpCode: otpCode,
         }),
       });
 
       if (!verifyResponse.ok) {
         const errorData = await verifyResponse.json();
-        throw new Error(errorData.error?.message || errorData.error || '認証コードが正しくありません');
+        const errorCode = errorData.error?.code;
+        const errorMessage = errorData.error?.message || errorData.error;
+        // エラーコード別にユーザーフレンドリーなメッセージに変換
+        if (errorCode === 'NOT_FOUND' || errorMessage?.includes('見つかりません')) {
+          throw new Error('認証に失敗しました。しばらく待ってから再度お試しください');
+        } else if (errorCode === 'VALIDATION_ERROR') {
+          throw new Error(errorMessage || '認証コードが正しくありません');
+        } else {
+          throw new Error(errorMessage || '認証コードが正しくありません');
+        }
       }
 
       const verifyData = await verifyResponse.json();
@@ -330,9 +341,10 @@ export default function ProfileSetupPage() {
       // 完了後、ダッシュボードへリダイレクト
       console.log('🎉 Profile setup complete! Redirecting to dashboard...');
       router.push('/user');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('❌ OTP verify error:', err);
-      setError(err.message || '認証に失敗しました');
+      const message = err instanceof Error ? err.message : '認証に失敗しました';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -362,9 +374,10 @@ export default function ProfileSetupPage() {
       setResendTimer(60);
       setOtpCode('');
       alert('認証コードを再送信しました');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Resend OTP error:', err);
-      setError(err.message || 'SMS送信に失敗しました');
+      const message = err instanceof Error ? err.message : 'SMS送信に失敗しました';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -489,12 +502,6 @@ export default function ProfileSetupPage() {
                     name="dateOfBirth"
                     value={formData.dateOfBirth}
                     onChange={handleChange}
-                    onFocus={(e) => {
-                      if (!formData.dateOfBirth) {
-                        // 未入力時は約30歳（1996年）を初期表示
-                        setFormData((prev) => ({ ...prev, dateOfBirth: '1996-01-01' }));
-                      }
-                    }}
                     max={new Date().toISOString().split('T')[0]}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
                     required

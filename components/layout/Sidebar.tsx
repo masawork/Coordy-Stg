@@ -7,6 +7,7 @@ import {
   Calendar,
   CalendarDays,
   ShoppingBag,
+  ShoppingCart,
   Heart,
   Activity,
   CreditCard,
@@ -18,6 +19,9 @@ import {
   BarChart,
   Package,
   ShieldCheck,
+  ClipboardList,
+  Store,
+  FileCheck,
 } from 'lucide-react';
 import { cn, getRoleFromPath } from '@/lib/utils';
 import { signOut as betterAuthSignOut } from '@/lib/auth';
@@ -65,6 +69,21 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           icon: Heart,
         },
         {
+          label: '商品を探す',
+          href: `/products`,
+          icon: Store,
+        },
+        {
+          label: 'カート',
+          href: `/user/cart`,
+          icon: ShoppingCart,
+        },
+        {
+          label: '注文履歴',
+          href: `/user/orders`,
+          icon: ClipboardList,
+        },
+        {
           label: '活動履歴',
           href: `/user/activity`,
           icon: Activity,
@@ -91,7 +110,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         },
       ];
     } else if (role === 'instructor') {
-      // クリエイター用メニュー
+      // サービス提供者用メニュー
       return [
         {
           label: 'ホーム',
@@ -102,6 +121,11 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           label: 'サービス管理',
           href: `/instructor/services`,
           icon: Package,
+        },
+        {
+          label: '商品管理',
+          href: `/instructor/products`,
+          icon: Store,
         },
         {
           label: '予約管理',
@@ -148,6 +172,16 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           icon: Package,
         },
         {
+          label: '公開承認',
+          href: `/manage/admin/services/publish`,
+          icon: FileCheck,
+        },
+        {
+          label: '注文管理',
+          href: `/manage/admin/orders`,
+          icon: ClipboardList,
+        },
+        {
           label: '銀行振込承認',
           href: `/manage/admin/pending-charges`,
           icon: CreditCard,
@@ -171,7 +205,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 
   const roleLabels = {
     user: 'クライアント',
-    instructor: 'クリエイター',
+    instructor: 'サービス提供者',
     admin: '管理者',
   };
 

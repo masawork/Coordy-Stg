@@ -32,14 +32,15 @@ export default function IdentityDocumentPage() {
 
       const data = await fetchCurrentInstructor();
       if (!data) {
-        setError('インストラクター情報が見つかりません');
+        setError('サービス提供者情報が見つかりません');
         return;
       }
 
       setInstructor(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('インストラクター情報の読み込みエラー:', err);
-      setError(err.message || '情報の読み込みに失敗しました');
+      const message = err instanceof Error ? err.message : '情報の読み込みに失敗しました';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -107,9 +108,10 @@ export default function IdentityDocumentPage() {
 
       alert('身分証明書を提出しました。審査完了までお待ちください。');
       router.push('/instructor');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ アップロードエラー:', error);
-      setError(error.message || 'アップロードに失敗しました');
+      const message = error instanceof Error ? error.message : 'アップロードに失敗しました';
+      setError(message);
     } finally {
       setUploading(false);
     }

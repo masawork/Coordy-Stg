@@ -29,9 +29,24 @@ export async function getAuthUser(): Promise<
   }
 
   // Prisma Userを取得
-  const dbUser = await prisma.user.findFirst({
-    where: { authId: authUser.id },
-  });
+  // user_metadata.role がある場合、そのロールの User レコードを優先的に取得
+  // （同一メールで複数ロールを持つユーザーへの対応）
+  const currentRole = authUser.user_metadata?.role as string | undefined;
+  let dbUser: User | null = null;
+
+  if (currentRole) {
+    const prismaRole = currentRole.toUpperCase() as UserRole;
+    dbUser = await prisma.user.findFirst({
+      where: { authId: authUser.id, role: prismaRole },
+    });
+  }
+
+  // ロール指定で見つからない場合は authId のみで検索（フォールバック）
+  if (!dbUser) {
+    dbUser = await prisma.user.findFirst({
+      where: { authId: authUser.id },
+    });
+  }
 
   if (!dbUser) {
     return notFoundError('ユーザー');
@@ -60,7 +75,7 @@ export async function getAuthInstructor(): Promise<
 
   // ロールチェック
   if (dbUser.role !== UserRole.INSTRUCTOR) {
-    return forbiddenError('インストラクターのみ利用可能です');
+    return forbiddenError('サービス提供者のみ利用可能です');
   }
 
   // インストラクター情報を取得
@@ -69,7 +84,7 @@ export async function getAuthInstructor(): Promise<
   });
 
   if (!instructor) {
-    return notFoundError('インストラクター情報');
+    return notFoundError('サービス提供者情報');
   }
 
   return { instructor, dbUser };
@@ -100,10 +115,40 @@ export async function getAuthAdmin(): Promise<{ dbUser: User } | NextResponse> {
 }
 
 /**
+ * 認証済み＆本人確認済みインストラクターを取得
+ * サービスや商品の作成など、本人確認（Level 2）が必要な操作で使用
+ *
+ * @returns インストラクター情報 or エラーレスポンス
+ */
+export async function getVerifiedInstructor(): Promise<
+  { instructor: Instructor; dbUser: User } | NextResponse
+> {
+  const authResult = await getAuthInstructor();
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+
+  const { instructor, dbUser } = authResult;
+
+  // 本人確認レベルチェック
+  const clientProfile = await prisma.clientProfile.findUnique({
+    where: { userId: dbUser.id },
+  });
+
+  if (!clientProfile || clientProfile.verificationLevel < 2) {
+    return forbiddenError(
+      '本人確認（Level 2）が必要です。本人確認書類を提出し、管理者の承認を受けてください。'
+    );
+  }
+
+  return { instructor, dbUser };
+}
+
+/**
  * 型ガード: NextResponseかどうかを判定
  */
 export function isErrorResponse(
-  result: any
+  result: unknown
 ): result is NextResponse {
   return result instanceof NextResponse;
 }

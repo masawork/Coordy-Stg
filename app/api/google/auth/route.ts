@@ -27,7 +27,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   });
 
   if (!dbUser?.instructor) {
-    return forbiddenError('インストラクターのみがGoogle連携を利用できます');
+    return forbiddenError('サービス提供者のみがGoogle連携を利用できます');
   }
 
   // stateにインストラクターIDを含める

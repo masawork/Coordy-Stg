@@ -101,9 +101,10 @@ export default function PhoneVerificationPage() {
 
       setOtpSent(true);
       setResendTimer(60);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Send OTP error:', err);
-      setError(err.message || 'SMS送信に失敗しました');
+      const message = err instanceof Error ? err.message : 'SMS送信に失敗しました';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -145,9 +146,10 @@ export default function PhoneVerificationPage() {
       // 完了後、ダッシュボードへリダイレクト
       console.log('🎉 Phone verification complete! Redirecting to dashboard...');
       router.push('/user');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('❌ Verify OTP error:', err);
-      setError(err.message || '認証に失敗しました');
+      const message = err instanceof Error ? err.message : '認証に失敗しました';
+      setError(message);
     } finally {
       setLoading(false);
     }

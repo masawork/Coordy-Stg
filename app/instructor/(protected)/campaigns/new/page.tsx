@@ -130,9 +130,10 @@ export default function NewCampaignPage() {
       });
 
       router.push('/instructor/campaigns');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Create campaign error:', err);
-      setError(err.message || 'キャンペーンの作成に失敗しました');
+      const message = err instanceof Error ? err.message : 'キャンペーンの作成に失敗しました';
+      setError(message);
     } finally {
       setLoading(false);
     }

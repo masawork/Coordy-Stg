@@ -38,6 +38,12 @@ model User {
   identityVerificationRequests IdentityVerificationRequest[]
   reviewedVerificationRequests IdentityVerificationRequest[] @relation("ReviewedRequests")
 
+  // EC関連
+  cart              Cart?
+  orders            Order[]
+  shippingAddresses ShippingAddress[]
+  productReviews    ProductReview[]
+
   @@unique([email, role]) // 同じメール+ロールの組み合わせは不可
   @@index([authId])
   @@map("users")
@@ -71,11 +77,22 @@ model Instructor {
   reservations Reservation[]
   favoriteCreators FavoriteCreator[]
   campaigns Campaign[]
+  products  Product[]
 
   @@map("instructors")
 }
 
 // サービスの繰り返しタイプ
+enum PublishStatus {
+  DRAFT            @map("draft")            // 下書き（作成直後）
+  PENDING_REVIEW   @map("pending_review")   // 公開申請中（管理者レビュー待ち）
+  PUBLISHED        @map("published")        // 公開中（管理者承認済み）
+  REJECTED         @map("rejected")         // 却下（管理者が非承認）
+  WITHDRAWN        @map("withdrawn")        // 取り下げ（管理者が公開停止）
+
+  @@map("publish_status")
+}
+
 enum RecurrenceType {
   ONCE     // 単発
   WEEKLY   // 毎週
@@ -97,6 +114,10 @@ model Service {
   price        Int
   duration     Int      // 分単位
   isActive     Boolean  @default(true) @map("is_active")
+  publishStatus PublishStatus @default(DRAFT) @map("publish_status")
+  publishRequestedAt DateTime? @map("publish_requested_at")
+  publishedAt        DateTime? @map("published_at")
+  publishRejectReason String?  @map("publish_reject_reason")
 
   // スケジュール設定
   recurrenceType    RecurrenceType @default(ONCE) @map("recurrence_type")
@@ -279,12 +300,14 @@ model PointTransaction {
   status        TransactionStatus  @default(COMPLETED)
   transferId    String?           @map("transfer_id") // 振込番号（銀行振込用、4桁）
   reservationId String?           @map("reservation_id") // 予約との紐付け（返金特定用）
+  orderId       String?           @map("order_id") // 注文との紐付け
   description   String?           @db.Text
   expiresAt     DateTime?         @map("expires_at")
   createdAt     DateTime          @default(now()) @map("created_at")
 
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   reservation Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  order       Order?       @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([transferId])
@@ -679,4 +702,226 @@ model WebhookLog {
   @@index([success])
   @@index([createdAt])
   @@map("webhook_logs")
+}
+
+// ========================================
+// 商品管理・ECシステム
+// ========================================
+
+enum ProductStatus {
+  DRAFT        @map("draft")
+  PUBLISHED    @map("published")
+  ARCHIVED     @map("archived")
+
+  @@map("product_status")
+}
+
+model Product {
+  id            String        @id @default(uuid())
+  instructorId  String        @map("instructor_id")
+
+  // 基本情報
+  name          String
+  description   String?       @db.Text
+  category      String
+  status        ProductStatus @default(DRAFT)
+
+  // 価格・在庫
+  price         Int                              // 価格（円）
+  stock         Int           @default(0)        // 在庫数
+  trackStock    Boolean       @default(true) @map("track_stock")
+  sku           String?       @unique            // SKU
+
+  // 配送
+  weight        Int?                             // 重量（グラム）
+  shippingFee   Int           @default(0) @map("shipping_fee") // 送料（円）
+
+  // ステータス
+  isActive      Boolean       @default(true) @map("is_active")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  // リレーション
+  instructor    Instructor    @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  images        ProductImage[]
+  cartItems     CartItem[]
+  orderItems    OrderItem[]
+  reviews       ProductReview[]
+
+  @@index([instructorId])
+  @@index([category])
+  @@index([status])
+  @@index([isActive])
+  @@map("products")
+}
+
+model ProductImage {
+  id         String   @id @default(uuid())
+  productId  String   @map("product_id")
+  url        String
+  storageKey String   @map("storage_key")
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+// ========================================
+// カート
+// ========================================
+
+model Cart {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id         String   @id @default(uuid())
+  cartId     String   @map("cart_id")
+  productId  String   @map("product_id")
+  quantity   Int      @default(1)
+  addedAt    DateTime @default(now()) @map("added_at")
+
+  cart       Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+  @@index([cartId])
+  @@index([productId])
+  @@map("cart_items")
+}
+
+// ========================================
+// 注文
+// ========================================
+
+enum OrderStatus {
+  PENDING      @map("pending")
+  CONFIRMED    @map("confirmed")
+  PROCESSING   @map("processing")
+  SHIPPED      @map("shipped")
+  DELIVERED    @map("delivered")
+  CANCELLED    @map("cancelled")
+  REFUNDED     @map("refunded")
+
+  @@map("order_status")
+}
+
+model Order {
+  id               String      @id @default(uuid())
+  userId           String      @map("user_id")
+  orderNumber      String      @unique @map("order_number")
+  status           OrderStatus @default(PENDING)
+
+  // 金額
+  subtotal         Int                              // 商品合計
+  shippingCost     Int         @default(0) @map("shipping_cost")
+  totalAmount      Int         @map("total_amount")
+
+  // 決済
+  paymentMethod    String      @map("payment_method") // 'points' | 'credit'
+  stripePaymentIntentId String? @map("stripe_payment_intent_id")
+
+  // 配送
+  shippingAddressId String?    @map("shipping_address_id")
+  trackingNumber   String?     @map("tracking_number")
+
+  // メモ
+  notes            String?     @db.Text
+
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+  confirmedAt      DateTime?   @map("confirmed_at")
+  shippedAt        DateTime?   @map("shipped_at")
+  deliveredAt      DateTime?   @map("delivered_at")
+
+  // リレーション
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items            OrderItem[]
+  shippingAddress  ShippingAddress? @relation(fields: [shippingAddressId], references: [id], onDelete: SetNull)
+  pointTransactions PointTransaction[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([orderNumber])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String   @map("order_id")
+  productId String   @map("product_id")
+  quantity  Int
+  unitPrice Int      @map("unit_price")
+  subtotal  Int
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+// ========================================
+// 配送先住所
+// ========================================
+
+model ShippingAddress {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  fullName     String   @map("full_name")
+  phoneNumber  String   @map("phone_number")
+  postalCode   String   @map("postal_code")
+  prefecture   String
+  city         String
+  street       String
+  building     String?
+  isDefault    Boolean  @default(false) @map("is_default")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders       Order[]
+
+  @@index([userId])
+  @@map("shipping_addresses")
+}
+
+// ========================================
+// 商品レビュー
+// ========================================
+
+model ProductReview {
+  id        String   @id @default(uuid())
+  productId String   @map("product_id")
+  userId    String   @map("user_id")
+  rating    Int                              // 1-5
+  title     String
+  comment   String?  @db.Text
+  isPublished Boolean @default(true) @map("is_published")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, userId])
+  @@index([productId])
+  @@index([userId])
+  @@map("product_reviews")
 }

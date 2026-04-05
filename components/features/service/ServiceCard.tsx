@@ -48,10 +48,10 @@ export function ServiceCard({ service, linkPrefix = '/user/services' }: ServiceC
       if (service.instructorId) {
         try {
           const favorites = await getFavoriteCreators();
-          const favorite = favorites.find((f: any) => f.instructorId === service.instructorId);
+          const favorite = favorites.find((f: Record<string, unknown>) => f.instructorId === service.instructorId);
           if (favorite) {
             setIsFavorite(true);
-            setFavoriteId(favorite.id);
+            setFavoriteId((favorite.id as string) ?? null);
           }
         } catch (err) {
           // 未ログイン時などはエラーを無視

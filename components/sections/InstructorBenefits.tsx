@@ -50,7 +50,7 @@ export default function InstructorBenefits() {
         >
           <div className="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm mb-4">
             <FaCoins className="text-green-600" />
-            <span className="text-sm font-medium text-gray-700">インストラクター向け</span>
+            <span className="text-sm font-medium text-gray-700">サービス提供者向け</span>
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
             あなたのスキルを収益に変える
@@ -254,7 +254,7 @@ export default function InstructorBenefits() {
               href="/signup/instructor"
               className="inline-block px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-full hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl"
             >
-              インストラクターとして始める
+              サービス提供者として始める
             </Link>
             <p className="text-sm text-gray-500">
               登録後、最短3時間で出品可能 →

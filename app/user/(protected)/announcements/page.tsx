@@ -21,9 +21,10 @@ export default function AnnouncementsPage() {
     try {
       const data = await getAnnouncements('users', 50); // 生徒向け最新50件
       setAnnouncements(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Load announcements error:', err);
-      setError(err.message);
+      const message = err instanceof Error ? err.message : 'お知らせの読み込みに失敗しました';
+      setError(message);
     } finally {
       setLoading(false);
     }

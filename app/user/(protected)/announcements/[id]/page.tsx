@@ -22,9 +22,10 @@ export default function AnnouncementDetailPage({ params }: { params: { id: strin
     try {
       const data = await getAnnouncement(params.id);
       setAnnouncement(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Load announcement error:', err);
-      setError(err.message);
+      const message = err instanceof Error ? err.message : 'お知らせの読み込みに失敗しました';
+      setError(message);
     } finally {
       setLoading(false);
     }

@@ -102,10 +102,11 @@ export async function POST(
     });
 
     return NextResponse.json(serviceImage, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Upload image error:', error);
     return NextResponse.json(
-      { error: '画像のアップロードに失敗しました', details: error?.message },
+      { error: '画像のアップロードに失敗しました', details: message },
       { status: 500 }
     );
   } finally {
@@ -168,10 +169,11 @@ export async function DELETE(
     await prisma.serviceImage.delete({ where: { id: imageId } });
 
     return NextResponse.json({ success: true, message: '画像を削除しました' });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Delete image error:', error);
     return NextResponse.json(
-      { error: '画像の削除に失敗しました', details: error?.message },
+      { error: '画像の削除に失敗しました', details: message },
       { status: 500 }
     );
   } finally {
@@ -237,10 +239,11 @@ export async function PUT(
     });
 
     return NextResponse.json(updatedImages);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Reorder images error:', error);
     return NextResponse.json(
-      { error: '画像の並び替えに失敗しました', details: error?.message },
+      { error: '画像の並び替えに失敗しました', details: message },
       { status: 500 }
     );
   } finally {

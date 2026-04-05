@@ -101,7 +101,7 @@ export const PUT = withErrorHandler(async (
   }
 
   // 更新データの準備
-  const updateData: any = {};
+  const updateData: Record<string, unknown> = {};
 
   if (body.fullName !== undefined) {
     updateData.fullName = body.fullName || null;
@@ -126,13 +126,17 @@ export const PUT = withErrorHandler(async (
   }
 
   // プロフィールをupsert（存在しなければ作成）
+  const isProfileComplete = typeof updateData.isProfileComplete === 'boolean'
+    ? updateData.isProfileComplete
+    : false;
+
   const profile = await prisma.clientProfile.upsert({
     where: { userId },
     update: updateData,
     create: {
       userId,
       ...updateData,
-      isProfileComplete: updateData.isProfileComplete ?? false,
+      isProfileComplete,
       verificationLevel: 0,
       phoneVerified: false,
       identityVerified: false,

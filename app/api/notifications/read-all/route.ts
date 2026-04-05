@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { createClient } from '@/lib/supabase/server';
-import { withErrorHandler, unauthorizedError } from '@/lib/api/errors';
+import { getAuthUser } from '@/lib/api/auth';
+import { withErrorHandler } from '@/lib/api/errors';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,14 +9,13 @@ export const dynamic = 'force-dynamic';
  * すべての通知を既読にする
  */
 export const POST = withErrorHandler(async (request: NextRequest) => {
-  const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return unauthorizedError();
+  const authResult = await getAuthUser();
+  if (authResult instanceof NextResponse) {
+    return authResult;
   }
 
-  const userId = user.id;
+  const { dbUser } = authResult;
+  const userId = dbUser.id; // Prisma User ID
 
   // すべての未読通知を既読にする
   const result = await prisma.notification.updateMany({

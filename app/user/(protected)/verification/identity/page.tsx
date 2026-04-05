@@ -80,7 +80,7 @@ export default function IdentityVerificationPage() {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Camera access error:', err);
       setError('カメラへのアクセスが拒否されました。設定を確認してください。');
       setShowCamera(false);
@@ -338,9 +338,10 @@ export default function IdentityVerificationPage() {
       setTimeout(() => {
         router.push('/user/profile');
       }, 3000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Submit error:', err);
-      setError(err.message || '本人確認書類の提出に失敗しました');
+      const message = err instanceof Error ? err.message : '本人確認書類の提出に失敗しました';
+      setError(message);
     } finally {
       setSubmitting(false);
     }

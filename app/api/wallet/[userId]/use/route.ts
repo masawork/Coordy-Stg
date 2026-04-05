@@ -67,11 +67,10 @@ export const POST = withErrorHandler(async (
       throw new Error('INSUFFICIENT_BALANCE');
     }
 
-    // 残高を更新
-    const newBalance = wallet.balance - amount;
+    // 残高を更新（decrementオペレータを使用）
     const updatedWallet = await tx.wallet.update({
       where: { userId: dbUser.id },
-      data: { balance: newBalance },
+      data: { balance: { decrement: amount } },
     });
 
     // ポイント履歴に記録

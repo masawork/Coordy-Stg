@@ -46,9 +46,10 @@ export default function WithdrawalsPage() {
       if (defaultAccount) {
         setSelectedBankAccountId(defaultAccount.id);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Load data error:', err);
-      setError(err.message);
+      const message = err instanceof Error ? err.message : '不明なエラー';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -79,9 +80,10 @@ export default function WithdrawalsPage() {
       setShowRequestForm(false);
       setAmount('');
       loadData();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Create withdrawal request error:', err);
-      setError(err.message);
+      const message = err instanceof Error ? err.message : '不明なエラー';
+      setError(message);
     }
   };
 

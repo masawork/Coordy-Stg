@@ -57,7 +57,7 @@ export default function StickyCTABar() {
                   className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-full hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl text-sm sm:text-base"
                 >
                   <FaChalkboardTeacher className="text-sm" />
-                  <span>インストラクター登録</span>
+                  <span>サービス提供者登録</span>
                 </Link>
               </div>
 

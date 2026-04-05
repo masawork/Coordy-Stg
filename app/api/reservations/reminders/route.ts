@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
           userName,
           userEmail,
           serviceName: reservation.service.title,
-          instructorName: reservation.instructor.user?.name || 'インストラクター',
+          instructorName: reservation.instructor.user?.name || 'サービス提供者',
           scheduledAt: reservation.scheduledAt,
           duration: reservation.service.duration,
           deliveryType: reservation.service.deliveryType,

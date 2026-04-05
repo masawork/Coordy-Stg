@@ -88,9 +88,10 @@ export async function createInstructor(input: InstructorInput) {
       },
     });
     return instructor;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Create instructor error:', error);
-    throw new Error(`インストラクターの作成に失敗しました: ${error.message}`);
+    throw new Error(`サービス提供者の作成に失敗しました: ${message}`);
   }
 }
 
@@ -102,7 +103,7 @@ export async function updateInstructor(
   updates: Partial<InstructorInput>
 ) {
   try {
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     
     if (updates.bio !== undefined) {
       updateData.bio = updates.bio;
@@ -135,8 +136,9 @@ export async function updateInstructor(
       },
     });
     return instructor;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Update instructor error:', error);
-    throw new Error(`インストラクター情報の更新に失敗しました: ${error.message}`);
+    throw new Error(`サービス提供者情報の更新に失敗しました: ${message}`);
   }
 }

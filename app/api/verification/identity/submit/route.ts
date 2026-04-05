@@ -86,7 +86,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   }
 
   const extraImages: string[] = Array.isArray(additionalImages)
-    ? additionalImages.filter((img: any) => typeof img === 'string' && img.trim() !== '')
+    ? additionalImages.filter((img: string) => typeof img === 'string' && img.trim() !== '')
     : [];
 
   // 申請を作成または再提出で更新

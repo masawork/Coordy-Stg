@@ -5,9 +5,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Prisma, RecurrenceType } from '@prisma/client';
+import { Prisma, RecurrenceType, PublishStatus } from '@prisma/client';
 import prisma from '@/lib/prisma';
-import { getAuthInstructor } from '@/lib/api/auth';
+import { getVerifiedInstructor } from '@/lib/api/auth';
 import { validationError, withErrorHandler } from '@/lib/api/errors';
 
 export const dynamic = 'force-dynamic';
@@ -54,9 +54,20 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   const page = Math.max(1, Number(searchParams.get('page')) || 1);
   const limit = Math.min(50, Math.max(1, Number(searchParams.get('limit')) || 12));
 
+  // --- 公開ステータスフィルタ ---
+  const publishStatus = searchParams.get('publishStatus') || undefined;
+
   // --- WHERE 構築 ---
-  const where: Prisma.ServiceWhereInput = {};
-  if (instructorId) where.instructorId = instructorId;
+  // Note: publishStatus は prisma generate 後に型に含まれる
+  const where: Record<string, unknown> = {};
+  if (instructorId) {
+    // インストラクター自身のサービス一覧（全ステータス表示）
+    where.instructorId = instructorId;
+    if (publishStatus) where.publishStatus = publishStatus;
+  } else {
+    // 公開一覧：PUBLISHED のみ表示（管理者が明示的にフィルタしない限り）
+    where.publishStatus = publishStatus || 'PUBLISHED';
+  }
   if (category) where.category = category;
   if (isActive !== undefined) where.isActive = isActive;
   if (deliveryType) where.deliveryType = deliveryType;
@@ -129,7 +140,8 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
  * サービスを作成（認証済みインストラクターのみ）
  */
 export const POST = withErrorHandler(async (request: NextRequest) => {
-  const authResult = await getAuthInstructor();
+  // 本人確認（Level 2）必須
+  const authResult = await getVerifiedInstructor();
   if (authResult instanceof NextResponse) {
     return authResult;
   }
@@ -167,27 +179,31 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     return validationError('繰り返しサービスの場合は曜日と開始・終了時間が必要です');
   }
 
+  // Note: publishStatus フィールドは prisma generate 後に型に含まれる
+  const createData = {
+    instructorId: instructor.id,
+    title,
+    description: description || null,
+    category,
+    deliveryType: deliveryType || 'remote',
+    location: location || null,
+    price: Number(price),
+    duration: Number(duration),
+    isActive: false, // 作成時は非公開（管理者承認後に公開）
+    publishStatus: PublishStatus.DRAFT,
+    // スケジュール設定
+    recurrenceType: recurrenceType as RecurrenceType,
+    availableDays: availableDays || [],
+    startTime: startTime || null,
+    endTime: endTime || null,
+    timezone,
+    validFrom: validFrom ? new Date(validFrom) : null,
+    validUntil: validUntil ? new Date(validUntil) : null,
+    maxParticipants: Number(maxParticipants) || 1,
+  };
+
   const service = await prisma.service.create({
-    data: {
-      instructorId: instructor.id,
-      title,
-      description: description || null,
-      category,
-      deliveryType: deliveryType || 'remote',
-      location: location || null,
-      price: Number(price),
-      duration: Number(duration),
-      isActive: Boolean(isActive),
-      // スケジュール設定
-      recurrenceType: recurrenceType as RecurrenceType,
-      availableDays: availableDays || [],
-      startTime: startTime || null,
-      endTime: endTime || null,
-      timezone,
-      validFrom: validFrom ? new Date(validFrom) : null,
-      validUntil: validUntil ? new Date(validUntil) : null,
-      maxParticipants: Number(maxParticipants) || 1,
-    },
+    data: createData,
     include: {
       instructor: { include: { user: true } },
       schedules: true,

@@ -18,6 +18,13 @@ export async function GET(request: Request) {
 
   console.log('🔐 Auth callback called:', { code: code ? 'present' : 'missing', origin, requestedRole });
 
+  // Validate role parameter - only allow user and instructor
+  const allowedRoles = ['user', 'instructor'];
+  if (!allowedRoles.includes(requestedRole.toLowerCase())) {
+    console.error('❌ Invalid role in callback:', requestedRole);
+    return NextResponse.redirect(`${origin}/login/user?error=invalid_role`);
+  }
+
   if (code) {
     const supabase = await createClient();
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);

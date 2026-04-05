@@ -40,10 +40,11 @@ export async function POST(request: NextRequest) {
     );
 
     console.log('✅ Webhookイベント受信:', event.type);
-  } catch (error: any) {
-    console.error('❌ Webhook検証エラー:', error.message);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('❌ Webhook検証エラー:', message);
     return NextResponse.json(
-      { error: `Webhook Error: ${error.message}` },
+      { error: `Webhook Error: ${message}` },
       { status: 400 }
     );
   }
@@ -71,10 +72,11 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ received: true }, { status: 200 });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Webhook処理エラー:', error);
     return NextResponse.json(
-      { error: 'Webhook processing failed', details: error.message },
+      { error: 'Webhook processing failed', details: message },
       { status: 500 }
     );
   } finally {

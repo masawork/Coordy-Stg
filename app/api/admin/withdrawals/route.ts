@@ -15,7 +15,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get('status');
 
-  const where = status ? { status: status as any } : {};
+  const where: Record<string, unknown> = status ? { status: status as string } : {};
 
   const withdrawalRequests = await prisma.withdrawalRequest.findMany({
     where,

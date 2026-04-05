@@ -456,7 +456,7 @@ export default function UserDashboardPage() {
         {/* お気に入りカード */}
         <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">⭐ お気に入り</h3>
-          <p className="text-gray-600 text-sm mb-4">お気に入りのクリエイター</p>
+          <p className="text-gray-600 text-sm mb-4">お気に入りのサービス提供者</p>
           <button
             onClick={() => router.push('/user/favorites')}
             className="text-purple-600 hover:text-purple-700 text-sm font-medium"

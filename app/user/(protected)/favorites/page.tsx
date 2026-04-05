@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSession } from '@/lib/auth';
-import { getFavoriteCreators, removeFavoriteCreator } from '@/lib/api/favorites';
+import { getFavoriteCreators, removeFavoriteCreator } from '@/lib/api/favorites-client';
 import { listServices } from '@/lib/api/services';
 import { ServiceCard } from '@/components/features/service/ServiceCard';
 import { Button } from '@/components/ui/button';
@@ -15,8 +15,21 @@ import { Heart, Star, Trash2 } from 'lucide-react';
 
 export default function FavoritesPage() {
   const router = useRouter();
-  const [favorites, setFavorites] = useState<any[]>([]);
-  const [services, setServices] = useState<any[]>([]);
+  const [favorites, setFavorites] = useState<Array<{
+    id: string;
+    instructorId: string;
+    instructor?: {
+      user?: { name: string };
+      bio?: string;
+      specialties?: string[];
+    };
+  }>>([]);
+  const [services, setServices] = useState<Array<{
+    id: string;
+    instructorId: string;
+    createdAt: string;
+    [key: string]: unknown;
+  }>>([]);
   const [loading, setLoading] = useState(true);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
@@ -34,18 +47,18 @@ export default function FavoritesPage() {
       }
 
       // お気に入りクリエイター取得（インストラクター情報も含まれる）
-      const favoriteData = await getFavoriteCreators(session.user.id);
-      setFavorites(favoriteData || []);
+      const favoriteData = await getFavoriteCreators();
+      setFavorites((favoriteData as any) || []);
 
       // お気に入りクリエイターのサービスを取得
       if (favoriteData.length > 0) {
-        const instructorIds = favoriteData.map((f) => f.instructorId);
+        const instructorIds = favoriteData.map((f: { instructorId: string }) => f.instructorId);
         const allServices = await listServices({ isActive: true });
         const favoriteServices = (allServices || [])
-          .filter((service: { instructorId: string }) => instructorIds.includes(service.instructorId))
-          .sort((a: { createdAt: string }, b: { createdAt: string }) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          .filter((service: any) => instructorIds.includes(service.instructorId))
+          .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-        setServices(favoriteServices);
+        setServices(favoriteServices as any);
       }
     } catch (err) {
       console.error('お気に入り取得エラー:', err);
@@ -57,7 +70,7 @@ export default function FavoritesPage() {
   };
 
   const handleRemove = async (instructorId: string) => {
-    if (!confirm('このクリエイターをお気に入りから削除しますか？')) {
+    if (!confirm('このサービス提供者をお気に入りから削除しますか？')) {
       return;
     }
 
@@ -67,7 +80,11 @@ export default function FavoritesPage() {
       const session = await getSession();
       if (!session?.user) return;
 
-      await removeFavoriteCreator(session.user.id, instructorId);
+      // instructorIdからfavorite IDを取得して削除
+      const favorite = favorites.find(f => f.instructorId === instructorId);
+      if (favorite) {
+        await removeFavoriteCreator(favorite.id);
+      }
       await loadFavorites();
     } catch (err) {
       console.error('お気に入り削除エラー:', err);
@@ -83,7 +100,7 @@ export default function FavoritesPage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">お気に入り</h1>
         <p className="mt-2 text-gray-600">
-          お気に入りのクリエイターとサービスを管理できます
+          お気に入りのサービス提供者とサービスを管理できます
         </p>
       </div>
 
@@ -94,10 +111,10 @@ export default function FavoritesPage() {
           </div>
         ) : (
           <>
-            {/* お気に入りクリエイター一覧 */}
+            {/* お気に入りサービス提供者一覧 */}
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                お気に入りクリエイター
+                お気に入りサービス提供者
               </h2>
 
               {favorites.length > 0 ? (
@@ -111,7 +128,7 @@ export default function FavoritesPage() {
                         <div className="flex items-start gap-3 flex-1">
                           <div className="flex-1">
                             <h3 className="font-semibold text-lg text-gray-900">
-                              {favorite.instructor?.user?.name || 'インストラクター'}
+                              {favorite.instructor?.user?.name || 'サービス提供者'}
                             </h3>
                             {favorite.instructor?.bio && (
                               <p className="text-gray-600 text-sm mt-1 line-clamp-2">
@@ -149,7 +166,7 @@ export default function FavoritesPage() {
                 <div className="text-center py-8">
                   <Heart className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                   <p className="text-gray-500 mb-4">
-                    お気に入りのクリエイターがまだいません
+                    お気に入りのサービス提供者がまだいません
                   </p>
                   <Button
                     onClick={() => router.push('/services')}
@@ -161,15 +178,15 @@ export default function FavoritesPage() {
               )}
             </div>
 
-            {/* お気に入りクリエイターのサービス */}
+            {/* お気に入りサービス提供者のサービス */}
             {services.length > 0 && (
               <div className="bg-white rounded-lg shadow p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                  お気に入りクリエイターのサービス
+                  お気に入りサービス提供者のサービス
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {services.map((service) => (
-                    <ServiceCard key={service.id} service={service} />
+                    <ServiceCard key={service.id} service={service as any} />
                   ))}
                 </div>
               </div>

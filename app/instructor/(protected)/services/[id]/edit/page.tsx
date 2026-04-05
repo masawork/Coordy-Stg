@@ -39,6 +39,8 @@ export default function EditServicePage() {
     locationDetail: '',
     price: '',
     duration: '',
+    startTime: '',
+    endTime: '',
     isActive: true,
   });
   const [error, setError] = useState('');
@@ -98,6 +100,8 @@ export default function EditServicePage() {
         locationDetail: parsedLocationDetail,
         price: service.price.toString(),
         duration: service.duration.toString(),
+        startTime: service.startTime || '',
+        endTime: service.endTime || '',
         isActive: service.isActive,
       });
 
@@ -112,12 +116,37 @@ export default function EditServicePage() {
     }
   };
 
+  /**
+   * 開始時間と所要時間から終了時間を計算する
+   */
+  const calculateEndTime = (startTime: string, durationMinutes: number): string => {
+    if (!startTime || !durationMinutes || durationMinutes <= 0) return '';
+    const [hours, minutes] = startTime.split(':').map(Number);
+    const totalMinutes = hours * 60 + minutes + durationMinutes;
+    const endHours = Math.floor(totalMinutes / 60) % 24;
+    const endMinutes = totalMinutes % 60;
+    return `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
-    }));
+    setFormData((prev) => {
+      const updated = {
+        ...prev,
+        [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
+      };
+
+      // 開始時間または所要時間が変わったら終了時間を自動計算
+      if (name === 'startTime' || name === 'duration') {
+        const start = name === 'startTime' ? value : prev.startTime;
+        const dur = name === 'duration' ? parseInt(value) : parseInt(prev.duration);
+        if (start && dur > 0) {
+          updated.endTime = calculateEndTime(start, dur);
+        }
+      }
+
+      return updated;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -152,13 +181,13 @@ export default function EditServicePage() {
         location: formData.deliveryType === 'remote' ? undefined : locationFull,
         price: parseInt(formData.price),
         duration: parseInt(formData.duration),
-        isActive: formData.isActive,
       });
 
       router.push('/instructor/services');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Update service error:', err);
-      setError(err.message || 'サービスの更新に失敗しました');
+      const message = err instanceof Error ? err.message : 'サービスの更新に失敗しました';
+      setError(message);
     } finally {
       setSaving(false);
     }
@@ -347,18 +376,8 @@ export default function EditServicePage() {
           }}
         />
 
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            id="isActive"
-            name="isActive"
-            checked={formData.isActive}
-            onChange={handleChange}
-            className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-          />
-          <label htmlFor="isActive" className="ml-2 block text-sm text-gray-700">
-            公開する
-          </label>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700">
+          公開設定は管理者の承認制です。編集後、サービス管理画面から「公開申請」を行ってください。
         </div>
 
         <div className="flex gap-4">

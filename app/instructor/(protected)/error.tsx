@@ -13,7 +13,7 @@ export default function InstructorError({
     <ErrorFallback
       error={error}
       reset={reset}
-      portalName="インストラクターポータル"
+      portalName="サービス提供者ポータル"
       backPath="/instructor"
       backLabel="ダッシュボードへ"
     />

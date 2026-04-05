@@ -44,7 +44,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   const { instructorId } = body;
 
   if (!instructorId) {
-    return validationError('クリエイターIDが必要です');
+    return validationError('サービス提供者IDが必要です');
   }
 
   // 既に登録済みかチェック

@@ -55,9 +55,10 @@ export default function BankAccountsPage() {
     try {
       const accounts = await getBankAccounts();
       setBankAccounts(accounts);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Load bank accounts error:', err);
-      setError(err.message);
+      const message = err instanceof Error ? err.message : '不明なエラー';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -134,9 +135,10 @@ export default function BankAccountsPage() {
       }
       resetForm();
       loadBankAccounts();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(editingAccount ? 'Update bank account error:' : 'Create bank account error:', err);
-      setError(err.message);
+      const message = err instanceof Error ? err.message : '不明なエラー';
+      setError(message);
     }
   };
 
@@ -148,9 +150,10 @@ export default function BankAccountsPage() {
     try {
       await deleteBankAccount(id);
       loadBankAccounts();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Delete error:', err);
-      alert(err.message);
+      const message = err instanceof Error ? err.message : '不明なエラー';
+      alert(message);
     }
   };
 

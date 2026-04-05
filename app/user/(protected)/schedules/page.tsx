@@ -100,9 +100,10 @@ export default function SchedulesPage() {
 
       setCategories(uniqueCategories);
       setInstructors(uniqueInstructors);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('スケジュール取得エラー:', err);
-      setError('スケジュールの取得に失敗しました');
+      const message = err instanceof Error ? err.message : 'スケジュールの取得に失敗しました';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -315,7 +316,7 @@ export default function SchedulesPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   <User className="h-4 w-4 inline mr-1" />
-                  クリエイター
+                  サービス提供者
                 </label>
                 <select
                   value={selectedInstructor}

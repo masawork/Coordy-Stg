@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { createClient } from '@/lib/supabase/server';
-import { withErrorHandler, unauthorizedError, notFoundError, forbiddenError } from '@/lib/api/errors';
+import { getAuthUser } from '@/lib/api/auth';
+import { withErrorHandler, notFoundError, forbiddenError } from '@/lib/api/errors';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,15 +12,14 @@ export const PATCH = withErrorHandler(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) => {
-  const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return unauthorizedError();
+  const authResult = await getAuthUser();
+  if (authResult instanceof NextResponse) {
+    return authResult;
   }
 
+  const { dbUser } = authResult;
   const { id } = await params;
-  const userId = user.id;
+  const userId = dbUser.id; // Prisma User ID
 
   // 通知を取得
   const notification = await prisma.notification.findUnique({
@@ -52,15 +51,14 @@ export const DELETE = withErrorHandler(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) => {
-  const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return unauthorizedError();
+  const authResult = await getAuthUser();
+  if (authResult instanceof NextResponse) {
+    return authResult;
   }
 
+  const { dbUser } = authResult;
   const { id } = await params;
-  const userId = user.id;
+  const userId = dbUser.id; // Prisma User ID
 
   // 通知を取得
   const notification = await prisma.notification.findUnique({

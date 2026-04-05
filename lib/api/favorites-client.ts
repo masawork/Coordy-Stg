@@ -44,9 +44,10 @@ export async function addFavoriteCreator(instructorId: string) {
     }
 
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Add favorite creator error:', error);
-    throw new Error(`お気に入り追加に失敗しました: ${error.message}`);
+    throw new Error(`お気に入り追加に失敗しました: ${message}`);
   }
 }
 
@@ -66,8 +67,9 @@ export async function removeFavoriteCreator(favoriteId: string) {
     }
 
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Remove favorite creator error:', error);
-    throw new Error(`お気に入り削除に失敗しました: ${error.message}`);
+    throw new Error(`お気に入り削除に失敗しました: ${message}`);
   }
 }

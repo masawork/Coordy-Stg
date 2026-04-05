@@ -61,9 +61,9 @@ export default function AdminWithdrawalsPage() {
 
       const data = await response.json();
       setWithdrawals(data);
-    } catch (err: any) {
+    } catch (err: unknown) { const message = err instanceof Error ? err.message : '不明なエラー';
       console.error('Load withdrawals error:', err);
-      setError(err.message);
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -102,9 +102,9 @@ export default function AdminWithdrawalsPage() {
       setSelectedRequest(null);
       setRejectedReason('');
       loadWithdrawals();
-    } catch (err: any) {
+    } catch (err: unknown) { const message = err instanceof Error ? err.message : '不明なエラー';
       console.error('Action error:', err);
-      alert(err.message);
+      alert(message);
     } finally {
       setProcessing(false);
     }

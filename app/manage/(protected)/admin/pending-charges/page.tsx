@@ -50,9 +50,9 @@ export default function PendingChargesPage() {
     try {
       await approveCharge(transactionId);
       await loadPendingCharges();
-    } catch (err: any) {
+    } catch (err: unknown) { const message = err instanceof Error ? err.message : '不明なエラー';
       console.error('承認エラー:', err);
-      alert(err.message || '承認に失敗しました');
+      alert(message || '承認に失敗しました');
     } finally {
       setProcessingId(null);
     }

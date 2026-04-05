@@ -86,7 +86,7 @@ export const PUT = withErrorHandler(async (
     'isActive',
   ];
 
-  const updateData: any = {};
+  const updateData: Record<string, unknown> = {};
   for (const key of allowedFields) {
     if (body[key] !== undefined) {
       switch (key) {

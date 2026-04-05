@@ -7,9 +7,9 @@ const prisma = new PrismaClient();
 import { ReservationStatus, Reservation as PrismaReservation } from '@prisma/client';
 
 export type Reservation = PrismaReservation & {
-  user?: any;
-  service?: any;
-  instructor?: any;
+  user?: { id: string; name: string; email: string; image?: string | null };
+  service?: { id: string; title: string; price: number; duration: number; category: string };
+  instructor?: { id: string; userId: string; bio?: string | null; user?: { name: string } };
 };
 
 export interface ReservationInput {
@@ -30,7 +30,7 @@ export async function listReservations(filters?: {
   status?: ReservationStatus;
 }) {
   try {
-    const where: any = {};
+    const where: Record<string, unknown> = {};
 
     if (filters?.userId) {
       where.userId = filters.userId;
@@ -135,9 +135,10 @@ export async function createReservation(input: ReservationInput) {
     });
 
     return reservation;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Create reservation error:', error);
-    throw new Error(`予約の作成に失敗しました: ${error.message}`);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`予約の作成に失敗しました: ${message}`);
   }
 }
 
@@ -153,7 +154,7 @@ export async function updateReservation(
   }>
 ) {
   try {
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
 
     if (updates.status !== undefined) {
       updateData.status = updates.status;
@@ -189,9 +190,10 @@ export async function updateReservation(
     });
 
     return reservation;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Update reservation error:', error);
-    throw new Error(`予約の更新に失敗しました: ${error.message}`);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`予約の更新に失敗しました: ${message}`);
   }
 }
 
@@ -211,8 +213,9 @@ export async function deleteReservation(id: string) {
       where: { id },
     });
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Delete reservation error:', error);
-    throw new Error(`予約の削除に失敗しました: ${error.message}`);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`予約の削除に失敗しました: ${message}`);
   }
 }

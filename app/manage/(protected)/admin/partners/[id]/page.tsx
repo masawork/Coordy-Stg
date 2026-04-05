@@ -89,8 +89,9 @@ export default function PartnerDetailPage() {
       });
       await loadPartner();
       alert('保存しました');
-    } catch (err: any) {
-      alert(err.message || '保存に失敗しました');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '不明なエラー';
+      alert(message || '保存に失敗しました');
     } finally {
       setSaving(false);
     }
@@ -108,8 +109,9 @@ export default function PartnerDetailPage() {
       );
       setCredentials(result.credentials);
       await loadPartner();
-    } catch (err: any) {
-      alert(err.message || 'キー再生成に失敗しました');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '不明なエラー';
+      alert(message || 'キー再生成に失敗しました');
     }
   };
 
@@ -361,7 +363,7 @@ export default function PartnerDetailPage() {
             <h3 className="font-bold mb-3">最近の予約</h3>
             {partner.externalReservations?.length > 0 ? (
               <div className="space-y-2 max-h-80 overflow-y-auto">
-                {partner.externalReservations.map((er: any) => (
+                {partner.externalReservations.map((er: Record<string, any>) => (
                   <div
                     key={er.id}
                     className="text-sm border-b border-gray-100 pb-2"

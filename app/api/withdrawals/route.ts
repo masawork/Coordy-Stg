@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { createClient } from '@/lib/supabase/server';
-import { withErrorHandler, unauthorizedError, validationError, notFoundError } from '@/lib/api/errors';
+import { getAuthInstructor } from '@/lib/api/auth';
+import { withErrorHandler, validationError, notFoundError } from '@/lib/api/errors';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,14 +12,13 @@ const TRANSFER_FEE = 250;
  * 引き出し申請一覧取得
  */
 export const GET = withErrorHandler(async (request: NextRequest) => {
-  const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return unauthorizedError();
+  const authResult = await getAuthInstructor();
+  if (authResult instanceof NextResponse) {
+    return authResult;
   }
 
-  const userId = user.id;
+  const { dbUser } = authResult;
+  const userId = dbUser.id; // Prisma User ID
 
   const withdrawalRequests = await prisma.withdrawalRequest.findMany({
     where: { instructorId: userId },
@@ -42,14 +41,13 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
  * 引き出し申請を作成
  */
 export const POST = withErrorHandler(async (request: NextRequest) => {
-  const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return unauthorizedError();
+  const authResult = await getAuthInstructor();
+  if (authResult instanceof NextResponse) {
+    return authResult;
   }
 
-  const userId = user.id;
+  const { dbUser } = authResult;
+  const userId = dbUser.id; // Prisma User ID
   const { amount, bankAccountId } = await request.json();
 
   // バリデーション
@@ -65,6 +63,12 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   const MIN_WITHDRAWAL = 1000;
   if (amount < MIN_WITHDRAWAL) {
     return validationError(`最低引き出し額は${MIN_WITHDRAWAL.toLocaleString()}円です`);
+  }
+
+  // 最大引き出し額チェック
+  const MAX_WITHDRAWAL = 10000000; // 1,000万円
+  if (amount > MAX_WITHDRAWAL) {
+    return validationError(`引き出し額は${MAX_WITHDRAWAL.toLocaleString()}円以下にしてください`);
   }
 
   // 銀行口座の確認
@@ -89,50 +93,72 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     return validationError('残高が不足しています');
   }
 
-  // 引き出し申請を作成
+  // トランザクションで引き出し申請作成 + 残高控除 + 取引履歴記録
   const netAmount = amount - TRANSFER_FEE;
 
-  const withdrawalRequest = await prisma.withdrawalRequest.create({
-    data: {
-      instructorId: userId,
-      amount,
-      fee: TRANSFER_FEE,
-      netAmount,
-      bankAccountId,
-      status: 'PENDING',
-    },
-    include: {
-      bankAccount: {
-        select: {
-          bankName: true,
-          branchName: true,
-          accountHolderName: true,
+  const withdrawalRequest = await prisma.$transaction(async (tx) => {
+    // 残高を再チェック（競合防止）
+    const currentWallet = await tx.wallet.findUnique({
+      where: { userId },
+    });
+    if (!currentWallet || currentWallet.balance < amount) {
+      throw new Error('INSUFFICIENT_BALANCE');
+    }
+
+    // 引き出し申請を作成
+    const request = await tx.withdrawalRequest.create({
+      data: {
+        instructorId: userId,
+        amount,
+        fee: TRANSFER_FEE,
+        netAmount,
+        bankAccountId,
+        status: 'PENDING',
+      },
+      include: {
+        bankAccount: {
+          select: {
+            bankName: true,
+            branchName: true,
+            accountHolderName: true,
+          },
         },
       },
-    },
-  });
+    });
 
-  // Walletから残高を減算（申請時点で予約）
-  await prisma.wallet.update({
-    where: { userId },
-    data: {
-      balance: {
-        decrement: amount,
+    // Walletから残高を減算（申請時点で予約）
+    await tx.wallet.update({
+      where: { userId },
+      data: {
+        balance: {
+          decrement: amount,
+        },
       },
-    },
+    });
+
+    // ポイント取引履歴を記録
+    await tx.pointTransaction.create({
+      data: {
+        userId,
+        type: 'USE',
+        amount: -amount,
+        method: 'bank_transfer',
+        status: 'PENDING',
+        description: `引き出し申請: ${bankAccount.bankName} ${bankAccount.accountHolderName}`,
+      },
+    });
+
+    return request;
+  }).catch((error) => {
+    if (error.message === 'INSUFFICIENT_BALANCE') {
+      return null;
+    }
+    throw error;
   });
 
-  // ポイント取引履歴を記録
-  await prisma.pointTransaction.create({
-    data: {
-      userId,
-      type: 'USE',
-      amount: -amount,
-      method: 'bank_transfer',
-      status: 'PENDING',
-      description: `引き出し申請: ${bankAccount.bankName} ${bankAccount.accountHolderName}`,
-    },
-  });
+  if (!withdrawalRequest) {
+    return validationError('残高が不足しています（他の処理と競合した可能性があります）');
+  }
 
   return NextResponse.json(withdrawalRequest, { status: 201 });
 });

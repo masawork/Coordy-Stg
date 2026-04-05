@@ -31,7 +31,7 @@ export async function PATCH(
     });
 
     if (!instructor) {
-      return forbiddenError('インストラクター権限が必要です');
+      return forbiddenError('サービス提供者権限が必要です');
     }
 
     // スケジュールを取得

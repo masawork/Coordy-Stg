@@ -115,27 +115,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 定員チェック
-    const existingBookings = await prisma.reservation.aggregate({
-      where: {
-        serviceId,
-        scheduledAt: new Date(scheduledAt),
-        status: { in: ['PENDING', 'CONFIRMED'] },
-      },
-      _sum: { participants: true },
-    });
-
-    const currentBooked = existingBookings._sum.participants || 0;
-    if (currentBooked + participants > service.maxParticipants) {
-      return NextResponse.json(
-        {
-          error: 'NO_AVAILABILITY',
-          remainingCapacity: service.maxParticipants - currentBooked,
-        },
-        { status: 409 },
-      );
-    }
-
     // 決済モード判定
     const actualPaymentMode =
       requestedPaymentMode === 'EXTERNAL' &&
@@ -154,6 +133,20 @@ export async function POST(request: NextRequest) {
 
     // トランザクションで予約作成
     const result = await prisma.$transaction(async (tx) => {
+      // 定員チェック（トランザクション内で再チェック）
+      const existingBookings = await tx.reservation.aggregate({
+        where: {
+          serviceId,
+          scheduledAt: new Date(scheduledAt),
+          status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] },
+        },
+        _sum: { participants: true },
+      });
+
+      const currentBooked = existingBookings._sum.participants || 0;
+      if (currentBooked + participants > service.maxParticipants) {
+        throw new Error('NO_AVAILABILITY');
+      }
       // ゲストユーザー作成 or 既存検索
       let guestUser = await tx.guestUser.findFirst({
         where: { email: guest.email },
@@ -253,7 +246,7 @@ export async function POST(request: NextRequest) {
       userName: result.guestUser.name,
       userEmail: result.guestUser.email,
       serviceName: service.title,
-      instructorName: result.reservation.instructor?.user?.name || 'インストラクター',
+      instructorName: result.reservation.instructor?.user?.name || 'サービス提供者',
       scheduledAt: result.reservation.scheduledAt,
       duration: service.duration,
       location: service.location || undefined,
@@ -302,6 +295,15 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     console.error('External reservation error:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
+
+    // 特定のエラーは異なるステータスコードで返す
+    if (message === 'NO_AVAILABILITY') {
+      return NextResponse.json(
+        { error: 'NO_AVAILABILITY' },
+        { status: 409 },
+      );
+    }
+
     return NextResponse.json(
       { error: 'RESERVATION_FAILED', details: message },
       { status: 500 },

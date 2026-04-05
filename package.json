@@ -8,13 +8,20 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "jest",
+    "test:e2e": "npx playwright test",
+    "test:e2e:ui": "npx playwright test --ui",
+    "test:all": "jest && npx playwright test",
     "db:generate": "supabase gen types typescript --local > lib/database.types.ts",
     "db:reset": "supabase db reset",
     "db:seed": "tsx scripts/seed.ts",
     "seed:admin": "tsx scripts/seed-admin.ts",
-    "setup": "supabase start && npx prisma generate && npx prisma db push && npm run seed:admin"
+    "seed:users": "tsx scripts/seed-users.ts",
+    "seed:all": "tsx scripts/seed-admin.ts && tsx scripts/seed-users.ts",
+    "setup": "supabase start && npx prisma generate && npx prisma db push && npm run seed:all"
   },
   "dependencies": {
+    "@next/swc-linux-arm64-gnu": "^16.2.1",
+    "@prisma/engines-version": "^7.6.0-1.75cbdc1eb7150937890ad5465d861175c6624711",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-slot": "^1.2.4",
@@ -39,6 +46,7 @@
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
+    "@playwright/test": "^1.58.2",
     "@prisma/client": "^6.19.1",
     "@types/jest": "^29.5.14",
     "@types/node": "^20",

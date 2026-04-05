@@ -40,9 +40,10 @@ export default function InstructorAnnouncementsPage() {
       // 自分が作成したもののみフィルタ
       const filtered = data.filter((a) => a.authorId === session.user.id);
       setMyAnnouncements(filtered);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Load announcements error:', err);
-      setError(err.message);
+      const message = err instanceof Error ? err.message : '不明なエラー';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -68,9 +69,10 @@ export default function InstructorAnnouncementsPage() {
         expiresAt: '',
       });
       loadMyAnnouncements();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Create announcement error:', err);
-      setError(err.message);
+      const message = err instanceof Error ? err.message : '不明なエラー';
+      setError(message);
     } finally {
       setCreating(false);
     }
@@ -82,9 +84,10 @@ export default function InstructorAnnouncementsPage() {
     try {
       await deleteAnnouncement(id);
       loadMyAnnouncements();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Delete error:', err);
-      alert(err.message);
+      const message = err instanceof Error ? err.message : '不明なエラー';
+      alert(message);
     }
   };
 

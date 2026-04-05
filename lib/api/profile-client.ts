@@ -34,7 +34,7 @@ export async function getClientProfile(userId: string) {
     }
 
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Get client profile error:', error);
     return null;
   }
@@ -60,7 +60,7 @@ export async function createClientProfile(input: ClientProfileInput) {
     }
 
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Create client profile error:', error);
     throw error;
   }
@@ -89,7 +89,7 @@ export async function updateClientProfile(
     }
 
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Update client profile error:', error);
     throw error;
   }
@@ -142,7 +142,7 @@ export async function getProfile(userId?: string) {
     }
 
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Get profile error:', error);
     return null;
   }

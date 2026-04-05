@@ -162,8 +162,10 @@ export default function InstructorIdentityVerificationPage() {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Camera access error:', err);
+      const message = err instanceof Error ? err.message : '不明なエラー';
+      console.error('Camera access error:', message);
       setError('カメラへのアクセスが拒否されました。設定を確認してください。');
       setShowCamera(false);
     }
@@ -382,15 +384,16 @@ export default function InstructorIdentityVerificationPage() {
 
       setSuccess(data.message || '本人確認書類を提出しました');
       await loadStatus();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Submit error:', err);
+      const message = err instanceof Error ? err.message : '提出に失敗しました';
       // エラー発生時も認証状態を確認
       const session = await getSession();
       if (!session?.user) {
         router.push('/login/instructor');
         return;
       }
-      setError(err.message || '提出に失敗しました');
+      setError(message);
     } finally {
       setSubmitting(false);
     }
@@ -415,7 +418,7 @@ export default function InstructorIdentityVerificationPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">本人確認（インストラクター）</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">本人確認（サービス提供者）</h1>
         <p className="text-gray-600">
           サービス提供には本人確認が必要です。書類の表・裏と補足写真を提出してください。
         </p>

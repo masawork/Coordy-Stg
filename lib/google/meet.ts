@@ -101,7 +101,7 @@ export async function createMeetEvent(params: CreateMeetEventParams): Promise<st
     // ホストが退出しても会議は継続可能（強制終了しない）
     const event = {
       summary,
-      description: `${description || ''}\n\n---\n主催者: ${instructor?.user?.name || 'インストラクター'}`,
+      description: `${description || ''}\n\n---\n主催者: ${instructor?.user?.name || 'サービス提供者'}`,
       start: {
         dateTime: startTime.toISOString(),
         timeZone: 'Asia/Tokyo',

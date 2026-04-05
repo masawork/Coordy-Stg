@@ -62,9 +62,10 @@ function CardRegistrationForm({ onSuccess }: { onSuccess: () => void }) {
       await createPaymentMethod(paymentMethod!.id);
 
       onSuccess();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Card registration error:', err);
-      setError(err.message || 'カードの登録に失敗しました');
+      const message = err instanceof Error ? err.message : 'カードの登録に失敗しました';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -183,9 +184,10 @@ export default function PaymentMethodsPage() {
     try {
       const methods = await getPaymentMethods();
       setPaymentMethods(methods);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Load payment methods error:', err);
-      setError(err.message);
+      const message = err instanceof Error ? err.message : '決済方法の読み込みに失敗しました';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -199,9 +201,10 @@ export default function PaymentMethodsPage() {
     try {
       await deletePaymentMethod(id);
       loadPaymentMethods();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Delete error:', err);
-      alert(err.message);
+      const message = err instanceof Error ? err.message : 'カードを削除できませんでした';
+      alert(message);
     }
   };
 
@@ -209,9 +212,10 @@ export default function PaymentMethodsPage() {
     try {
       await setDefaultPaymentMethod(id);
       loadPaymentMethods();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Set default error:', err);
-      alert(err.message);
+      const message = err instanceof Error ? err.message : 'デフォルトカードを設定できませんでした';
+      alert(message);
     }
   };
 

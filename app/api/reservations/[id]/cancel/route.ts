@@ -21,6 +21,7 @@ import {
   sendCancellationConfirmationEmail,
   sendCancellationNotifyInstructorEmail,
 } from '@/lib/mail/reservation';
+import { refundPaymentIntent } from '@/lib/stripe/helpers';
 
 export const dynamic = 'force-dynamic';
 
@@ -112,39 +113,92 @@ export const PATCH = withErrorHandler(async (
       },
     });
 
-    // ポイント返金: reservationId で USE 取引を特定
+    // 返金処理: reservationId で取引を特定
     if (reservation.userId) {
-      const useTransaction = await tx.pointTransaction.findFirst({
+      // クレジット決済の返金チェック
+      const creditChargeTransaction = await tx.pointTransaction.findFirst({
         where: {
           reservationId: reservation.id,
-          type: TransactionType.USE,
+          type: TransactionType.CHARGE,
+          method: 'credit',
           status: TransactionStatus.COMPLETED,
         },
       });
 
-      if (useTransaction) {
-        // ウォレット残高を返金
-        const wallet = await tx.wallet.findUnique({
-          where: { userId: reservation.userId },
-        });
+      if (creditChargeTransaction?.transferId) {
+        // Stripe経由のクレジット返金
+        try {
+          await refundPaymentIntent(creditChargeTransaction.transferId, creditChargeTransaction.amount);
 
-        if (wallet) {
-          await tx.wallet.update({
-            where: { userId: reservation.userId },
-            data: { balance: wallet.balance + useTransaction.amount },
-          });
-
-          // 返金トランザクションを作成
+          // クレジット返金記録を作成
           await tx.pointTransaction.create({
             data: {
               userId: reservation.userId,
               type: TransactionType.CHARGE,
-              amount: useTransaction.amount,
+              amount: creditChargeTransaction.amount,
+              method: 'credit_refund',
               status: TransactionStatus.COMPLETED,
               reservationId: reservation.id,
-              description: `予約キャンセル返金: ${reservation.service.title}${reason ? ` (理由: ${reason})` : ''}`,
+              description: `クレジットカード返金: ${reservation.service.title}${reason ? ` (理由: ${reason})` : ''}`,
             },
           });
+        } catch (stripeError) {
+          console.error('Stripe refund failed:', stripeError);
+          // Stripe返金失敗時はポイントで返金
+          const wallet = await tx.wallet.findUnique({
+            where: { userId: reservation.userId },
+          });
+          if (wallet) {
+            await tx.wallet.update({
+              where: { userId: reservation.userId },
+              data: { balance: wallet.balance + creditChargeTransaction.amount },
+            });
+            await tx.pointTransaction.create({
+              data: {
+                userId: reservation.userId,
+                type: TransactionType.CHARGE,
+                amount: creditChargeTransaction.amount,
+                status: TransactionStatus.COMPLETED,
+                reservationId: reservation.id,
+                description: `予約キャンセル返金（ポイント）: ${reservation.service.title}（クレジット返金失敗のためポイント返金）`,
+              },
+            });
+          }
+        }
+      } else {
+        // ポイント返金: reservationId で USE 取引を特定
+        const useTransaction = await tx.pointTransaction.findFirst({
+          where: {
+            reservationId: reservation.id,
+            type: TransactionType.USE,
+            status: TransactionStatus.COMPLETED,
+          },
+        });
+
+        if (useTransaction) {
+          // ウォレット残高を返金
+          const wallet = await tx.wallet.findUnique({
+            where: { userId: reservation.userId },
+          });
+
+          if (wallet) {
+            await tx.wallet.update({
+              where: { userId: reservation.userId },
+              data: { balance: wallet.balance + useTransaction.amount },
+            });
+
+            // 返金トランザクションを作成
+            await tx.pointTransaction.create({
+              data: {
+                userId: reservation.userId,
+                type: TransactionType.CHARGE,
+                amount: useTransaction.amount,
+                status: TransactionStatus.COMPLETED,
+                reservationId: reservation.id,
+                description: `予約キャンセル返金: ${reservation.service.title}${reason ? ` (理由: ${reason})` : ''}`,
+              },
+            });
+          }
         }
       }
     }
@@ -159,10 +213,12 @@ export const PATCH = withErrorHandler(async (
     where: {
       reservationId: id,
       type: TransactionType.CHARGE,
-      description: { contains: 'キャンセル返金' },
+      description: { contains: '返金' },
     },
     orderBy: { createdAt: 'desc' },
   });
+
+  const refundMethod = refundTx?.method === 'credit_refund' ? 'クレジットカード' : 'ポイント';
 
   if (reservation.user?.email) {
     sendCancellationConfirmationEmail({
@@ -170,12 +226,12 @@ export const PATCH = withErrorHandler(async (
       userName: reservation.user.name || reservation.user.email,
       userEmail: reservation.user.email,
       serviceName: reservation.service.title,
-      instructorName: reservation.instructor?.user?.name || 'インストラクター',
+      instructorName: reservation.instructor?.user?.name || 'サービス提供者',
       scheduledAt: reservation.scheduledAt,
       cancelReason: reason,
       cancelledBy,
       refundAmount: refundTx?.amount,
-      refundMethod: 'ポイント',
+      refundMethod,
     }).catch((err) => console.error('Failed to send cancellation email:', err));
   }
 
@@ -186,7 +242,7 @@ export const PATCH = withErrorHandler(async (
       userName: reservation.user?.name || 'ゲスト',
       userEmail: reservation.user?.email || '',
       serviceName: reservation.service.title,
-      instructorName: reservation.instructor.user.name || 'インストラクター',
+      instructorName: reservation.instructor.user.name || 'サービス提供者',
       scheduledAt: reservation.scheduledAt,
       cancelReason: reason,
       cancelledBy,

@@ -47,7 +47,7 @@ export async function getAnnouncements(
     }
 
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Announcements fetch error:', error);
     return []; // エラーを握りつぶして空配列を返す
   }

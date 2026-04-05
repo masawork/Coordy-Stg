@@ -30,14 +30,14 @@ export default function AdminAnnouncementsPage() {
     setLoading(true);
     try {
       // 管理者は全てのお知らせを取得（下書き含む）
-      const response = await fetch('/api/announcements?target=all&limit=100', {
+      const response = await fetch('/api/announcements?target=all&limit=100&include_drafts=true', {
         cache: 'no-store',
       });
       const data = await response.json();
       setAnnouncements(data);
-    } catch (err: any) {
+    } catch (err: unknown) { const message = err instanceof Error ? err.message : '不明なエラー';
       console.error('Load announcements error:', err);
-      setError(err.message);
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -63,9 +63,9 @@ export default function AdminAnnouncementsPage() {
         expiresAt: '',
       });
       loadAnnouncements();
-    } catch (err: any) {
+    } catch (err: unknown) { const message = err instanceof Error ? err.message : '不明なエラー';
       console.error('Create announcement error:', err);
-      setError(err.message);
+      setError(message);
     } finally {
       setCreating(false);
     }
@@ -77,9 +77,9 @@ export default function AdminAnnouncementsPage() {
     try {
       await publishAnnouncement(id);
       loadAnnouncements();
-    } catch (err: any) {
+    } catch (err: unknown) { const message = err instanceof Error ? err.message : '不明なエラー';
       console.error('Publish error:', err);
-      alert(err.message);
+      alert(message);
     }
   };
 
@@ -89,9 +89,9 @@ export default function AdminAnnouncementsPage() {
     try {
       await deleteAnnouncement(id);
       loadAnnouncements();
-    } catch (err: any) {
+    } catch (err: unknown) { const message = err instanceof Error ? err.message : '不明なエラー';
       console.error('Delete error:', err);
-      alert(err.message);
+      alert(message);
     }
   };
 
@@ -130,7 +130,7 @@ export default function AdminAnnouncementsPage() {
                 </label>
                 <select
                   value={formData.target}
-                  onChange={(e) => setFormData({ ...formData, target: e.target.value as any })}
+                  onChange={(e) => setFormData({ ...formData, target: e.target.value as 'all' | 'users' | 'instructors' })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
                   <option value="all">全員</option>
@@ -146,7 +146,7 @@ export default function AdminAnnouncementsPage() {
                 </label>
                 <select
                   value={formData.priority}
-                  onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
+                  onChange={(e) => setFormData({ ...formData, priority: e.target.value as 'low' | 'medium' | 'high' })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
                   <option value="low">低</option>

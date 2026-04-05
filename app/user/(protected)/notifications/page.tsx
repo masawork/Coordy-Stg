@@ -22,9 +22,10 @@ export default function NotificationsPage() {
     try {
       const data = await getNotifications(filter === 'unread');
       setNotifications(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Load notifications error:', err);
-      setError(err.message);
+      const message = err instanceof Error ? err.message : '通知の読み込みに失敗しました';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -34,9 +35,10 @@ export default function NotificationsPage() {
     try {
       await markNotificationAsRead(id);
       loadNotifications();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Mark as read error:', err);
-      alert(err.message);
+      const message = err instanceof Error ? err.message : '既読にできませんでした';
+      alert(message);
     }
   };
 
@@ -44,9 +46,10 @@ export default function NotificationsPage() {
     try {
       await dismissNotification(id);
       loadNotifications();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Dismiss error:', err);
-      alert(err.message);
+      const message = err instanceof Error ? err.message : '削除できませんでした';
+      alert(message);
     }
   };
 
@@ -54,9 +57,10 @@ export default function NotificationsPage() {
     try {
       await markAllNotificationsAsRead();
       loadNotifications();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Mark all as read error:', err);
-      alert(err.message);
+      const message = err instanceof Error ? err.message : '全て既読にできませんでした';
+      alert(message);
     }
   };
 

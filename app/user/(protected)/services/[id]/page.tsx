@@ -28,9 +28,9 @@ export default function ServiceDetailPage() {
   const params = useParams();
   const serviceId = params.id as string;
 
-  const [service, setService] = useState<any>(null);
-  const [instructor, setInstructor] = useState<any>(null);
-  const [wallet, setWallet] = useState<any>(null);
+  const [service, setService] = useState<{ id: string; price: number; instructor?: unknown; [key: string]: unknown } | null>(null);
+  const [instructor, setInstructor] = useState<{ [key: string]: unknown } | null>(null);
+  const [wallet, setWallet] = useState<{ balance: number; [key: string]: unknown } | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodData[]>([]);
   const [schedules, setSchedules] = useState<ScheduleSlot[]>([]);
   const [loading, setLoading] = useState(true);
@@ -165,7 +165,7 @@ export default function ServiceDetailPage() {
 
   const handleReservation = async () => {
     const session = await getSession();
-    if (!session) return;
+    if (!session || !service) return;
 
     if (!selectedSchedule) {
       setError('開催日時を選択してください');
@@ -223,7 +223,7 @@ export default function ServiceDetailPage() {
 
       // 予約一覧ページへ遷移
       router.push('/user/reservations?success=true');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('予約エラー:', err);
       setError('予約に失敗しました。もう一度お試しください。');
     } finally {
@@ -252,12 +252,12 @@ export default function ServiceDetailPage() {
     );
   }
 
-  if (error && !service) {
+  if (!service || (error && !service)) {
     return (
       <div className="min-h-screen bg-gray-50 py-12 px-4">
         <div className="max-w-4xl mx-auto">
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-600">{error}</p>
+            <p className="text-red-600">{error || 'サービスが見つかりませんでした'}</p>
           </div>
           <Button
             onClick={() => router.push('/user/services')}
@@ -272,7 +272,10 @@ export default function ServiceDetailPage() {
     );
   }
 
-  const totalPrice = service ? (service.price ?? 0) * participants : 0;
+  // At this point, service is guaranteed to be non-null due to the guard above
+  if (!service) return null;
+
+  const totalPrice = (service.price ?? 0) * participants;
   const hasEnoughPoints = (wallet?.balance || 0) >= totalPrice;
   const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -293,9 +296,9 @@ export default function ServiceDetailPage() {
         <div className="bg-white rounded-lg shadow p-6 space-y-6">
           {/* サービス画像ギャラリー */}
           <ServiceImageGallery
-            images={service.images || []}
-            title={service.title}
-            category={service.category}
+            images={(service.images as any) || []}
+            title={String(service.title ?? '')}
+            category={String(service.category ?? '')}
           />
 
           {/* タイトルとカテゴリー */}
@@ -308,21 +311,21 @@ export default function ServiceDetailPage() {
                 {service.category === 'other' && 'その他'}
               </span>
             </div>
-            <h1 className="text-3xl font-bold text-gray-900">{service.title}</h1>
+            <h1 className="text-3xl font-bold text-gray-900">{String(service.title ?? '')}</h1>
           </div>
 
           {/* 説明 */}
-          <p className="text-gray-700 leading-relaxed">{service.description}</p>
+          <p className="text-gray-700 leading-relaxed">{String(service.description ?? '')}</p>
 
           {/* 詳細情報 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
             <div className="flex items-center gap-2 text-gray-600">
               <Clock className="h-5 w-5 text-purple-600" />
-              <span>{service.duration}分</span>
+              <span>{Number(service.duration ?? 0)}分</span>
             </div>
             <div className="flex items-center gap-2 text-gray-600">
               <Users className="h-5 w-5 text-purple-600" />
-              <span>最大{service.maxParticipants}名</span>
+              <span>最大{Number(service.maxParticipants ?? 1)}名</span>
             </div>
             <div className="flex items-center gap-2 text-gray-600">
               <Tag className="h-5 w-5 text-purple-600" />
@@ -333,9 +336,9 @@ export default function ServiceDetailPage() {
           </div>
 
           {/* タグ */}
-          {service.tags && service.tags.length > 0 && (
+          {(service.tags as any) && (service.tags as any[]).length > 0 && (
             <div className="flex flex-wrap gap-2">
-              {service.tags.map((tag: string, index: number) => (
+              {(service.tags as any[]).map((tag: string, index: number) => (
                 <span
                   key={index}
                   className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
@@ -347,28 +350,28 @@ export default function ServiceDetailPage() {
           )}
         </div>
 
-        {/* クリエイター情報 */}
+        {/* サービス提供者情報 */}
         {instructor && (
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              クリエイター情報
+              サービス提供者情報
             </h2>
             <div className="flex items-start gap-4">
-              {instructor.profileImage && (
+              {(instructor.profileImage as any) && (
                 <img
-                  src={instructor.profileImage}
-                  alt={instructor.displayName}
+                  src={String(instructor.profileImage ?? '')}
+                  alt={String(instructor.displayName ?? '')}
                   className="w-16 h-16 rounded-full object-cover"
                 />
               )}
               <div>
                 <h3 className="font-semibold text-lg text-gray-900">
-                  {instructor.displayName}
+                  {String(instructor.displayName ?? '')}
                 </h3>
-                <p className="text-gray-600 text-sm mt-1">{instructor.bio}</p>
-                {instructor.specialties && instructor.specialties.length > 0 && (
+                <p className="text-gray-600 text-sm mt-1">{String(instructor.bio ?? '')}</p>
+                {(instructor.specialties as any) && (instructor.specialties as any[]).length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {instructor.specialties.map((specialty: string, index: number) => (
+                    {(instructor.specialties as any[]).map((specialty: string, index: number) => (
                       <span
                         key={index}
                         className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs"
@@ -545,7 +548,7 @@ export default function ServiceDetailPage() {
                 onChange={(e) => setParticipants(parseInt(e.target.value))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
-                {Array.from({ length: Math.min(service.maxParticipants, selectedSchedule?.availableSlots || service.maxParticipants) }, (_, i) => i + 1).map((n) => (
+                {Array.from({ length: Math.min(Number(service.maxParticipants ?? 1), selectedSchedule?.availableSlots || Number(service.maxParticipants ?? 1)) }, (_, i) => i + 1).map((n) => (
                   <option key={n} value={n}>
                     {n}名
                   </option>

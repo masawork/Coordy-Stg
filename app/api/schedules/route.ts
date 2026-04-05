@@ -27,7 +27,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   const toDate = to ? new Date(to) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
   // ServiceScheduleから取得
-  const scheduleWhere: any = {
+  const scheduleWhere: Record<string, unknown> = {
     date: {
       gte: fromDate,
       lte: toDate,
@@ -80,7 +80,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   }
 
   // 繰り返しサービスからスケジュールを生成
-  const serviceWhere: any = {
+  const serviceWhere: Record<string, unknown> = {
     isActive: true,
     recurrenceType: { not: 'ONCE' },
   };
@@ -112,7 +112,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   });
 
   // 繰り返しサービスから日付範囲内のスケジュールを生成
-  const generatedSchedules: any[] = [];
+  const generatedSchedules: Record<string, unknown>[] = [];
 
   for (const service of recurringServices) {
     if (!service.startTime || service.availableDays.length === 0) continue;
@@ -150,16 +150,20 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
 
   // 両方のスケジュールを結合してソート
   const allSchedules = [...filteredSchedules, ...generatedSchedules].sort((a, b) => {
-    const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime();
+    const aDate = a.date instanceof Date ? a.date : new Date(a.date as string | number);
+    const bDate = b.date instanceof Date ? b.date : new Date(b.date as string | number);
+    const dateCompare = aDate.getTime() - bDate.getTime();
     if (dateCompare !== 0) return dateCompare;
-    return a.startTime.localeCompare(b.startTime);
+    const aStartTime = String(a.startTime || '');
+    const bStartTime = String(b.startTime || '');
+    return aStartTime.localeCompare(bStartTime);
   });
 
   // 重複を排除（同じサービス・日付・時刻）
   const uniqueSchedules = allSchedules.filter((schedule, index, self) => {
     return index === self.findIndex((s) =>
       s.serviceId === schedule.serviceId &&
-      new Date(s.date).toDateString() === new Date(schedule.date).toDateString() &&
+      new Date(s.date as string | number).toDateString() === new Date(schedule.date as string | number).toDateString() &&
       s.startTime === schedule.startTime
     );
   });
@@ -181,7 +185,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   });
 
   if (!instructor) {
-    return forbiddenError('インストラクター権限が必要です');
+    return forbiddenError('サービス提供者権限が必要です');
   }
 
   const body = await request.json();

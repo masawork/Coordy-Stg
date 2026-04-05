@@ -31,10 +31,10 @@ export default function SignupUserPage() {
           setTimeout(() => reject(new Error('Session check timeout')), 5000);
         });
 
-        const session = await Promise.race([
+        const session = (await Promise.race([
           getSession(),
           timeoutPromise,
-        ]) as any;
+        ])) as { user?: { user_metadata?: { role?: string } } } | null;
 
         if (session?.user) {
           const user = session.user;
@@ -64,6 +64,19 @@ export default function SignupUserPage() {
     if (loading) return;
 
     // バリデーション
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      setError('お名前を入力してください');
+      return;
+    }
+
+    // Email validation with regex
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+      setError('有効なメールアドレスを入力してください');
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError('パスワードが一致しません');
       return;
@@ -97,24 +110,25 @@ export default function SignupUserPage() {
         console.log('✅ ユーザー登録成功、メール認証が必要です');
         router.push(`/verify?email=${encodeURIComponent(email)}`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '不明なエラー';
+      const errObj = err as Record<string, unknown>;
+      const details = (errObj?.details ?? {}) as Record<string, unknown>;
+      const status = details?.status;
+      const originalError = (details?.originalError ?? {}) as Record<string, unknown>;
+
       console.error('Signup error:', err);
-      console.error('Error details:', err.details);
-      console.error('Error message:', err.message);
+      console.error('Error details:', details);
+      console.error('Error message:', message);
       console.error('Full error object:', JSON.stringify(err, null, 2));
-      
+
       // エラーメッセージを日本語化
       let friendlyMessage = '登録に失敗しました。';
       let errorDetails = '';
-      
-      // エラーの詳細情報を取得
-      const details = err.details || {};
-      const errorMessage = err.message || '';
-      const status = details.status;
-      const originalError = details.originalError || {};
-      
+
       // Supabase Authのエラーメッセージを取得（複数の形式に対応）
-      const betterAuthError = originalError.error?.message || originalError.error || originalError.message || errorMessage;
+      const origErr = originalError?.error as Record<string, unknown> | string | undefined;
+      const betterAuthError = (typeof origErr === 'object' && origErr?.message ? String(origErr.message) : typeof origErr === 'string' ? origErr : null) || String(originalError?.message || message);
       
       // エラーの種類に応じたメッセージを設定
       const lowerMessage = betterAuthError.toLowerCase();
@@ -141,8 +155,6 @@ export default function SignupUserPage() {
         errorDetails = process.env.NODE_ENV === 'development' ? betterAuthError : '';
       } else if (betterAuthError && betterAuthError !== '登録に失敗しました') {
         friendlyMessage = betterAuthError;
-      } else if (errorMessage && errorMessage !== '登録に失敗しました') {
-        friendlyMessage = errorMessage;
       } else {
         friendlyMessage = `登録に失敗しました。${status ? `(エラーコード: ${status})` : ''}`;
       }

@@ -86,8 +86,9 @@ export default function PartnersPage() {
         commissionRate: 0,
       });
       await loadPartners();
-    } catch (err: any) {
-      alert(err.message || '作成に失敗しました');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '不明なエラー';
+      alert(message || '作成に失敗しました');
     } finally {
       setCreating(false);
     }
@@ -284,7 +285,7 @@ export default function PartnersPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {partners.map((p: any) => (
+          {partners.map((p: Record<string, any>) => (
             <div
               key={p.id}
               className={`bg-white border rounded-lg p-4 ${

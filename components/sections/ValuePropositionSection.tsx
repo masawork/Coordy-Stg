@@ -20,7 +20,7 @@ export default function ValuePropositionSection() {
     {
       icon: <FaSearchLocation className="text-5xl text-orange-600" />,
       title: '精度の高いマッチング',
-      description: 'あなたの目的・レベルに合わせた最適なインストラクターを提案',
+      description: 'あなたの目的・レベルに合わせた最適なサービス提供者を提案',
       stats: 'マッチ満足度 98%',
     },
   ];

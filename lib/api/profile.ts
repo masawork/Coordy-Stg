@@ -47,9 +47,10 @@ export async function createClientProfile(input: ClientProfileInput) {
       },
     });
     return profile;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Create client profile error:', error);
-    throw new Error(`プロフィールの作成に失敗しました: ${error.message}`);
+    throw new Error(`プロフィールの作成に失敗しました: ${message}`);
   }
 }
 
@@ -61,8 +62,8 @@ export async function updateClientProfile(
   updates: Partial<ClientProfileInput>
 ) {
   try {
-    const updateData: any = {};
-    
+    const updateData: Record<string, unknown> = {};
+
     if (updates.displayName !== undefined) {
       updateData.displayName = updates.displayName;
     }
@@ -87,9 +88,10 @@ export async function updateClientProfile(
       data: updateData,
     });
     return profile;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Update client profile error:', error);
-    throw new Error(`プロフィールの更新に失敗しました: ${error.message}`);
+    throw new Error(`プロフィールの更新に失敗しました: ${message}`);
   }
 }
 

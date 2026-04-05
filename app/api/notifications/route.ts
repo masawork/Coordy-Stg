@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { createClient } from '@/lib/supabase/server';
-import { withErrorHandler, unauthorizedError } from '@/lib/api/errors';
+import { getAuthUser } from '@/lib/api/auth';
+import { withErrorHandler } from '@/lib/api/errors';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,38 +9,39 @@ export const dynamic = 'force-dynamic';
  * 通知一覧取得
  */
 export const GET = withErrorHandler(async (request: NextRequest) => {
-  const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return unauthorizedError();
+  const authResult = await getAuthUser();
+  if (authResult instanceof NextResponse) {
+    return authResult;
   }
 
-  const userId = user.id;
+  const { dbUser } = authResult;
+  const userId = dbUser.id; // Prisma User ID を使用
   const { searchParams } = new URL(request.url);
   const unreadOnly = searchParams.get('unread') === 'true';
 
-  const where: any = {
-    AND: [
-      {
-        OR: [
-          { userId }, // 個別通知
-          { userId: null }, // 全体通知
-        ],
-      },
-      { isDismissed: false }, // 非表示にしていないもののみ
-      {
-        OR: [
-          { expiresAt: null }, // 期限なし
-          { expiresAt: { gt: new Date() } }, // 有効期限内
-        ],
-      },
-    ],
-  };
+  const whereAND: Record<string, unknown>[] = [
+    {
+      OR: [
+        { userId }, // 個別通知
+        { userId: null }, // 全体通知
+      ],
+    },
+    { isDismissed: false }, // 非表示にしていないもののみ
+    {
+      OR: [
+        { expiresAt: null }, // 期限なし
+        { expiresAt: { gt: new Date() } }, // 有効期限内
+      ],
+    },
+  ];
 
   if (unreadOnly) {
-    where.AND.push({ isRead: false });
+    whereAND.push({ isRead: false });
   }
+
+  const where: Record<string, unknown> = {
+    AND: whereAND,
+  };
 
   const notifications = await prisma.notification.findMany({
     where,

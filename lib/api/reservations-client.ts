@@ -11,9 +11,24 @@ export interface CreateReservationInput {
   paymentMethodId?: string;
 }
 
+export interface Reservation {
+  id: string;
+  userId?: string | null;
+  guestUserId?: string | null;
+  serviceId: string;
+  instructorId: string;
+  scheduledAt: string;
+  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
+  notes?: string | null;
+  meetUrl?: string | null;
+  participants: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface ReservationResult {
   success: boolean;
-  reservation?: any;
+  reservation?: Reservation;
   paymentMethod?: string;
   message?: string;
   requiresAction?: boolean;
@@ -39,7 +54,7 @@ export async function getReservations() {
     }
 
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Get reservations error:', error);
     throw error;
   }
@@ -71,11 +86,12 @@ export async function createReservation(input: CreateReservationInput): Promise<
     }
 
     return data;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Create reservation error:', error);
     return {
       success: false,
-      error: error.message || '予約に失敗しました',
+      error: message || '予約に失敗しました',
     };
   }
 }
@@ -83,15 +99,15 @@ export async function createReservation(input: CreateReservationInput): Promise<
 /**
  * 予約キャンセル
  */
-export async function cancelReservation(reservationId: string) {
+export async function cancelReservation(reservationId: string, reason?: string) {
   try {
-    const response = await fetch(`/api/reservations/${reservationId}`, {
+    const response = await fetch(`/api/reservations/${reservationId}/cancel`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
       },
       credentials: 'include',
-      body: JSON.stringify({ status: 'CANCELLED' }),
+      body: JSON.stringify({ reason: reason || '' }),
     });
 
     if (!response.ok) {
@@ -100,7 +116,7 @@ export async function cancelReservation(reservationId: string) {
     }
 
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Cancel reservation error:', error);
     throw error;
   }

@@ -44,8 +44,9 @@ export default function AdminLoginPage() {
 
       // 管理者ダッシュボードへリダイレクト
       router.push(PATHS.ADMIN.HOME);
-    } catch (err: any) {
-      setError(err.message || 'ログインに失敗しました');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'ログインに失敗しました';
+      setError(message);
     } finally {
       setLoading(false);
     }

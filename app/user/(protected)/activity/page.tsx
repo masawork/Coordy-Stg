@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSession } from '@/lib/auth';
-import { getTransactionHistory } from '@/lib/api/wallet';
+// 取引履歴はAPI経由で取得
 import { ArrowDownCircle, ArrowUpCircle, XCircle, Clock } from 'lucide-react';
 
 export default function ActivityPage() {
@@ -32,8 +32,16 @@ export default function ActivityPage() {
     try {
       setLoading(true);
 
-      const history = await getTransactionHistory(userId);
-      setTransactions(history);
+      const response = await fetch(`/api/wallet/${userId}/transactions`, {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('取引履歴の取得に失敗しました');
+      }
+
+      const data = await response.json();
+      setTransactions(data.transactions || data || []);
     } catch (err) {
       console.error('活動履歴取得エラー:', err);
       setTransactions([]);

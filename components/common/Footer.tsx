@@ -17,7 +17,7 @@ export default function Footer() {
             <h4 className="font-semibold text-white mb-4">サービス</h4>
             <ul className="space-y-2 text-sm">
               <li><a href="#" className="hover:text-white transition-colors">カテゴリー一覧</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">インストラクター検索</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">サービス提供者検索</a></li>
               <li><a href="#" className="hover:text-white transition-colors">料金プラン</a></li>
             </ul>
           </div>

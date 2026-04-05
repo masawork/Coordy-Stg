@@ -19,12 +19,15 @@ export default function AdminLoginPage() {
   const [error, setError] = useState('');
   const router = useRouter();
 
-  // マウント時に既にログイン済みかチェック
+  // マウント時に既にログイン済みかチェック（タイムアウト付き）
   useEffect(() => {
     let active = true;
     const checkSession = async () => {
       try {
-        const session = await getSession();
+        // タイムアウト付きでセッションチェック（5秒）
+        const sessionPromise = getSession();
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
+        const session = await Promise.race([sessionPromise, timeoutPromise]);
         if (session?.user) {
           const user = session.user;
           // ロールがadminであることを確認
@@ -73,20 +76,20 @@ export default function AdminLoginPage() {
 
       console.log('✅ 管理者ログイン成功');
       window.location.href = '/manage/admin';
-    } catch (err: any) {
+    } catch (err: unknown) { const message = err instanceof Error ? err.message : '不明なエラー';
       console.error('Login error:', err);
 
       // エラーメッセージを日本語化
       let friendlyMessage = 'ログインに失敗しました。時間をおいて再度お試しください。';
 
-      if (err.message?.includes('email') || err.message?.includes('password')) {
+      if (message?.includes('email') || message?.includes('password')) {
         friendlyMessage = 'メールアドレスまたはパスワードが正しくありません';
-      } else if (err.message?.includes('not found') || err.message?.includes('登録')) {
+      } else if (message?.includes('not found') || message?.includes('登録')) {
         friendlyMessage = 'このメールアドレスは登録されていません';
-      } else if (err.message?.includes('network') || err.message?.includes('Network')) {
+      } else if (message?.includes('network') || message?.includes('Network')) {
         friendlyMessage = 'ネットワークエラーが発生しました。インターネット接続を確認してください。';
-      } else if (err.message) {
-        friendlyMessage = err.message;
+      } else if (message) {
+        friendlyMessage = message;
       }
 
       setError(friendlyMessage);

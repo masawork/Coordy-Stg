@@ -72,7 +72,30 @@ export default function ServiceDetailPage() {
     );
   }
 
-  const canReserve = isAuthenticated && userRole === 'user';
+  const canReserve = isAuthenticated && userRole === 'user' && service.publishStatus === 'PUBLISHED';
+  const publishStatus = service.publishStatus as string | undefined;
+
+  const publishStatusBanner = () => {
+    if (!publishStatus || publishStatus === 'PUBLISHED') return null;
+    const banners: Record<string, { bg: string; border: string; text: string; message: string }> = {
+      DRAFT: { bg: 'bg-gray-50', border: 'border-gray-300', text: 'text-gray-800', message: 'このサービスは下書き状態です。公開申請を行うと一般ユーザーに表示されます。' },
+      PENDING_REVIEW: { bg: 'bg-yellow-50', border: 'border-yellow-300', text: 'text-yellow-800', message: 'このサービスは公開審査中です。承認されると一般ユーザーに表示されます。' },
+      REJECTED: { bg: 'bg-red-50', border: 'border-red-300', text: 'text-red-800', message: 'このサービスの公開申請は却下されました。内容を修正して再申請してください。' },
+      WITHDRAWN: { bg: 'bg-orange-50', border: 'border-orange-300', text: 'text-orange-800', message: 'このサービスは取り下げられています。再度公開するには公開申請が必要です。' },
+    };
+    const config = banners[publishStatus];
+    if (!config) return null;
+    return (
+      <div className={`${config.bg} border ${config.border} rounded-lg p-4 mb-6`}>
+        <p className={`${config.text} text-sm font-medium`}>{config.message}</p>
+        {publishStatus === 'REJECTED' && service.publishRejectReason && (
+          <p className={`${config.text} text-sm mt-2`}>
+            却下理由: {service.publishRejectReason}
+          </p>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -84,6 +107,8 @@ export default function ServiceDetailPage() {
           <ArrowLeft className="w-4 h-4 mr-2" />
           サービス一覧に戻る
         </Link>
+
+        {publishStatusBanner()}
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -100,7 +125,7 @@ export default function ServiceDetailPage() {
               <div className="flex items-center gap-6 text-gray-600 mb-6">
                 <div className="flex items-center gap-2">
                   <User className="w-5 h-5" />
-                  <span>{service.instructor?.user?.name || 'インストラクター'}</span>
+                  <span>{service.instructor?.user?.name || 'サービス提供者'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="w-5 h-5" />
@@ -119,10 +144,10 @@ export default function ServiceDetailPage() {
               </div>
             )}
 
-            {/* インストラクター情報 */}
+            {/* サービス提供者情報 */}
             {service.instructor && (
               <div className="mb-8 p-6 bg-gray-50 rounded-lg">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">インストラクター情報</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">サービス提供者情報</h2>
                 <div className="space-y-2">
                   <p className="text-gray-700">
                     <span className="font-semibold">名前:</span> {service.instructor.user?.name}
@@ -153,7 +178,13 @@ export default function ServiceDetailPage() {
 
             {/* 予約ボタン */}
             <div className="border-t pt-6">
-              {canReserve ? (
+              {publishStatus && publishStatus !== 'PUBLISHED' ? (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <p className="text-gray-600 text-sm">
+                    このサービスは現在予約を受け付けていません。
+                  </p>
+                </div>
+              ) : canReserve ? (
                 <Button
                   variant="primary"
                   size="lg"

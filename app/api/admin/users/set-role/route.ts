@@ -59,8 +59,9 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   try {
     await updateAuthUserRole(userId, normalizedRole);
     console.log(`Auth user_metadata updated: ${userId} -> ${normalizedRole}`);
-  } catch (authUpdateError: any) {
-    console.error('Failed to update Auth user_metadata:', authUpdateError);
+  } catch (authUpdateError: unknown) {
+    const message = authUpdateError instanceof Error ? authUpdateError.message : 'Unknown error';
+    console.error('Failed to update Auth user_metadata:', message);
     // Auth側の更新に失敗しても、DB側は更新を試みる
     // （ローカル開発でSERVICE_ROLE_KEYがない場合など）
   }

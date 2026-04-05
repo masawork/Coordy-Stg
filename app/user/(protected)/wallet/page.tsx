@@ -18,13 +18,29 @@ import { Building2, Eye, ArrowDownCircle, ArrowUpCircle, AlertTriangle, CheckCir
 export default function WalletPage() {
   const router = useRouter();
   const [balance, setBalance] = useState(0);
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<Array<{
+    id: string;
+    method: string;
+    status: string;
+    type: string;
+    amount: number;
+    description?: string;
+    createdAt: Date | string;
+    transferId?: string;
+  }>>([]);
   const [loading, setLoading] = useState(true);
   const [chargeAmount, setChargeAmount] = useState('');
   const [charging, setCharging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [bankInfo, setBankInfo] = useState<any>(null);
+  const [bankInfo, setBankInfo] = useState<{
+    bankName: string;
+    branchName: string;
+    accountType: string;
+    accountNumber: string;
+    accountHolder: string;
+    transferAmount: number;
+  } | null>(null);
   const [pendingTransfers, setPendingTransfers] = useState<any[]>([]);
   const [showBankInfo, setShowBankInfo] = useState(false);
   const [pendingAmount, setPendingAmount] = useState(0);
@@ -60,7 +76,7 @@ export default function WalletPage() {
 
       // 管理者確認待ちの振込申請を抽出（TRANSFERRED = 振込完了報告済み、管理者確認待ち）
       const pending = (history || []).filter(
-        (tx: any) => tx.method === 'bank_transfer' && tx.status === 'TRANSFERRED'
+        (tx: { method?: string; status?: string }) => tx.method === 'bank_transfer' && tx.status === 'TRANSFERRED'
       );
       setPendingTransfers(pending);
     } catch (err) {
@@ -119,9 +135,10 @@ export default function WalletPage() {
 
       // データを再読み込み
       await loadWalletData();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('振込完了報告エラー:', err);
-      setError(err.message || '振込完了報告に失敗しました。');
+      const message = err instanceof Error ? err.message : '振込完了報告に失敗しました。';
+      setError(message);
     } finally {
       setSubmittingTransfer(false);
     }
@@ -258,14 +275,14 @@ export default function WalletPage() {
                   振込先情報
                 </p>
                 <div className="bg-white p-3 rounded border border-blue-200 text-sm">
-                  <p><span className="text-gray-600">銀行名:</span> {bankInfo.bankName}</p>
-                  <p><span className="text-gray-600">支店名:</span> {bankInfo.branchName}</p>
-                  <p><span className="text-gray-600">口座種別:</span> {bankInfo.accountType}</p>
-                  <p><span className="text-gray-600">口座番号:</span> {bankInfo.accountNumber}</p>
-                  <p><span className="text-gray-600">口座名義:</span> {bankInfo.accountHolder}</p>
+                  <p><span className="text-gray-600">銀行名:</span> {bankInfo?.bankName}</p>
+                  <p><span className="text-gray-600">支店名:</span> {bankInfo?.branchName}</p>
+                  <p><span className="text-gray-600">口座種別:</span> {bankInfo?.accountType}</p>
+                  <p><span className="text-gray-600">口座番号:</span> {bankInfo?.accountNumber}</p>
+                  <p><span className="text-gray-600">口座名義:</span> {bankInfo?.accountHolder}</p>
                   <p className="mt-2 pt-2 border-t">
                     <span className="text-gray-600">振込金額:</span>{' '}
-                    <span className="font-bold text-blue-700">{bankInfo.transferAmount.toLocaleString()}円</span>
+                    <span className="font-bold text-blue-700">{(bankInfo?.transferAmount ?? 0).toLocaleString()}円</span>
                   </p>
                 </div>
               </div>

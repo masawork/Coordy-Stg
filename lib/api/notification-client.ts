@@ -47,7 +47,7 @@ export async function getNotifications(unreadOnly: boolean = false): Promise<Not
     }
 
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Notifications fetch error:', error);
     return []; // エラーを握りつぶして空配列を返す
   }

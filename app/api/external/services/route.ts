@@ -3,6 +3,7 @@
  * パートナー向けサービス一覧取得
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { PublishStatus } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { verifyPartnerRequest } from '@/lib/partner/auth';
 import { withPartnerRateLimit } from '@/lib/api/rate-limit-helper';
@@ -42,9 +43,10 @@ export async function GET(request: NextRequest) {
     const rateLimitResponse = withPartnerRateLimit(partnerId, RATE_LIMIT_PARTNER);
     if (rateLimitResponse) return rateLimitResponse;
 
-    // フィルタ条件構築
+    // フィルタ条件構築（公開承認済みのサービスのみ）
     const where: Record<string, unknown> = {
       isActive: true,
+      publishStatus: PublishStatus.PUBLISHED,
     };
 
     // パートナーのサービス制限

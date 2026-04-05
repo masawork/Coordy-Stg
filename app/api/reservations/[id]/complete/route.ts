@@ -75,32 +75,73 @@ export const PATCH = withErrorHandler(async (
     return validationError('この予約は完了できません。ステータスがCONFIRMEDではありません。');
   }
 
-  // 予約を完了
-  const updatedReservation = await prisma.reservation.update({
-    where: { id },
-    data: {
-      status: ReservationStatus.COMPLETED,
-    },
-    include: {
-      service: true,
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
+  // トランザクションで予約完了 + インストラクター売上加算
+  const totalAmount = reservation.service.price * reservation.participants;
+
+  const updatedReservation = await prisma.$transaction(async (tx) => {
+    // 予約を完了
+    const updated = await tx.reservation.update({
+      where: { id },
+      data: {
+        status: ReservationStatus.COMPLETED,
       },
-      instructor: {
-        include: {
-          user: {
-            select: {
-              name: true,
-              image: true,
+      include: {
+        service: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        instructor: {
+          include: {
+            user: {
+              select: {
+                name: true,
+                image: true,
+              },
             },
           },
         },
       },
-    },
+    });
+
+    // インストラクターのウォレットに売上を加算
+    const instructorUserId = reservation.instructor?.userId;
+    if (instructorUserId) {
+      // ウォレットを取得または作成
+      let wallet = await tx.wallet.findUnique({
+        where: { userId: instructorUserId },
+      });
+
+      if (!wallet) {
+        wallet = await tx.wallet.create({
+          data: { userId: instructorUserId, balance: 0 },
+        });
+      }
+
+      // 残高を加算
+      await tx.wallet.update({
+        where: { userId: instructorUserId },
+        data: { balance: { increment: totalAmount } },
+      });
+
+      // 売上取引履歴を作成
+      await tx.pointTransaction.create({
+        data: {
+          userId: instructorUserId,
+          type: 'CHARGE',
+          amount: totalAmount,
+          method: 'service_revenue',
+          status: 'COMPLETED',
+          reservationId: id,
+          description: `サービス売上: ${reservation.service.title}（${reservation.participants}名）`,
+        },
+      });
+    }
+
+    return updated;
   });
 
   // 完了メール送信（非同期）
@@ -110,7 +151,7 @@ export const PATCH = withErrorHandler(async (
       userName: updatedReservation.user.name || updatedReservation.user.email,
       userEmail: updatedReservation.user.email,
       serviceName: updatedReservation.service.title,
-      instructorName: updatedReservation.instructor?.user?.name || 'インストラクター',
+      instructorName: updatedReservation.instructor?.user?.name || 'サービス提供者',
       scheduledAt: updatedReservation.scheduledAt,
       duration: updatedReservation.service.duration,
       price: updatedReservation.service.price * updatedReservation.participants,

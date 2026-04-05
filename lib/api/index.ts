@@ -58,8 +58,6 @@ export {
 // Admin API
 export {
   getAdminStats,
-  listUsers,
-  updateUserRole,
   listPendingCharges,
   approveCharge,
   rejectCharge,

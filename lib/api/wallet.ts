@@ -81,9 +81,10 @@ export async function chargePoints(
     });
 
     return result;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Charge points error:', error);
-    throw new Error(`ポイントチャージに失敗しました: ${error.message}`);
+    throw new Error(`ポイントチャージに失敗しました: ${message}`);
   }
 }
 
@@ -129,9 +130,10 @@ export async function usePoints(userId: string, amount: number, description: str
     });
 
     return result;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Use points error:', error);
-    throw new Error(`ポイント使用に失敗しました: ${error.message}`);
+    throw new Error(`ポイント使用に失敗しました: ${message}`);
   }
 }
 

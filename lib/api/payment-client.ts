@@ -44,7 +44,7 @@ export async function getPaymentMethods(): Promise<PaymentMethod[]> {
     }
 
     return await response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Payment methods fetch error:', error);
     return []; // エラーを握りつぶして空配列を返す
   }

@@ -14,15 +14,17 @@ import { useRouter } from 'next/navigation';
 import { getCurrentAuthUser } from '@/lib/auth';
 import { fetchCurrentInstructor } from '@/lib/api/instructors-client';
 import { getBankAccounts, BankAccount } from '@/lib/api/bank-client';
-import type { User } from '@/lib/auth/types';
+
 
 export default function InstructorDashboardPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any | null>(null);
+  const [userName, setUserName] = useState<string>('');
   const [instructor, setInstructor] = useState<any>(null);
   const [identityStatus, setIdentityStatus] = useState<'approved' | 'pending' | 'rejected' | 'notSubmitted'>('notSubmitted');
   const [identityRejectedReason, setIdentityRejectedReason] = useState<string | null>(null);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [todayReservations, setTodayReservations] = useState<number>(0);
+  const [serviceCount, setServiceCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [showRejectedModal, setShowRejectedModal] = useState(false);
   const ACK_KEY = 'instructor_rejected_ack';
@@ -35,7 +37,18 @@ export default function InstructorDashboardPage() {
     try {
       const authUser = await getCurrentAuthUser();
       if (authUser) {
-        setUser(authUser);
+        // Prisma DBからユーザー名を取得
+        try {
+          const roleRes = await fetch('/api/auth/check-role?role=instructor', { credentials: 'include' });
+          if (roleRes.ok) {
+            const roleData = await roleRes.json();
+            setUserName(roleData.user?.name || authUser.user_metadata?.name || authUser.email || 'サービス提供者');
+          } else {
+            setUserName(authUser.user_metadata?.name || authUser.email || 'サービス提供者');
+          }
+        } catch {
+          setUserName(authUser.user_metadata?.name || authUser.email || 'サービス提供者');
+        }
 
         // インストラクター情報を取得
         const instructorData = await fetchCurrentInstructor();
@@ -86,6 +99,36 @@ export default function InstructorDashboardPage() {
         } catch (err) {
           console.error('銀行口座取得エラー:', err);
           setBankAccounts([]);
+        }
+
+        // ダッシュボード統計（予約数・サービス数）を取得
+        try {
+          // 今日の予約数
+          const reservationsRes = await fetch('/api/reservations?role=instructor', { credentials: 'include' });
+          if (reservationsRes.ok) {
+            const reservationsData = await reservationsRes.json();
+            const today = new Date();
+            const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            const todayCount = (reservationsData || []).filter((r: { scheduledAt: string; status: string }) => {
+              const rDate = r.scheduledAt?.substring(0, 10);
+              return rDate === todayStr && r.status !== 'CANCELLED';
+            }).length;
+            setTodayReservations(todayCount);
+          }
+        } catch (err) {
+          console.error('予約数取得エラー:', err);
+        }
+
+        try {
+          // サービス数
+          const servicesRes = await fetch('/api/services?instructorId=' + (instructorData?.id || ''), { credentials: 'include' });
+          if (servicesRes.ok) {
+            const servicesData = await servicesRes.json();
+            const servicesList = servicesData.services || servicesData || [];
+            setServiceCount(servicesList.length);
+          }
+        } catch (err) {
+          console.error('サービス数取得エラー:', err);
         }
       }
     } catch (error) {
@@ -153,7 +196,7 @@ export default function InstructorDashboardPage() {
       {/* ウェルカムセクション */}
       <div className="bg-gradient-to-r from-green-600 to-teal-600 rounded-lg shadow-lg p-8 text-white">
         <h1 className="text-3xl font-bold mb-2">
-          ようこそ、{user?.name || 'ゲスト'}さん！
+          ようこそ、{userName || 'ゲスト'}さん！
         </h1>
         <p className="text-green-100">
           今日も素晴らしいレッスンを提供しましょう
@@ -218,7 +261,7 @@ export default function InstructorDashboardPage() {
             今日の予約
           </h2>
           <div className="text-center py-8">
-            <p className="text-3xl font-bold text-gray-900">0</p>
+            <p className="text-3xl font-bold text-gray-900">{todayReservations}</p>
             <p className="text-gray-500 text-sm mt-2">件の予約</p>
           </div>
         </div>
@@ -229,7 +272,7 @@ export default function InstructorDashboardPage() {
             登録サービス
           </h2>
           <div className="text-center py-8">
-            <p className="text-3xl font-bold text-gray-900">0</p>
+            <p className="text-3xl font-bold text-gray-900">{serviceCount}</p>
             <p className="text-gray-500 text-sm mt-2">個のサービス</p>
           </div>
         </div>

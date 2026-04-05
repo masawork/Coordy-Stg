@@ -45,7 +45,7 @@ export const DELETE = withErrorHandler(async (request: NextRequest) => {
   });
 
   if (!instructor) {
-    return notFoundError('インストラクター');
+    return notFoundError('サービス提供者');
   }
 
   // Google連携を解除
