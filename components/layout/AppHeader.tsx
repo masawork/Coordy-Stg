@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Menu, LogOut, User, Home, Wallet, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Menu, LogOut, User, Home, Wallet, RefreshCw, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from './SidebarProvider';
 import { getRoleFromPath } from '@/lib/utils';
@@ -43,6 +43,7 @@ export function AppHeader({ userName }: AppHeaderProps) {
   const pathname = usePathname();
   const { toggle } = useSidebar();
   const [balance, setBalance] = useState<number | null>(null);
+  const [cartCount, setCartCount] = useState<number>(0);
   const [availableRoles, setAvailableRoles] = useState<RoleInfo[]>([]);
   const [showRoleSwitcher, setShowRoleSwitcher] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
@@ -72,6 +73,23 @@ export function AppHeader({ userName }: AppHeaderProps) {
     };
 
     loadBalance();
+  }, [pathname, role]);
+
+  // カート件数を取得
+  useEffect(() => {
+    const loadCartCount = async () => {
+      if (!role || role !== 'user') return;
+      try {
+        const response = await fetch('/api/cart', { credentials: 'include' });
+        if (response.ok) {
+          const data = await response.json();
+          setCartCount(data.items?.length || 0);
+        }
+      } catch {
+        // カート未取得でもエラーにしない
+      }
+    };
+    loadCartCount();
   }, [pathname, role]);
 
   // 利用可能なロール一覧を取得
@@ -270,6 +288,23 @@ export function AppHeader({ userName }: AppHeaderProps) {
 
         {/* Right: Balance + Logout + Profile */}
         <div className="flex items-center gap-2">
+          {role === 'user' && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push('/user/cart')}
+              aria-label="カート"
+              className="h-9 w-9 relative"
+            >
+              <ShoppingCart className="h-4 w-4" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
+                  {cartCount > 9 ? '9+' : cartCount}
+                </span>
+              )}
+            </Button>
+          )}
+
           {balance !== null && role === 'user' && (
             <Button
               variant="ghost"

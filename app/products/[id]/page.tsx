@@ -208,12 +208,9 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
             {/* Seller Info */}
             <div className="mb-6 pb-6 border-b border-gray-200">
               <p className="text-sm text-gray-600 mb-1">サービス提供者</p>
-              <Link
-                href={`/instructor/${product.instructorId}`}
-                className="text-base font-medium text-purple-600 hover:underline"
-              >
+              <span className="text-base font-medium text-gray-900">
                 {sellerName}
-              </Link>
+              </span>
             </div>
 
             {/* Price */}
