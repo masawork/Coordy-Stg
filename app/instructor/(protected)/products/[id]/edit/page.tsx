@@ -8,6 +8,7 @@ import { use } from 'react';
 import { useRouter } from 'next/navigation';
 import { getProduct, updateProduct } from '@/lib/api/products-client';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
+import { ProductImageUploader } from '@/components/features/product/ProductImageUploader';
 
 const CATEGORIES = [
   { id: 'online_lesson', label: 'オンラインレッスン' },
@@ -37,6 +38,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [existingImages, setExistingImages] = useState<Array<{ id: string; url: string; sortOrder: number }>>([]);
   const [formData, setFormData] = useState<FormData>({
     name: '',
     description: '',
@@ -74,6 +76,17 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         trackStock: product.trackStock !== false,
         isActive: product.isActive !== false,
       });
+
+      // 既存画像を設定
+      if (product.images && product.images.length > 0) {
+        setExistingImages(
+          product.images.map((img: { id: string; url: string; sortOrder: number }) => ({
+            id: img.id,
+            url: img.url,
+            sortOrder: img.sortOrder,
+          }))
+        );
+      }
     } catch (err) {
       console.error('商品取得エラー:', err);
       setError(err instanceof Error ? err.message : '商品の取得に失敗しました');
@@ -413,6 +426,18 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
               <span className="text-sm font-medium text-gray-900">この商品を有効にする</span>
             </label>
           </div>
+        </div>
+
+        {/* 商品画像 */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">商品画像</h2>
+          <ProductImageUploader
+            productId={id}
+            existingImages={existingImages}
+            onImageDeleted={(imageId) => {
+              setExistingImages((prev) => prev.filter((img) => img.id !== imageId));
+            }}
+          />
         </div>
 
         {/* ボタン */}

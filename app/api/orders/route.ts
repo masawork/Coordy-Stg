@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { TransactionType, TransactionStatus } from '@prisma/client';
 import { getAuthUser } from '@/lib/api/auth';
+import { createPaymentIntent } from '@/lib/stripe/helpers';
 import {
   withErrorHandler,
   validationError,
@@ -74,7 +75,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   const { dbUser } = authResult;
 
   const body = await request.json();
-  const { paymentMethod, shippingAddressId, notes } = body;
+  const { paymentMethod, paymentMethodId, shippingAddressId, notes } = body;
 
   if (!paymentMethod || !['points', 'credit'].includes(paymentMethod)) {
     return validationError('決済方法は "points" または "credit" を指定してください');
@@ -133,9 +134,111 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     }
   }
 
-  // トランザクションで注文作成
+  // クレジット決済の場合、Stripe PaymentIntentを作成
+  if (paymentMethod === 'credit') {
+    // 決済に使用するカードを取得
+    let dbPaymentMethod;
+    if (paymentMethodId) {
+      dbPaymentMethod = await prisma.paymentMethod.findFirst({
+        where: { id: paymentMethodId, userId: dbUser.id },
+      });
+    } else {
+      dbPaymentMethod = await prisma.paymentMethod.findFirst({
+        where: { userId: dbUser.id, isDefault: true },
+      });
+    }
+
+    if (!dbPaymentMethod || !dbPaymentMethod.stripeCustomerId || !dbPaymentMethod.stripePaymentMethodId) {
+      return validationError('クレジットカードが登録されていません。先にカードを登録してください。');
+    }
+
+    // Stripe PaymentIntentを作成
+    const paymentIntent = await createPaymentIntent(
+      totalAmount,
+      dbPaymentMethod.stripeCustomerId,
+      dbPaymentMethod.stripePaymentMethodId,
+      {
+        userId: dbUser.id,
+        type: 'order',
+        amount: totalAmount.toString(),
+      }
+    );
+
+    // 3Dセキュア等の追加認証が必要な場合
+    if (paymentIntent.status === 'requires_action' || paymentIntent.status === 'requires_confirmation') {
+      return NextResponse.json({
+        requiresAction: true,
+        clientSecret: paymentIntent.client_secret,
+        message: '追加の認証が必要です',
+      });
+    }
+
+    // 決済が成功しなかった場合
+    if (paymentIntent.status !== 'succeeded') {
+      return validationError(`決済処理中にエラーが発生しました（status: ${paymentIntent.status}）`);
+    }
+
+    // 決済成功 - 注文を作成
+    const order = await prisma.$transaction(async (tx) => {
+      const newOrder = await tx.order.create({
+        data: {
+          userId: dbUser.id,
+          orderNumber: generateOrderNumber(),
+          subtotal,
+          shippingCost,
+          totalAmount,
+          paymentMethod,
+          stripePaymentIntentId: paymentIntent.id,
+          shippingAddressId,
+          notes: notes || null,
+          status: 'CONFIRMED',
+          confirmedAt: new Date(),
+        },
+      });
+
+      await tx.orderItem.createMany({
+        data: cart.items.map((item) => ({
+          orderId: newOrder.id,
+          productId: item.productId,
+          quantity: item.quantity,
+          unitPrice: item.product.price,
+          subtotal: item.product.price * item.quantity,
+        })),
+      });
+
+      for (const item of cart.items) {
+        if (item.product.trackStock) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { decrement: item.quantity } },
+          });
+        }
+      }
+
+      await tx.cartItem.deleteMany({
+        where: { cartId: cart.id },
+      });
+
+      return tx.order.findUnique({
+        where: { id: newOrder.id },
+        include: {
+          items: {
+            include: {
+              product: {
+                include: { images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
+              },
+            },
+          },
+          shippingAddress: true,
+        },
+      });
+    });
+
+    return NextResponse.json(order, { status: 201 });
+  }
+
+  // ポイント決済の場合
   const order = await prisma.$transaction(async (tx) => {
-    // 注文作成
     const newOrder = await tx.order.create({
       data: {
         userId: dbUser.id,
@@ -150,7 +253,6 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       },
     });
 
-    // 注文アイテム作成
     await tx.orderItem.createMany({
       data: cart.items.map((item) => ({
         orderId: newOrder.id,
@@ -161,7 +263,6 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       })),
     });
 
-    // 在庫を減らす
     for (const item of cart.items) {
       if (item.product.trackStock) {
         await tx.product.update({
@@ -171,31 +272,29 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       }
     }
 
-    // ポイント決済の場合
-    if (paymentMethod === 'points') {
-      await tx.wallet.update({
-        where: { userId: dbUser.id },
-        data: { balance: { decrement: totalAmount } },
-      });
+    // ポイント決済
+    await tx.wallet.update({
+      where: { userId: dbUser.id },
+      data: { balance: { decrement: totalAmount } },
+    });
 
-      await tx.pointTransaction.create({
-        data: {
-          userId: dbUser.id,
-          type: TransactionType.USE,
-          amount: -totalAmount,
-          status: TransactionStatus.COMPLETED,
-          method: 'points',
-          description: `注文 ${newOrder.orderNumber} の決済`,
-          orderId: newOrder.id,
-        },
-      });
+    await tx.pointTransaction.create({
+      data: {
+        userId: dbUser.id,
+        type: TransactionType.USE,
+        amount: -totalAmount,
+        status: TransactionStatus.COMPLETED,
+        method: 'points',
+        description: `注文 ${newOrder.orderNumber} の決済`,
+        orderId: newOrder.id,
+      },
+    });
 
-      // ポイント決済は即CONFIRMED
-      await tx.order.update({
-        where: { id: newOrder.id },
-        data: { status: 'CONFIRMED', confirmedAt: new Date() },
-      });
-    }
+    // ポイント決済は即CONFIRMED
+    await tx.order.update({
+      where: { id: newOrder.id },
+      data: { status: 'CONFIRMED', confirmedAt: new Date() },
+    });
 
     // カートを空にする
     await tx.cartItem.deleteMany({

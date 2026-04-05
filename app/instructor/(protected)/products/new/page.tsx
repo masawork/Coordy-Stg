@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createProduct } from '@/lib/api/products-client';
-import { ArrowLeft, AlertCircle } from 'lucide-react';
+import { ArrowLeft, AlertCircle, ImageIcon } from 'lucide-react';
 
 const CATEGORIES = [
   { id: 'online_lesson', label: 'オンラインレッスン' },
@@ -94,7 +94,7 @@ export default function NewProductPage() {
     }
 
     try {
-      await createProduct({
+      const product = await createProduct({
         name: formData.name,
         description: formData.description || undefined,
         category: formData.category,
@@ -107,7 +107,8 @@ export default function NewProductPage() {
         trackStock: formData.trackStock,
       });
 
-      router.push('/instructor/products?success=created');
+      // 作成後は編集ページへ遷移（画像アップロードが可能になる）
+      router.push(`/instructor/products/${product.id}/edit?success=created`);
     } catch (err) {
       console.error('商品作成エラー:', err);
       setError(err instanceof Error ? err.message : '商品の作成に失敗しました');
@@ -339,6 +340,20 @@ export default function NewProductPage() {
               />
               <span className="text-sm font-medium text-gray-900">公開</span>
             </label>
+          </div>
+        </div>
+
+        {/* 商品画像（作成後に追加可能） */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">商品画像</h2>
+          <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <ImageIcon className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm text-blue-800 font-medium">商品作成後に画像を追加できます</p>
+              <p className="text-xs text-blue-600 mt-1">
+                商品を作成すると、編集画面に遷移します。そこで最大5枚まで画像をアップロードできます。
+              </p>
+            </div>
           </div>
         </div>
 
