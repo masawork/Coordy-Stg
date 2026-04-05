@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/lib/prisma';
 import { createClient } from '@/lib/supabase/server';
+import {
+  unauthorizedError,
+  notFoundError,
+  forbiddenError,
+  validationError,
+  internalError,
+} from '@/lib/api/errors';
 
-const prisma = new PrismaClient();
 export const dynamic = 'force-dynamic';
 
 /**
@@ -22,7 +28,7 @@ export async function POST(
       error: authError,
     } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
+      return unauthorizedError();
     }
 
     // 商品の所有者確認
@@ -35,17 +41,17 @@ export async function POST(
     });
 
     if (!product) {
-      return NextResponse.json({ error: '商品が見つかりません' }, { status: 404 });
+      return notFoundError('商品');
     }
 
     const instructorUser = product.instructor.user;
     if (instructorUser.authId !== user.id && instructorUser.id !== user.id) {
-      return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+      return forbiddenError();
     }
 
     // 画像数上限チェック
     if (product.images.length >= 5) {
-      return NextResponse.json({ error: '画像は最大5枚までです' }, { status: 400 });
+      return validationError('画像は最大5枚までです');
     }
 
     // FormDataからファイル取得
@@ -54,16 +60,16 @@ export async function POST(
     const sortOrder = parseInt(formData.get('sortOrder') as string || '0');
 
     if (!file || file.size === 0) {
-      return NextResponse.json({ error: 'ファイルが必要です' }, { status: 400 });
+      return validationError('ファイルが必要です');
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json({ error: 'ファイルサイズは5MB以下にしてください' }, { status: 400 });
+      return validationError('ファイルサイズは5MB以下にしてください');
     }
 
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-      return NextResponse.json({ error: 'JPEG、PNG、WebPのみ対応しています' }, { status: 400 });
+      return validationError('JPEG、PNG、WebPのみ対応しています');
     }
 
     // Supabase Storageにアップロード
@@ -80,10 +86,7 @@ export async function POST(
 
     if (uploadError) {
       console.error('Storage upload error:', uploadError);
-      return NextResponse.json(
-        { error: '画像のアップロードに失敗しました', details: uploadError.message },
-        { status: 500 }
-      );
+      return internalError('画像のアップロードに失敗しました');
     }
 
     // 公開URLを取得
@@ -103,14 +106,8 @@ export async function POST(
 
     return NextResponse.json(productImage, { status: 201 });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Upload product image error:', error);
-    return NextResponse.json(
-      { error: '画像のアップロードに失敗しました', details: message },
-      { status: 500 }
-    );
-  } finally {
-    await prisma.$disconnect();
+    return internalError('画像のアップロードに失敗しました');
   }
 }
 
@@ -131,14 +128,14 @@ export async function DELETE(
       error: authError,
     } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
+      return unauthorizedError();
     }
 
     const body = await request.json();
     const { imageId } = body;
 
     if (!imageId) {
-      return NextResponse.json({ error: 'imageIdが必要です' }, { status: 400 });
+      return validationError('imageIdが必要です');
     }
 
     // 画像の所有者確認
@@ -152,12 +149,12 @@ export async function DELETE(
     });
 
     if (!productImage || productImage.productId !== productId) {
-      return NextResponse.json({ error: '画像が見つかりません' }, { status: 404 });
+      return notFoundError('画像');
     }
 
     const instructorUser = productImage.product.instructor.user;
     if (instructorUser.authId !== user.id && instructorUser.id !== user.id) {
-      return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+      return forbiddenError();
     }
 
     // Supabase Storageから削除
@@ -170,14 +167,8 @@ export async function DELETE(
 
     return NextResponse.json({ success: true, message: '画像を削除しました' });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Delete product image error:', error);
-    return NextResponse.json(
-      { error: '画像の削除に失敗しました', details: message },
-      { status: 500 }
-    );
-  } finally {
-    await prisma.$disconnect();
+    return internalError('画像の削除に失敗しました');
   }
 }
 
@@ -198,7 +189,7 @@ export async function PUT(
       error: authError,
     } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
+      return unauthorizedError();
     }
 
     // 商品の所有者確認
@@ -208,19 +199,19 @@ export async function PUT(
     });
 
     if (!product) {
-      return NextResponse.json({ error: '商品が見つかりません' }, { status: 404 });
+      return notFoundError('商品');
     }
 
     const instructorUser = product.instructor.user;
     if (instructorUser.authId !== user.id && instructorUser.id !== user.id) {
-      return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+      return forbiddenError();
     }
 
     const body = await request.json();
     const { images } = body as { images: Array<{ id: string; sortOrder: number }> };
 
     if (!images || !Array.isArray(images)) {
-      return NextResponse.json({ error: 'images配列が必要です' }, { status: 400 });
+      return validationError('images配列が必要です');
     }
 
     // 並び順を一括更新
@@ -240,13 +231,7 @@ export async function PUT(
 
     return NextResponse.json(updatedImages);
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Reorder product images error:', error);
-    return NextResponse.json(
-      { error: '画像の並び替えに失敗しました', details: message },
-      { status: 500 }
-    );
-  } finally {
-    await prisma.$disconnect();
+    return internalError('画像の並び替えに失敗しました');
   }
 }

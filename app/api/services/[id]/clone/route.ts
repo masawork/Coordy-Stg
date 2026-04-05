@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { RecurrenceType, PublishStatus } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { getVerifiedInstructor } from '@/lib/api/auth';
-import { withErrorHandler, notFoundError, forbiddenError } from '@/lib/api/errors';
+import { withErrorHandler, notFoundError, forbiddenError, validationError } from '@/lib/api/errors';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,10 +76,7 @@ export const POST = withErrorHandler(
       newRecurrenceType !== 'ONCE' &&
       (!newAvailableDays.length || !newStartTime || !newEndTime)
     ) {
-      return NextResponse.json(
-        { error: '繰り返しサービスの場合は曜日と開始・終了時間が必要です' },
-        { status: 400 }
-      );
+      return validationError('繰り返しサービスの場合は曜日と開始・終了時間が必要です');
     }
 
     // サービスを作成（publishStatus は prisma generate 後に型に含まれる）

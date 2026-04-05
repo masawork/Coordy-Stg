@@ -14,6 +14,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { unauthorizedError, internalError } from '@/lib/api/errors';
 import {
   sendReminderEmail,
   sendReminderInstructorEmail,
@@ -43,10 +44,7 @@ function verifyCronAuth(request: NextRequest): boolean {
 export async function GET(request: NextRequest) {
   // 認証チェック
   if (!verifyCronAuth(request)) {
-    return NextResponse.json(
-      { error: '認証エラー' },
-      { status: 401 }
-    );
+    return unauthorizedError('認証エラー');
   }
 
   try {
@@ -133,9 +131,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Reminder API error:', error);
-    return NextResponse.json(
-      { error: 'リマインダー送信中にエラーが発生しました' },
-      { status: 500 }
-    );
+    return internalError('リマインダー送信中にエラーが発生しました');
   }
 }
