@@ -103,6 +103,7 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [showNewAddress, setShowNewAddress] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(false);
   const [newAddress, setNewAddress] = useState({
     fullName: '',
     phoneNumber: '',
@@ -142,6 +143,61 @@ export default function CheckoutPage() {
     };
     load();
   }, []);
+
+  const handleUseMyAddress = async () => {
+    setLoadingProfile(true);
+    try {
+      const res = await fetch('/api/profile/me?role=USER', { credentials: 'include' });
+      if (!res.ok) throw new Error('プロフィール取得に失敗しました');
+      const profile = await res.json();
+
+      // プロフィール情報をフォームに自動入力
+      setNewAddress((prev) => ({
+        ...prev,
+        fullName: profile.fullName || prev.fullName,
+        phoneNumber: profile.phoneNumber || prev.phoneNumber,
+      }));
+
+      // 住所テキストがあれば解析を試みる
+      if (profile.address) {
+        const addr = profile.address as string;
+        const matchedPref = PREFECTURES.find((p) => addr.startsWith(p));
+        if (matchedPref) {
+          const rest = addr.slice(matchedPref.length).trim();
+          // 市区町村を抽出（市・区・町・村・郡で分割）
+          const cityMatch = rest.match(/^(.+?[市区町村郡])/);
+          if (cityMatch) {
+            const city = cityMatch[1];
+            const street = rest.slice(city.length).trim();
+            setNewAddress((prev) => ({
+              ...prev,
+              prefecture: matchedPref,
+              city,
+              street: street || prev.street,
+            }));
+          } else {
+            setNewAddress((prev) => ({
+              ...prev,
+              prefecture: matchedPref,
+              city: rest,
+            }));
+          }
+        } else {
+          setNewAddress((prev) => ({
+            ...prev,
+            street: addr,
+          }));
+        }
+      }
+
+      setShowNewAddress(true);
+    } catch (err) {
+      console.error('プロフィール取得エラー:', err);
+      setError('プロフィール情報の取得に失敗しました');
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
 
   const handleAddAddress = async () => {
     if (
@@ -308,12 +364,24 @@ export default function CheckoutPage() {
               </p>
             )}
 
-            <button
-              onClick={() => setShowNewAddress(!showNewAddress)}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
-            >
-              {showNewAddress ? 'キャンセル' : '+ 新しい住所を追加'}
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setShowNewAddress(!showNewAddress)}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+              >
+                {showNewAddress ? 'キャンセル' : '+ 新しい住所を追加'}
+              </button>
+
+              {!showNewAddress && (
+                <button
+                  onClick={handleUseMyAddress}
+                  disabled={loadingProfile}
+                  className="text-sm text-green-600 hover:text-green-700 font-medium transition-colors disabled:opacity-50"
+                >
+                  {loadingProfile ? '読み込み中...' : '📋 自分の住所を使う'}
+                </button>
+              )}
+            </div>
 
             {showNewAddress && (
               <div className="mt-4 p-4 border border-gray-200 rounded-lg space-y-3 bg-gray-50">
