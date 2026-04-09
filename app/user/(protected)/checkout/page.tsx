@@ -87,9 +87,9 @@ interface CartData {
 }
 
 interface WalletData {
-  wallet: {
-    balance: number;
-  };
+  balance: number;
+  id?: string;
+  userId?: string;
 }
 
 export default function CheckoutPage() {
@@ -123,7 +123,7 @@ export default function CheckoutPage() {
         ]);
         setCart(cartData);
         setAddresses(addressData);
-        setWalletBalance(walletData.wallet.balance);
+        setWalletBalance(walletData.balance ?? 0);
 
         const defaultAddr = addressData.find(
           (a: ShippingAddress) => a.isDefault
