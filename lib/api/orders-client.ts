@@ -174,7 +174,8 @@ export async function getShippingAddresses(): Promise<ShippingAddress[]> {
       throw new Error(error.error?.message || error.error || '配送先住所の取得に失敗しました');
     }
 
-    return await response.json();
+    const data = await response.json();
+    return data.addresses || data || [];
   } catch (error: unknown) {
     console.error('Get shipping addresses error:', error);
     throw error;
