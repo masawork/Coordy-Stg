@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#06b6d4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0891b2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#bg)" rx="12"/>
+  <path d="M360 240 L400 170 L440 240 Z" fill="none" stroke="white" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M380 240 L410 190 L440 240" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="2" stroke-linejoin="round"/>
+  <circle cx="430" cy="175" r="15" fill="rgba(255,255,255,0.3)"/>
+  <text x="400" y="320" text-anchor="middle" font-family="system-ui, sans-serif" font-size="28" font-weight="bold" fill="white">アウトドア・自然体験</text>
+  <text x="400" y="360" text-anchor="middle" font-family="system-ui, sans-serif" font-size="16" fill="rgba(255,255,255,0.8)">自然の中でリフレッシュ</text>
+</svg>

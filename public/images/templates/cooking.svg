@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ef4444;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#dc2626;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#bg)" rx="12"/>
+  <ellipse cx="400" cy="220" rx="50" ry="20" fill="none" stroke="white" stroke-width="3"/>
+  <path d="M350 220 Q350 170 400 160 Q450 170 450 220" fill="none" stroke="white" stroke-width="3"/>
+  <line x1="400" y1="240" x2="400" y2="260" stroke="white" stroke-width="3"/>
+  <ellipse cx="400" cy="265" rx="15" ry="5" fill="rgba(255,255,255,0.3)"/>
+  <text x="400" y="320" text-anchor="middle" font-family="system-ui, sans-serif" font-size="28" font-weight="bold" fill="white">料理・クッキング</text>
+  <text x="400" y="360" text-anchor="middle" font-family="system-ui, sans-serif" font-size="16" fill="rgba(255,255,255,0.8)">美味しい料理を学びましょう</text>
+</svg>

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#bg)" rx="12"/>
+  <circle cx="400" cy="160" r="20" fill="rgba(255,255,255,0.3)"/>
+  <path d="M400 180 v40 M380 195 h40 M385 220 l-20 40 M415 220 l20 40" stroke="white" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="400" cy="200" r="70" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="2"/>
+  <text x="400" y="320" text-anchor="middle" font-family="system-ui, sans-serif" font-size="28" font-weight="bold" fill="white">ヨガ・ピラティス</text>
+  <text x="400" y="360" text-anchor="middle" font-family="system-ui, sans-serif" font-size="16" fill="rgba(255,255,255,0.8)">心と体のバランスを整えます</text>
+</svg>
