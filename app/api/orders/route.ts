@@ -136,15 +136,24 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   // クレジット決済の場合、Stripe PaymentIntentを作成
   if (paymentMethod === 'credit') {
+    // 同じauthIdを持つ全ロールのユーザーIDを取得（カードは別ロールに紐づいている場合がある）
+    const sameAuthUsers = dbUser.authId
+      ? await prisma.user.findMany({
+          where: { authId: dbUser.authId },
+          select: { id: true },
+        })
+      : [{ id: dbUser.id }];
+    const userIds = sameAuthUsers.map((u) => u.id);
+
     // 決済に使用するカードを取得
     let dbPaymentMethod;
     if (paymentMethodId) {
       dbPaymentMethod = await prisma.paymentMethod.findFirst({
-        where: { id: paymentMethodId, userId: dbUser.id },
+        where: { id: paymentMethodId, userId: { in: userIds } },
       });
     } else {
       dbPaymentMethod = await prisma.paymentMethod.findFirst({
-        where: { userId: dbUser.id, isDefault: true },
+        where: { userId: { in: userIds }, isDefault: true },
       });
     }
 
