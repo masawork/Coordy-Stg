@@ -202,7 +202,8 @@ export async function createShippingAddress(data: Omit<
       throw new Error(error.error?.message || error.error || '配送先住所の作成に失敗しました');
     }
 
-    return await response.json();
+    const result = await response.json();
+    return result.address || result;
   } catch (error: unknown) {
     console.error('Create shipping address error:', error);
     throw error;
@@ -229,7 +230,8 @@ export async function updateShippingAddress(
       throw new Error(error.error?.message || error.error || '配送先住所の更新に失敗しました');
     }
 
-    return await response.json();
+    const result = await response.json();
+    return result.address || result;
   } catch (error: unknown) {
     console.error('Update shipping address error:', error);
     throw error;
