@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthAdmin } from '@/lib/api/auth';
+import { decrypt } from '@/lib/utils/encryption';
 import { withErrorHandler } from '@/lib/api/errors';
 
 export const dynamic = 'force-dynamic';
@@ -42,5 +43,14 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     orderBy: { createdAt: 'desc' },
   });
 
-  return NextResponse.json(withdrawalRequests);
+  // Issue #2: 口座番号を復号化して返却
+  const withdrawalsWithDecryptedAccount = withdrawalRequests.map((wr) => ({
+    ...wr,
+    bankAccount: wr.bankAccount ? {
+      ...wr.bankAccount,
+      accountNumber: wr.bankAccount.accountNumber ? decrypt(wr.bankAccount.accountNumber) : null,
+    } : null,
+  }));
+
+  return NextResponse.json(withdrawalsWithDecryptedAccount);
 });

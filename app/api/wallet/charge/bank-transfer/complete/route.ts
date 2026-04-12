@@ -92,6 +92,19 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   const transferId = transferCode;
 
+  // Issue #3: 同じ振込コードで未処理のトランザクションが既にある場合はエラー
+  const existingTransaction = await prisma.pointTransaction.findFirst({
+    where: {
+      method: 'bank_transfer',
+      transferId,
+      status: { in: ['PENDING', 'TRANSFERRED'] },
+    },
+  });
+
+  if (existingTransaction) {
+    return validationError('この振込コードは既に使用されています。別のコードで再度お試しください。');
+  }
+
   // トランザクションを作成（TRANSFERRED状態 = 振込完了報告済み）
   const transaction = await prisma.pointTransaction.create({
     data: {

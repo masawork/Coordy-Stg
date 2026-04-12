@@ -46,6 +46,19 @@ export const POST = withErrorHandler(async (
     },
   });
 
+  // Issue #7: ユーザーに却下通知を送信
+  await prisma.notification.create({
+    data: {
+      userId: transaction.userId,
+      type: 'system',
+      category: 'payment',
+      title: '銀行振込チャージ却下',
+      message: reason
+        ? `銀行振込チャージ ¥${transaction.amount.toLocaleString()} が却下されました。理由: ${reason}`
+        : `銀行振込チャージ ¥${transaction.amount.toLocaleString()} が却下されました。`,
+    },
+  });
+
   return NextResponse.json({
     success: true,
     message: 'チャージ申請を却下しました',

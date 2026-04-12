@@ -1,8 +1,11 @@
 /**
- * 銀行振込ステータス更新API
+ * 銀行振込ステータス更新API（レガシー）
  * PATCH /api/wallet/charge/bank-transfer/[transactionId]
  *
  * 振込完了報告を受け付け、ステータスをTRANSFERREDに更新
+ *
+ * NOTE: この旧エンドポイントは後方互換性のために維持されています。
+ * 新しいフローでは /api/wallet/charge/bank-transfer/complete を使用してください。
  */
 
 import { NextRequest, NextResponse } from 'next/server';

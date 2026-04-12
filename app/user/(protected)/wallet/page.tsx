@@ -48,6 +48,9 @@ export default function WalletPage() {
   const [submittingTransfer, setSubmittingTransfer] = useState(false);
 
   // 4桁の振込コードを生成
+  // TODO: Issue #4 - この振込コード生成はサーバーサイドに移行すべき。
+  // クライアントサイドでの生成はコード衝突のリスクがある。
+  // サーバーサイドでDB内の既存コードと重複チェック付きで生成する方式に変更予定。
   const generateTransferCode = () => {
     const num = Math.floor(Math.random() * 9999) + 1;
     return num.toString().padStart(4, '0');

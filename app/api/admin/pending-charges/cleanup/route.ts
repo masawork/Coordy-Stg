@@ -34,11 +34,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { TransactionStatus } from '@prisma/client';
+import { getAuthAdmin } from '@/lib/api/auth';
 import { withErrorHandler } from '@/lib/api/errors';
 
 export const dynamic = 'force-dynamic';
 
 export const POST = withErrorHandler(async (request: NextRequest) => {
+  // Issue #1: 管理者認証チェック
+  const authResult = await getAuthAdmin();
+  if (authResult instanceof NextResponse) return authResult;
+
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -46,7 +51,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   const expiredTransactions = await prisma.pointTransaction.findMany({
     where: {
       method: 'bank_transfer',
-      status: TransactionStatus.TRANSFERRED,
+      status: { in: [TransactionStatus.PENDING, TransactionStatus.TRANSFERRED] },
       createdAt: { lt: thirtyDaysAgo },
     },
   });

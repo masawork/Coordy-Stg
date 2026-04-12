@@ -15,12 +15,12 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   const authResult = await getAuthAdmin();
   if (authResult instanceof NextResponse) return authResult;
 
-  // 承認待ちの銀行振込チャージ一覧を取得（TRANSFERRED = 振込完了報告済み）
+  // Issue #6: 未処理の銀行振込チャージ一覧を取得（PENDING + TRANSFERRED）
   const transactions = await prisma.pointTransaction.findMany({
     where: {
       type: 'CHARGE',
       method: 'bank_transfer',
-      status: 'TRANSFERRED',
+      status: { in: ['PENDING', 'TRANSFERRED'] },
     },
     include: {
       user: {

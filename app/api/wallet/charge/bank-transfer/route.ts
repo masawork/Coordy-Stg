@@ -1,8 +1,11 @@
 /**
- * 銀行振込チャージ申請API
+ * 銀行振込チャージ申請API（レガシー）
  * POST /api/wallet/charge/bank-transfer
  *
  * 銀行振込でのポイントチャージを申請（管理者承認後に反映）
+ *
+ * NOTE: この旧エンドポイントは後方互換性のために維持されています。
+ * 新しいフローでは /api/wallet/charge/bank-transfer/complete を使用してください。
  */
 
 import { NextRequest, NextResponse } from 'next/server';
