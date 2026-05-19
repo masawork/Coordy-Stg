@@ -98,7 +98,7 @@ export default function SettingsPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error || '退会に失敗しました');
+        alert(data.error?.message || '退会に失敗しました');
         return;
       }
       clearSession();

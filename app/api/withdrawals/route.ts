@@ -2,16 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthInstructor, isErrorResponse } from '@/lib/api/auth';
 import { withErrorHandler, validationError, notFoundError, conflictError } from '@/lib/api/errors';
+import { TRANSFER_FEE, WITHDRAWAL_LIMITS } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
-
-// 振込手数料（円）— 出金頻度により異なる
-const TRANSFER_FEE_IMMEDIATE = 250;
-const TRANSFER_FEE_MONTHLY = 150;
-// 最低引き出し額
-const MIN_WITHDRAWAL = 1000;
-// 最大引き出し額（1,000万円）
-const MAX_WITHDRAWAL = 10_000_000;
 
 /**
  * 引き出し申請一覧取得
@@ -63,12 +56,12 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     return validationError('振込先の銀行口座を選択してください');
   }
 
-  if (amount < MIN_WITHDRAWAL) {
-    return validationError(`最低引き出し額は${MIN_WITHDRAWAL.toLocaleString()}円です`);
+  if (amount < WITHDRAWAL_LIMITS.MIN) {
+    return validationError(`最低引き出し額は${WITHDRAWAL_LIMITS.MIN.toLocaleString()}円です`);
   }
 
-  if (amount > MAX_WITHDRAWAL) {
-    return validationError(`1回の引き出し上限は${MAX_WITHDRAWAL.toLocaleString()}円です`);
+  if (amount > WITHDRAWAL_LIMITS.MAX) {
+    return validationError(`1回の引き出し上限は${WITHDRAWAL_LIMITS.MAX.toLocaleString()}円です`);
   }
 
   // インストラクターの振込頻度を取得して手数料を決定
@@ -78,8 +71,8 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   });
 
   const transferFee = instructor?.payoutFrequency === 'MONTHLY'
-    ? TRANSFER_FEE_MONTHLY
-    : TRANSFER_FEE_IMMEDIATE;
+    ? TRANSFER_FEE.MONTHLY
+    : TRANSFER_FEE.IMMEDIATE;
 
   // 銀行口座の確認（Prisma User IDで比較）
   const bankAccount = await prisma.bankAccount.findUnique({

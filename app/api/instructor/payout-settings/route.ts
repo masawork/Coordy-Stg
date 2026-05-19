@@ -1,28 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { createClient } from '@/lib/supabase/server';
-import { withErrorHandler, unauthorizedError, validationError, notFoundError } from '@/lib/api/errors';
+import { getAuthInstructor, isErrorResponse } from '@/lib/api/auth';
+import { withErrorHandler, validationError } from '@/lib/api/errors';
+import { TRANSFER_FEE } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
 
 export const GET = withErrorHandler(async () => {
-  const supabase = await createClient();
-  const { data: { user: authUser }, error } = await supabase.auth.getUser();
-  if (error || !authUser) return unauthorizedError();
+  const authResult = await getAuthInstructor();
+  if (isErrorResponse(authResult)) return authResult;
 
-  const dbUser = await prisma.user.findUnique({
-    where: { email_role: { email: authUser.email!, role: 'INSTRUCTOR' } },
-    include: { instructor: true },
-  });
-
-  if (!dbUser?.instructor) return notFoundError('出品者アカウント');
+  const { instructor } = authResult;
 
   return NextResponse.json({
-    payoutFrequency: dbUser.instructor.payoutFrequency,
-    fees: {
-      IMMEDIATE: 250,
-      MONTHLY: 150,
-    },
+    payoutFrequency: instructor.payoutFrequency,
+    fees: TRANSFER_FEE,
     monthlySchedule: {
       cutoffDay: '月末',
       payoutDay: '翌月15日',
@@ -31,16 +23,10 @@ export const GET = withErrorHandler(async () => {
 });
 
 export const PUT = withErrorHandler(async (request: NextRequest) => {
-  const supabase = await createClient();
-  const { data: { user: authUser }, error } = await supabase.auth.getUser();
-  if (error || !authUser) return unauthorizedError();
+  const authResult = await getAuthInstructor();
+  if (isErrorResponse(authResult)) return authResult;
 
-  const dbUser = await prisma.user.findUnique({
-    where: { email_role: { email: authUser.email!, role: 'INSTRUCTOR' } },
-    include: { instructor: true },
-  });
-
-  if (!dbUser?.instructor) return notFoundError('出品者アカウント');
+  const { instructor } = authResult;
 
   const body = await request.json();
   const { payoutFrequency } = body;
@@ -50,7 +36,7 @@ export const PUT = withErrorHandler(async (request: NextRequest) => {
   }
 
   const updated = await prisma.instructor.update({
-    where: { id: dbUser.instructor.id },
+    where: { id: instructor.id },
     data: { payoutFrequency },
   });
 

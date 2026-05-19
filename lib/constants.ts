@@ -83,3 +83,15 @@ export const PAYMENT_STATUS = {
   FAILED: 'failed',
 } as const;
 
+// 振込手数料（円）
+export const TRANSFER_FEE = {
+  IMMEDIATE: 250,
+  MONTHLY: 150,
+} as const;
+
+// 引き出し制限（円）
+export const WITHDRAWAL_LIMITS = {
+  MIN: 1_000,
+  MAX: 10_000_000,
+} as const;
+

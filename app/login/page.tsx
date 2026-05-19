@@ -23,7 +23,7 @@ export default function LoginPage() {
       try {
         const session = await getSession();
         if (session?.user) {
-          const dest = await detectRedirect(session.user.id);
+          const dest = await detectRedirect();
           if (active) window.location.href = dest;
           return;
         }
@@ -48,7 +48,7 @@ export default function LoginPage() {
       const session = await getSession();
       if (!session?.user) throw new Error('ログインに失敗しました');
 
-      const dest = await detectRedirect(session.user.id);
+      const dest = await detectRedirect();
       window.location.href = dest;
     } catch (err: any) {
       let msg = 'ログインに失敗しました。時間をおいて再度お試しください。';
@@ -168,7 +168,7 @@ export default function LoginPage() {
   );
 }
 
-async function detectRedirect(_authUserId: string): Promise<string> {
+async function detectRedirect(): Promise<string> {
   try {
     const [userRes, instrRes] = await Promise.all([
       fetch('/api/auth/check-role?role=USER'),

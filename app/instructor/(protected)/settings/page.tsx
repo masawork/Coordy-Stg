@@ -72,6 +72,7 @@ export default function InstructorSettingsPage() {
   };
 
   const handlePayoutChange = async (freq: 'IMMEDIATE' | 'MONTHLY') => {
+    if (freq === payoutFrequency) return;
     setPayoutSaving(true);
     try {
       const res = await fetch('/api/instructor/payout-settings', {

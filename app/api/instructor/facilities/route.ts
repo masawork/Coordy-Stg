@@ -52,13 +52,22 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   if (!slot) return notFoundError('スロット');
   if (slot.status !== 'AVAILABLE') return validationError('このスロットは既に予約されています');
 
-  const updatedSlot = await prisma.facilitySlot.update({
+  const updated = await prisma.facilitySlot.updateMany({
     where: { id: slotId, status: 'AVAILABLE' },
     data: {
       status: 'HELD',
       bookedBy: dbUser.id,
       serviceId: serviceId || null,
     },
+  });
+
+  if (updated.count === 0) {
+    return validationError('このスロットは既に予約されています');
+  }
+
+  const updatedSlot = await prisma.facilitySlot.findUnique({
+    where: { id: slotId },
+    include: { facility: true },
   });
 
   return NextResponse.json(updatedSlot, { status: 201 });

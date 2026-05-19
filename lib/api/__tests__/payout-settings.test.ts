@@ -1,23 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const mockGetUser = jest.fn();
-const mockUserFindUnique = jest.fn();
+const mockGetAuthInstructor = jest.fn();
 const mockInstructorUpdate = jest.fn();
 
-jest.mock('@/lib/supabase/server', () => ({
-  createClient: jest.fn().mockResolvedValue({
-    auth: {
-      getUser: () => mockGetUser(),
-    },
-  }),
+jest.mock('@/lib/api/auth', () => ({
+  getAuthInstructor: () => mockGetAuthInstructor(),
+  isErrorResponse: (result: unknown) => result instanceof NextResponse,
 }));
 
 jest.mock('@/lib/prisma', () => ({
   __esModule: true,
   default: {
-    user: {
-      findUnique: (...args: any[]) => mockUserFindUnique(...args),
-    },
     instructor: {
       update: (...args: any[]) => mockInstructorUpdate(...args),
     },
@@ -47,7 +40,9 @@ describe('GET /api/instructor/payout-settings', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('should return 401 if not authenticated', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: null }, error: new Error('no session') });
+    mockGetAuthInstructor.mockResolvedValue(
+      NextResponse.json({ error: { code: 'UNAUTHORIZED', message: '認証が必要です' } }, { status: 401 })
+    );
 
     const res = await GET(makeGetRequest());
     const { status } = await parseResponse(res);
@@ -55,13 +50,9 @@ describe('GET /api/instructor/payout-settings', () => {
   });
 
   it('should return payout settings with fee schedule', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'auth-1', email: 'i@test.com' } },
-      error: null,
-    });
-    mockUserFindUnique.mockResolvedValue({
-      id: 'u1',
+    mockGetAuthInstructor.mockResolvedValue({
       instructor: { id: 'inst-1', payoutFrequency: 'IMMEDIATE' },
+      dbUser: { id: 'u1', role: 'INSTRUCTOR' },
     });
 
     const res = await GET(makeGetRequest());
@@ -75,11 +66,9 @@ describe('GET /api/instructor/payout-settings', () => {
   });
 
   it('should return 404 if no instructor account', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'auth-1', email: 'u@test.com' } },
-      error: null,
-    });
-    mockUserFindUnique.mockResolvedValue({ id: 'u1', instructor: null });
+    mockGetAuthInstructor.mockResolvedValue(
+      NextResponse.json({ error: { code: 'NOT_FOUND', message: 'サービス提供者情報が見つかりません' } }, { status: 404 })
+    );
 
     const res = await GET(makeGetRequest());
     const { status } = await parseResponse(res);
@@ -91,13 +80,9 @@ describe('PUT /api/instructor/payout-settings', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('should update to MONTHLY', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'auth-1', email: 'i@test.com' } },
-      error: null,
-    });
-    mockUserFindUnique.mockResolvedValue({
-      id: 'u1',
+    mockGetAuthInstructor.mockResolvedValue({
       instructor: { id: 'inst-1', payoutFrequency: 'IMMEDIATE' },
+      dbUser: { id: 'u1', role: 'INSTRUCTOR' },
     });
     mockInstructorUpdate.mockResolvedValue({ payoutFrequency: 'MONTHLY' });
 
@@ -109,13 +94,9 @@ describe('PUT /api/instructor/payout-settings', () => {
   });
 
   it('should reject invalid payoutFrequency', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'auth-1', email: 'i@test.com' } },
-      error: null,
-    });
-    mockUserFindUnique.mockResolvedValue({
-      id: 'u1',
+    mockGetAuthInstructor.mockResolvedValue({
       instructor: { id: 'inst-1', payoutFrequency: 'IMMEDIATE' },
+      dbUser: { id: 'u1', role: 'INSTRUCTOR' },
     });
 
     const res = await PUT(makePutRequest({ payoutFrequency: 'WEEKLY' }));

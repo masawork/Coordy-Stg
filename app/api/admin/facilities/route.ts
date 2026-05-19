@@ -17,7 +17,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
 
   const where: any = {};
   if (prefecture) where.prefecture = prefecture;
-  if (isActive !== null && isActive !== undefined) where.isActive = isActive === 'true';
+  if (isActive !== null) where.isActive = isActive === 'true';
 
   const [facilities, total] = await Promise.all([
     prisma.facility.findMany({
@@ -46,6 +46,12 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   if (!name?.trim()) return validationError('施設名を入力してください');
   if (!address?.trim()) return validationError('住所を入力してください');
   if (!prefecture?.trim()) return validationError('都道府県を選択してください');
+  if (capacity !== undefined && (typeof capacity !== 'number' || capacity < 1)) {
+    return validationError('定員は1以上の整数を指定してください');
+  }
+  if (hourlyRate !== undefined && hourlyRate !== null && (typeof hourlyRate !== 'number' || hourlyRate < 0)) {
+    return validationError('時間単価は0以上の数値を指定してください');
+  }
 
   const facility = await prisma.facility.create({
     data: {
@@ -55,7 +61,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       description: description?.trim() || null,
       amenities: amenities || [],
       capacity: capacity || 1,
-      hourlyRate: hourlyRate || null,
+      hourlyRate: hourlyRate ?? null,
       imageUrl: imageUrl || null,
     },
   });
