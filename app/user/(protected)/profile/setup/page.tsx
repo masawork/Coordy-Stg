@@ -371,7 +371,7 @@ export default function ProfileSetupPage() {
                 プロフィール設定
               </h1>
               <p className="text-sm text-gray-600 mb-6">
-                商品をご利用いただくために、プロフィール情報を入力してください。
+                サービスをご利用いただくために、プロフィール情報を入力してください。
               </p>
 
               {error && (

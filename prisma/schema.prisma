@@ -94,6 +94,7 @@ model Service {
   category     String
   deliveryType String   @default("remote") @map("delivery_type") // remote, onsite, hybrid
   location     String?  // 都道府県（例: 東京、大阪）
+  pricingType  String   @default("fixed") @map("pricing_type") // fixed, hourly, daily, monthly, negotiable
   price        Int
   duration     Int      // 分単位
   isActive     Boolean  @default(true) @map("is_active")
@@ -242,11 +243,12 @@ model PhoneVerification {
 }
 
 model Wallet {
-  id        String   @id @default(uuid())
-  userId    String   @unique @map("user_id")
-  balance   Int      @default(0)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id           String   @id @default(uuid())
+  userId       String   @unique @map("user_id")
+  balance      Int      @default(0)
+  creditLimit  Int?     @map("credit_limit") // 月額クレジット使用上限（null=制限なし、単位:円）
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

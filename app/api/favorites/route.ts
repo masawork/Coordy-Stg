@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthUser } from '@/lib/api/auth';
+import { UserRole } from '@prisma/client';
 import { withErrorHandler, validationError, conflictError } from '@/lib/api/errors';
 
 export const dynamic = 'force-dynamic';
@@ -10,7 +11,7 @@ export const dynamic = 'force-dynamic';
  * GET /api/favorites
  */
 export const GET = withErrorHandler(async (request: NextRequest) => {
-  const authResult = await getAuthUser();
+  const authResult = await getAuthUser(UserRole.USER);
   if (authResult instanceof NextResponse) return authResult;
   const { dbUser } = authResult;
 
@@ -36,7 +37,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
  * POST /api/favorites
  */
 export const POST = withErrorHandler(async (request: NextRequest) => {
-  const authResult = await getAuthUser();
+  const authResult = await getAuthUser(UserRole.USER);
   if (authResult instanceof NextResponse) return authResult;
   const { dbUser } = authResult;
 
@@ -44,7 +45,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   const { instructorId } = body;
 
   if (!instructorId) {
-    return validationError('クリエイターIDが必要です');
+    return validationError('サービス提供者IDが必要です');
   }
 
   // 既に登録済みかチェック

@@ -50,7 +50,7 @@ export default function VerificationBenefitsSection() {
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             認証レベルに応じて、より柔軟なキャンセルポリシーや高額決済が可能に。
             <br />
-            安心して商品をご利用いただけます。
+            安心してサービスをご利用いただけます。
           </p>
         </motion.div>
 
@@ -131,7 +131,7 @@ export default function VerificationBenefitsSection() {
           className="text-center mt-12"
         >
           <p className="text-gray-600 mb-4">
-            まずはメールアドレスで登録して、商品を体験してみましょう
+            まずはメールアドレスで登録して、サービスを体験してみましょう
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <a

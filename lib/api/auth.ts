@@ -16,9 +16,10 @@ import { unauthorizedError, forbiddenError, notFoundError } from './errors';
  * 認証済みユーザーを取得
  * SupabaseとPrismaの両方からユーザー情報を取得する
  *
+ * @param role - 取得するロールを明示指定。指定がない場合は user_metadata.role → フォールバック
  * @returns ユーザー情報 or エラーレスポンス
  */
-export async function getAuthUser(): Promise<
+export async function getAuthUser(role?: UserRole): Promise<
   { dbUser: User; authUser: SupabaseUser } | NextResponse
 > {
   const supabase = await createClient();
@@ -28,10 +29,27 @@ export async function getAuthUser(): Promise<
     return unauthorizedError();
   }
 
-  // Prisma Userを取得
-  const dbUser = await prisma.user.findFirst({
-    where: { authId: authUser.id },
-  });
+  let dbUser: User | null = null;
+
+  if (role) {
+    dbUser = await prisma.user.findFirst({
+      where: { authId: authUser.id, role },
+    });
+  } else {
+    const metadataRole = authUser.user_metadata?.role as string | undefined;
+    if (metadataRole) {
+      const prismaRole = metadataRole.toUpperCase() as UserRole;
+      dbUser = await prisma.user.findFirst({
+        where: { authId: authUser.id, role: prismaRole },
+      });
+    }
+  }
+
+  if (!dbUser) {
+    dbUser = await prisma.user.findFirst({
+      where: { authId: authUser.id },
+    });
+  }
 
   if (!dbUser) {
     return notFoundError('ユーザー');
@@ -40,6 +58,7 @@ export async function getAuthUser(): Promise<
   return { dbUser, authUser };
 }
 
+/** @deprecated getAuthSeller() を使用してください */
 /**
  * 認証済みインストラクターを取得
  * ユーザーがINSTRUCTORロールであり、instructor情報が存在することを確認
@@ -49,18 +68,16 @@ export async function getAuthUser(): Promise<
 export async function getAuthInstructor(): Promise<
   { instructor: Instructor; dbUser: User } | NextResponse
 > {
-  const authResult = await getAuthUser();
+  const authResult = await getAuthUser(UserRole.INSTRUCTOR);
 
-  // エラーレスポンスの場合はそのまま返す
   if (authResult instanceof NextResponse) {
     return authResult;
   }
 
   const { dbUser } = authResult;
 
-  // ロールチェック
   if (dbUser.role !== UserRole.INSTRUCTOR) {
-    return forbiddenError('インストラクターのみ利用可能です');
+    return forbiddenError('サービス提供者のみ利用可能です');
   }
 
   // インストラクター情報を取得
@@ -69,7 +86,7 @@ export async function getAuthInstructor(): Promise<
   });
 
   if (!instructor) {
-    return notFoundError('インストラクター情報');
+    return notFoundError('サービス提供者情報');
   }
 
   return { instructor, dbUser };
@@ -82,16 +99,14 @@ export async function getAuthInstructor(): Promise<
  * @returns 管理者ユーザー情報 or エラーレスポンス
  */
 export async function getAuthAdmin(): Promise<{ dbUser: User } | NextResponse> {
-  const authResult = await getAuthUser();
+  const authResult = await getAuthUser(UserRole.ADMIN);
 
-  // エラーレスポンスの場合はそのまま返す
   if (authResult instanceof NextResponse) {
     return authResult;
   }
 
   const { dbUser } = authResult;
 
-  // 管理者ロールチェック
   if (dbUser.role !== UserRole.ADMIN) {
     return forbiddenError('管理者のみ利用可能です');
   }
@@ -99,11 +114,100 @@ export async function getAuthAdmin(): Promise<{ dbUser: User } | NextResponse> {
   return { dbUser };
 }
 
+/** @deprecated getVerifiedSeller() を使用してください */
+/**
+ * 認証済み＆本人確認済みインストラクターを取得
+ * サービスや商品の作成など、本人確認（Level 2）が必要な操作で使用
+ *
+ * @returns インストラクター情報 or エラーレスポンス
+ */
+export async function getVerifiedInstructor(): Promise<
+  { instructor: Instructor; dbUser: User } | NextResponse
+> {
+  const authResult = await getAuthInstructor();
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+
+  const { instructor, dbUser } = authResult;
+
+  // 本人確認レベルチェック
+  const clientProfile = await prisma.clientProfile.findUnique({
+    where: { userId: dbUser.id },
+  });
+
+  if (!clientProfile || clientProfile.verificationLevel < 2) {
+    return forbiddenError(
+      '本人確認（Level 2）が必要です。本人確認書類を提出し、管理者の承認を受けてください。'
+    );
+  }
+
+  return { instructor, dbUser };
+}
+
+/**
+ * 出品者モードのユーザーを取得
+ * sellerEnabled=true であることを確認し、Instructor情報も取得する
+ */
+export async function getAuthSeller(): Promise<
+  { instructor: Instructor; dbUser: User } | NextResponse
+> {
+  const authResult = await getAuthUser(UserRole.INSTRUCTOR);
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+
+  const { dbUser } = authResult;
+
+  // 出品者モードチェック
+  if (!dbUser.sellerEnabled) {
+    return forbiddenError('出品者モードが有効になっていません。モード切替を行ってください。');
+  }
+
+  // インストラクター情報を取得
+  const instructor = await prisma.instructor.findUnique({
+    where: { userId: dbUser.id },
+  });
+
+  if (!instructor) {
+    return notFoundError('出品者プロフィール');
+  }
+
+  return { instructor, dbUser };
+}
+
+/**
+ * 本人確認済み出品者を取得
+ * 出品公開など、本人確認（Level 2）が必要な操作で使用
+ */
+export async function getVerifiedSeller(): Promise<
+  { instructor: Instructor; dbUser: User } | NextResponse
+> {
+  const authResult = await getAuthSeller();
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+
+  const { instructor, dbUser } = authResult;
+
+  const clientProfile = await prisma.clientProfile.findUnique({
+    where: { userId: dbUser.id },
+  });
+
+  if (!clientProfile || clientProfile.verificationLevel < 2) {
+    return forbiddenError(
+      '本人確認（Level 2）が必要です。本人確認書類を提出し、管理者の承認を受けてください。'
+    );
+  }
+
+  return { instructor, dbUser };
+}
+
 /**
  * 型ガード: NextResponseかどうかを判定
  */
 export function isErrorResponse(
-  result: any
+  result: unknown
 ): result is NextResponse {
   return result instanceof NextResponse;
 }

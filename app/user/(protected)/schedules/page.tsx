@@ -222,7 +222,7 @@ export default function SchedulesPage() {
             <CalendarDays className="h-6 w-6 text-purple-600" />
             スケジュール一覧
           </h1>
-          <p className="text-gray-600 mt-1">開催中の商品をカレンダーで確認できます</p>
+          <p className="text-gray-600 mt-1">開催中のサービスをカレンダーで確認できます</p>
         </div>
 
         {/* コントロールバー */}

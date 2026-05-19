@@ -115,9 +115,9 @@ function ServicesContent() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">商品検索</h1>
+        <h1 className="text-3xl font-bold text-gray-900">サービス検索</h1>
         <p className="mt-2 text-gray-600">
-          あなたにぴったりの商品を見つけましょう
+          あなたにぴったりのサービスを見つけましょう
         </p>
       </div>
 
@@ -151,7 +151,7 @@ function ServicesContent() {
         </>
       ) : (
         <div className="text-center py-12">
-          <p className="text-gray-500">該当する商品が見つかりませんでした</p>
+          <p className="text-gray-500">該当するサービスが見つかりませんでした</p>
           {(filters.q || filters.category || filters.location || filters.priceMin || filters.priceMax || filters.deliveryType) && (
             <button
               onClick={() =>

@@ -15,18 +15,7 @@ import { fetchCurrentInstructor } from '@/lib/api/instructors-client';
 import { getBankAccounts } from '@/lib/api/bank-client';
 import { ServiceImageUploader } from '@/components/features/service/ServiceImageUploader';
 import { handleNumericInput } from '@/lib/utils/number';
-
-const categories = [
-  'ファッション',
-  '電子機器・ガジェット',
-  'ハンドメイド・アート',
-  '本・雑誌',
-  'スポーツ・アウトドア',
-  'コスメ・美容',
-  '食品・飲料',
-  'インテリア・雑貨',
-  'その他',
-];
+import { SERVICE_CATEGORIES, PRICING_TYPES } from '@/lib/constants/categories';
 
 const recurrenceTypes = [
   { value: 'ONCE', label: '単発（1回のみ）' },
@@ -57,6 +46,7 @@ export default function NewServicePage() {
     duration: '',
     isActive: true,
     deliveryType: 'remote', // remote | onsite | hybrid
+    pricingType: 'fixed', // fixed | hourly | daily | monthly | negotiable
     location: '',
     locationDetail: '', // 区・最寄り駅など
     // スケジュール設定
@@ -209,6 +199,7 @@ export default function NewServicePage() {
         description: formData.description || undefined,
         category: formData.category,
         deliveryType: formData.deliveryType,
+        pricingType: formData.pricingType,
         location: locationFull,
         price: parseInt(formData.price),
         duration: parseInt(formData.duration),
@@ -261,7 +252,7 @@ export default function NewServicePage() {
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">出品する</h1>
-          <p className="text-sm text-gray-600 mt-1">新しい商品を出品します</p>
+          <p className="text-sm text-gray-600 mt-1">新しいサービスを出品します</p>
         </div>
       </div>
 
@@ -274,7 +265,7 @@ export default function NewServicePage() {
 
         <div>
           <label htmlFor="title" className="block text-sm font-semibold text-gray-700 mb-2">
-            商品名 <span className="text-red-500">*</span>
+            サービス名 <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
@@ -290,7 +281,7 @@ export default function NewServicePage() {
 
         <div>
           <label htmlFor="description" className="block text-sm font-semibold text-gray-700 mb-2">
-            商品説明
+            サービス説明
           </label>
           <textarea
             id="description"
@@ -299,7 +290,7 @@ export default function NewServicePage() {
             onChange={handleChange}
             rows={5}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            placeholder="商品の詳細を入力してください"
+            placeholder="サービスの詳細を入力してください"
           />
         </div>
 
@@ -317,9 +308,29 @@ export default function NewServicePage() {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
             >
               <option value="">選択してください</option>
-              {categories.map((cat) => (
+              {SERVICE_CATEGORIES.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="pricingType" className="block text-sm font-semibold text-gray-700 mb-2">
+              料金体系 <span className="text-red-500">*</span>
+            </label>
+            <select
+              id="pricingType"
+              name="pricingType"
+              value={formData.pricingType}
+              onChange={handleChange}
+              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            >
+              {PRICING_TYPES.map((pt) => (
+                <option key={pt.value} value={pt.value}>
+                  {pt.label}
                 </option>
               ))}
             </select>
@@ -400,7 +411,7 @@ export default function NewServicePage() {
               </div>
             </div>
             <p className="text-xs text-gray-500">
-              詳しい住所やビル名は上の「商品説明」欄に記載してください。エリア・最寄り駅は商品一覧に表示されます。
+              詳しい住所やビル名は上の「サービス説明」欄に記載してください。エリア・最寄り駅はサービス一覧に表示されます。
             </p>
           </div>
         )}
@@ -545,7 +556,7 @@ export default function NewServicePage() {
 
         <div>
           <label htmlFor="price" className="block text-sm font-semibold text-gray-700 mb-2">
-            価格（円） <span className="text-red-500">*</span>
+            {formData.pricingType === 'negotiable' ? '参考価格（円）' : '価格（円）'} <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
@@ -559,6 +570,16 @@ export default function NewServicePage() {
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
             placeholder="5000"
           />
+          {formData.pricingType !== 'fixed' && formData.pricingType !== 'negotiable' && (
+            <p className="text-xs text-gray-500 mt-1">
+              {formData.pricingType === 'hourly' && '1時間あたりの料金を入力してください'}
+              {formData.pricingType === 'daily' && '1日あたりの料金を入力してください'}
+              {formData.pricingType === 'monthly' && '月額料金を入力してください'}
+            </p>
+          )}
+          {formData.pricingType === 'negotiable' && (
+            <p className="text-xs text-gray-500 mt-1">目安となる料金を入力してください（0で「要相談」表示）</p>
+          )}
         </div>
 
         {/* 画像アップロード */}

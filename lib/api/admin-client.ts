@@ -46,3 +46,28 @@ export async function updateUserRoleRemote(userId: string, role: UserRole) {
   return res.json();
 }
 
+export async function getCreditLimit(userId: string) {
+  const res = await fetch(`/api/admin/users/credit-limit?userId=${userId}`, {
+    method: 'GET',
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || 'クレジット制限の取得に失敗しました');
+  }
+  return res.json();
+}
+
+export async function updateCreditLimit(userId: string, creditLimit: number | null) {
+  const res = await fetch('/api/admin/users/credit-limit', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, creditLimit }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || 'クレジット制限の更新に失敗しました');
+  }
+  return res.json();
+}
+

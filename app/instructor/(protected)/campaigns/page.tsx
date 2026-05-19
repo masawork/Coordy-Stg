@@ -166,7 +166,7 @@ export default function InstructorCampaignsPage() {
                         </div>
                       )}
                       {!campaign.service && (
-                        <div className="text-blue-600">対象: 全商品</div>
+                        <div className="text-blue-600">対象: 全サービス</div>
                       )}
                     </div>
 

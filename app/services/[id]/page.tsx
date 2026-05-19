@@ -12,6 +12,7 @@ import { getService } from '@/lib/api/services';
 import { getSession } from '@/lib/auth';
 import Button from '@/components/common/Button';
 import { Calendar, Clock, User, Tag, ArrowLeft } from 'lucide-react';
+import { PRICING_TYPES } from '@/lib/constants/categories';
 
 export default function ServiceDetailPage() {
   const params = useParams();
@@ -61,9 +62,9 @@ export default function ServiceDetailPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">商品が見つかりません</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">サービスが見つかりません</h1>
           <Link href="/services" className="text-purple-600 hover:text-purple-700">
-            商品一覧に戻る
+            サービス一覧に戻る
           </Link>
         </div>
       </div>
@@ -80,7 +81,7 @@ export default function ServiceDetailPage() {
           className="inline-flex items-center text-purple-600 hover:text-purple-700 mb-6"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          商品一覧に戻る
+          サービス一覧に戻る
         </Link>
 
         <motion.div
@@ -106,13 +107,18 @@ export default function ServiceDetailPage() {
                 </div>
                 <div className="text-2xl font-bold text-purple-600">
                   ¥{service.price.toLocaleString()}
+                  {service.pricingType && service.pricingType !== 'fixed' && (
+                    <span className="text-sm font-normal text-gray-500 ml-2">
+                      {PRICING_TYPES.find(pt => pt.value === service.pricingType)?.label || ''}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
 
             {service.description && (
               <div className="mb-8">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">商品詳細</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">サービス詳細</h2>
                 <p className="text-gray-700 whitespace-pre-wrap">{service.description}</p>
               </div>
             )}
@@ -164,7 +170,7 @@ export default function ServiceDetailPage() {
               ) : (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
                   <p className="text-yellow-800 text-sm mb-3">
-                    この商品を予約するにはログインが必要です
+                    このサービスを予約するにはログインが必要です
                   </p>
                   <div className="flex gap-2">
                     <Link href="/login/user">

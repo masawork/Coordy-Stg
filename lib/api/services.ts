@@ -8,6 +8,7 @@ export interface ServiceInput {
   description?: string;
   category: string;
   deliveryType?: string;
+  pricingType?: string;
   location?: string;
   price: number;
   duration: number;

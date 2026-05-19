@@ -57,7 +57,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                           レッスンを受ける
                         </h3>
                         <p className="text-sm text-gray-600">
-                          商品を購入・受講する
+                          サービスを購入・受講する
                         </p>
                       </div>
                     </div>
@@ -75,7 +75,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                           出品者として
                         </h3>
                         <p className="text-sm text-gray-600">
-                          商品を出品する
+                          サービスを出品する
                         </p>
                       </div>
                     </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthUser } from '@/lib/api/auth';
+import { UserRole } from '@prisma/client';
 import { setDefaultPaymentMethod } from '@/lib/stripe/helpers';
 import { withErrorHandler, notFoundError, forbiddenError } from '@/lib/api/errors';
 
@@ -13,7 +14,7 @@ export const PUT = withErrorHandler(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) => {
-  const authResult = await getAuthUser();
+  const authResult = await getAuthUser(UserRole.USER);
   if (authResult instanceof NextResponse) return authResult;
   const { dbUser } = authResult;
 

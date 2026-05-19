@@ -151,7 +151,7 @@ export function ServiceImageUploader({
   return (
     <div className="space-y-4">
       <label className="block text-sm font-semibold text-gray-700">
-        商品画像（最大5枚）
+        サービス画像（最大5枚）
       </label>
 
       {error && (
@@ -170,7 +170,7 @@ export function ServiceImageUploader({
           >
             <img
               src={img.url}
-              alt={`商品画像 ${index + 1}`}
+              alt={`サービス画像 ${index + 1}`}
               className={`w-full object-cover ${index === 0 ? 'h-48 md:h-full' : 'h-24 md:h-28'}`}
             />
             {index === 0 && (

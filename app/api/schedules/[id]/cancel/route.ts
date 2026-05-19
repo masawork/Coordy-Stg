@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthUser } from '@/lib/api/auth';
+import { UserRole } from '@prisma/client';
 import {
   notFoundError,
   forbiddenError,
@@ -21,7 +22,7 @@ export async function PATCH(
   try {
     const { id } = await params;
 
-    const authResult = await getAuthUser();
+    const authResult = await getAuthUser(UserRole.INSTRUCTOR);
     if (authResult instanceof NextResponse) return authResult;
     const { dbUser } = authResult;
 
@@ -31,7 +32,7 @@ export async function PATCH(
     });
 
     if (!instructor) {
-      return forbiddenError('インストラクター権限が必要です');
+      return forbiddenError('サービス提供者権限が必要です');
     }
 
     // スケジュールを取得

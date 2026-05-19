@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthUser } from '@/lib/api/auth';
+import { UserRole } from '@prisma/client';
 import { encrypt } from '@/lib/utils/encryption';
 import { sendBankAccountUpdatedEmail, sendBankAccountDeletedEmail } from '@/lib/mail/resend';
 import { withErrorHandler, notFoundError, forbiddenError, validationError } from '@/lib/api/errors';
@@ -19,7 +20,7 @@ export const PUT = withErrorHandler(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) => {
-  const authResult = await getAuthUser();
+  const authResult = await getAuthUser(UserRole.INSTRUCTOR);
   if (authResult instanceof NextResponse) return authResult;
   const { dbUser, authUser } = authResult;
 
@@ -116,7 +117,7 @@ export const DELETE = withErrorHandler(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) => {
-  const authResult = await getAuthUser();
+  const authResult = await getAuthUser(UserRole.INSTRUCTOR);
   if (authResult instanceof NextResponse) return authResult;
   const { dbUser, authUser } = authResult;
 

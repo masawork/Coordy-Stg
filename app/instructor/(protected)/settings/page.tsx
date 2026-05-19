@@ -145,7 +145,7 @@ export default function InstructorSettingsPage() {
           </div>
           {!googleConnected && !googleLoading && (
             <p className="text-xs text-gray-400 mt-2">
-              ※ 連携するとオンライン商品予約時にGoogle Calendarにイベントが作成され、Meet URLが自動生成されます
+              ※ 連携するとオンラインサービス予約時にGoogle Calendarにイベントが作成され、Meet URLが自動生成されます
             </p>
           )}
         </div>

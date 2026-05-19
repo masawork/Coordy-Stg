@@ -177,7 +177,7 @@ export default function SignupUserPage() {
       >
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">ユーザー新規登録</h1>
-          <p className="text-gray-600">商品を購入・利用する方の登録</p>
+          <p className="text-gray-600">サービスを購入・利用する方の登録</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

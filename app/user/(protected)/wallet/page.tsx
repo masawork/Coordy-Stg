@@ -178,7 +178,7 @@ export default function WalletPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">ポイントウォレット</h1>
           <p className="mt-2 text-gray-600">
-            ポイントをチャージして、商品を購入できます
+            ポイントをチャージして、サービスを購入できます
           </p>
         </div>
 

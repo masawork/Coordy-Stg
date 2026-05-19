@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { ReservationStatus, TransactionType, TransactionStatus } from '@prisma/client';
+import { ReservationStatus, TransactionType, TransactionStatus, UserRole, PublishStatus } from '@prisma/client';
 import { createPaymentIntent } from '@/lib/stripe/helpers';
 import { createMeetEvent } from '@/lib/google/meet';
 import { getAuthUser } from '@/lib/api/auth';
@@ -20,6 +20,7 @@ import {
   sendReservationConfirmationEmail,
   sendReservationNotifyInstructorEmail,
 } from '@/lib/mail/reservation';
+import { checkCreditLimit } from '@/lib/api/credit-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,16 +28,49 @@ export const dynamic = 'force-dynamic';
  * 予約一覧取得
  */
 export const GET = withErrorHandler(async (request: NextRequest) => {
-  const authResult = await getAuthUser();
+  const { searchParams } = new URL(request.url);
+  const role = searchParams.get('role');
+  const authRole = role === 'instructor' ? UserRole.INSTRUCTOR : UserRole.USER;
+  const authResult = await getAuthUser(authRole);
   if (authResult instanceof NextResponse) {
     return authResult;
   }
 
   const { dbUser } = authResult;
+  const status = searchParams.get('status');
+
+  // インストラクターとして予約を取得する場合
+  const where: Record<string, unknown> = {};
+
+  if (role === 'instructor') {
+    // インストラクターIDを取得
+    const instructor = await prisma.instructor.findUnique({
+      where: { userId: dbUser.id },
+    });
+    if (!instructor) {
+      return notFoundError('サービス提供者');
+    }
+    where.instructorId = instructor.id;
+  } else {
+    where.userId = dbUser.id;
+  }
+
+  if (status) {
+    where.status = status;
+  }
 
   const reservations = await prisma.reservation.findMany({
-    where: { userId: dbUser.id },
+    where,
     include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+        },
+      },
+      guestUser: true,
       service: true,
       instructor: {
         include: {
@@ -59,7 +93,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
  * 予約作成
  */
 export const POST = withErrorHandler(async (request: NextRequest) => {
-  const authResult = await getAuthUser();
+  const authResult = await getAuthUser(UserRole.USER);
   if (authResult instanceof NextResponse) {
     return authResult;
   }
@@ -80,6 +114,18 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     return validationError('サービスIDと予約日時は必須です');
   }
 
+  if (participants < 1) {
+    return validationError('participants は1以上である必要があります');
+  }
+
+  const scheduledDate = new Date(scheduledAt);
+  if (isNaN(scheduledDate.getTime())) {
+    return validationError('予約日時の形式が正しくありません');
+  }
+  if (scheduledDate <= new Date()) {
+    return validationError('過去の日時には予約できません');
+  }
+
   // サービスを取得
   const service = await prisma.service.findUnique({
     where: { id: serviceId },
@@ -88,6 +134,19 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   if (!service) {
     return notFoundError('サービス');
+  }
+
+  // 公開中のサービスのみ予約可能
+  if (service.publishStatus !== PublishStatus.PUBLISHED) {
+    return validationError('このサービスは現在予約を受け付けていません');
+  }
+
+  if (!service.isActive) {
+    return validationError('このサービスは現在利用できません');
+  }
+
+  if (participants > service.maxParticipants) {
+    return validationError(`最大定員は${service.maxParticipants}名です`);
   }
 
   const totalPrice = service.price * participants;
@@ -109,6 +168,12 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
     if (!pmToUse || !pmToUse.stripeCustomerId || !pmToUse.stripePaymentMethodId) {
       return validationError('クレジットカードが登録されていません');
+    }
+
+    // クレジット使用制限チェック
+    const creditCheck = await checkCreditLimit(dbUser.id, totalPrice);
+    if (!creditCheck.allowed) {
+      return validationError(creditCheck.message);
     }
 
     // Stripe PaymentIntent を作成
@@ -136,6 +201,21 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
     // トランザクションで予約作成と取引記録を作成
     const result = await prisma.$transaction(async (tx) => {
+      // 容量チェック（トランザクション内で再チェック）
+      const existingBookings = await tx.reservation.aggregate({
+        where: {
+          serviceId,
+          scheduledAt: new Date(scheduledAt),
+          status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] },
+        },
+        _sum: { participants: true },
+      });
+
+      const currentBooked = existingBookings._sum.participants || 0;
+      if (currentBooked + participants > service.maxParticipants) {
+        throw new Error('NO_AVAILABILITY');
+      }
+
       // 予約作成
       const reservation = await tx.reservation.create({
         data: {
@@ -144,6 +224,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
           instructorId: service.instructorId,
           scheduledAt: new Date(scheduledAt),
           notes,
+          participants,
           status: ReservationStatus.CONFIRMED,
         },
         include: {
@@ -159,7 +240,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       });
 
       // 取引履歴を作成（クレジット決済 → チャージ → 使用の2レコード）
-      // チャージ記録（transferIdにPaymentIntent IDを保存 → 返金時に使用）
+      // チャージ記録（PaymentIntent IDを返金用にtransferIdに保存）
       await tx.pointTransaction.create({
         data: {
           userId: dbUser.id,
@@ -167,8 +248,8 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
           amount: totalPrice,
           method: 'credit',
           status: TransactionStatus.COMPLETED,
-          transferId: paymentIntent.id,
           reservationId: reservation.id,
+          transferId: paymentIntent.id,
           description: `予約時クレジット決済（${service.title}）`,
         },
       });
@@ -186,6 +267,11 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       });
 
       return reservation;
+    }).catch((error) => {
+      if (error.message === 'NO_AVAILABILITY') {
+        throw new Error('NO_AVAILABILITY');
+      }
+      throw error;
     });
 
     // オンラインサービスの場合、Google Meet URLを生成
@@ -215,7 +301,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       userName: dbUser.name || dbUser.email,
       userEmail: dbUser.email,
       serviceName: service.title,
-      instructorName: result.instructor?.user?.name || 'インストラクター',
+      instructorName: result.instructor?.user?.name || 'サービス提供者',
       scheduledAt: new Date(scheduledAt),
       duration: service.duration,
       location: service.location || undefined,
@@ -251,17 +337,32 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   } else {
     // ポイント決済
-    // ウォレット残高を確認
-    const wallet = await prisma.wallet.findUnique({
-      where: { userId: dbUser.id },
-    });
-
-    if (!wallet || wallet.balance < totalPrice) {
-      return insufficientBalanceError(totalPrice, wallet?.balance || 0);
-    }
-
     // トランザクションで予約作成とポイント使用
     const result = await prisma.$transaction(async (tx) => {
+      // ウォレット残高を確認（トランザクション内で確認）
+      const wallet = await tx.wallet.findUnique({
+        where: { userId: dbUser.id },
+      });
+
+      if (!wallet || wallet.balance < totalPrice) {
+        throw new Error('INSUFFICIENT_BALANCE');
+      }
+
+      // 容量チェック（トランザクション内で再チェック）
+      const existingBookings = await tx.reservation.aggregate({
+        where: {
+          serviceId,
+          scheduledAt: new Date(scheduledAt),
+          status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] },
+        },
+        _sum: { participants: true },
+      });
+
+      const currentBooked = existingBookings._sum.participants || 0;
+      if (currentBooked + participants > service.maxParticipants) {
+        throw new Error('NO_AVAILABILITY');
+      }
+
       // 予約作成
       const reservation = await tx.reservation.create({
         data: {
@@ -270,6 +371,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
           instructorId: service.instructorId,
           scheduledAt: new Date(scheduledAt),
           notes,
+          participants,
           status: ReservationStatus.PENDING,
         },
         include: {
@@ -284,10 +386,10 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
         },
       });
 
-      // ポイント使用
+      // ポイント使用（decrementオペレータを使用）
       await tx.wallet.update({
         where: { userId: dbUser.id },
-        data: { balance: wallet.balance - totalPrice },
+        data: { balance: { decrement: totalPrice } },
       });
 
       // 取引履歴を作成
@@ -303,6 +405,14 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       });
 
       return reservation;
+    }).catch((error) => {
+      if (error.message === 'INSUFFICIENT_BALANCE') {
+        throw new Error('INSUFFICIENT_BALANCE');
+      }
+      if (error.message === 'NO_AVAILABILITY') {
+        throw new Error('NO_AVAILABILITY');
+      }
+      throw error;
     });
 
     // オンラインサービスの場合、Google Meet URLを生成
@@ -332,7 +442,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       userName: dbUser.name || dbUser.email,
       userEmail: dbUser.email,
       serviceName: service.title,
-      instructorName: result.instructor?.user?.name || 'インストラクター',
+      instructorName: result.instructor?.user?.name || 'サービス提供者',
       scheduledAt: new Date(scheduledAt),
       duration: service.duration,
       location: service.location || undefined,

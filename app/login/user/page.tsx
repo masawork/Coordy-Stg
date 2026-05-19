@@ -134,7 +134,7 @@ export default function UserLoginPage() {
       >
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">ユーザーログイン</h1>
-          <p className="text-gray-600">商品を購入・利用する方のログイン</p>
+          <p className="text-gray-600">サービスを購入・利用する方のログイン</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

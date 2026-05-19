@@ -14,8 +14,8 @@ export default function AdminServicesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">商品管理</h1>
-          <p className="mt-1 text-gray-600">登録されている商品を管理・承認します</p>
+          <h1 className="text-2xl font-bold text-gray-900">サービス管理</h1>
+          <p className="mt-1 text-gray-600">登録されているサービスを管理・承認します</p>
         </div>
       </div>
 
@@ -25,7 +25,7 @@ export default function AdminServicesPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
-              placeholder="商品を検索..."
+              placeholder="サービスを検索..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
@@ -35,7 +35,7 @@ export default function AdminServicesPage() {
 
         <div className="text-center py-12">
           <Package className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-500">商品一覧を表示するエリア（実装予定）</p>
+          <p className="text-gray-500">サービス一覧を表示するエリア（実装予定）</p>
         </div>
       </div>
     </div>

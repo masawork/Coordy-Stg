@@ -176,7 +176,7 @@ export default function SignupInstructorPage() {
       >
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">インストラクター新規登録</h1>
-          <p className="text-gray-600">商品を出品する方の登録</p>
+          <p className="text-gray-600">サービスを出品する方の登録</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

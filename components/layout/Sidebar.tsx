@@ -45,7 +45,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           icon: LayoutDashboard,
         },
         {
-          label: '商品検索',
+          label: 'サービス検索',
           href: `/user/services`,
           icon: ShoppingBag,
         },
@@ -143,7 +143,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           icon: Users,
         },
         {
-          label: '商品管理',
+          label: 'サービス管理',
           href: `/manage/admin/services`,
           icon: Package,
         },

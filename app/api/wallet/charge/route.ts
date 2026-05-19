@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createPaymentIntent } from '@/lib/stripe/helpers';
 import { TransactionType, TransactionStatus } from '@prisma/client';
 import { withErrorHandler, unauthorizedError, validationError, notFoundError } from '@/lib/api/errors';
+import { checkCreditLimit } from '@/lib/api/credit-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,6 +66,12 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     return validationError('クレジットカードが登録されていません。先にカードを登録してください。');
   }
 
+  // クレジット使用制限チェック
+  const creditCheck = await checkCreditLimit(dbUser.id, amount);
+  if (!creditCheck.allowed) {
+    return validationError(creditCheck.message);
+  }
+
   // Stripe PaymentIntent を作成して決済実行
   const paymentIntent = await createPaymentIntent(
     amount,
@@ -95,10 +102,10 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
         });
       }
 
-      // 残高を更新
+      // 残高を更新（increment演算子でatomicに加算）
       const updatedWallet = await tx.wallet.update({
         where: { userId: dbUser.id },
-        data: { balance: wallet.balance + amount },
+        data: { balance: { increment: amount } },
       });
 
       // 取引履歴を作成

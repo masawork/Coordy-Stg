@@ -114,7 +114,7 @@ export default function InstructorLoginPage() {
       >
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">インストラクターログイン</h1>
-          <p className="text-gray-600">商品を出品する方のログイン</p>
+          <p className="text-gray-600">サービスを出品する方のログイン</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

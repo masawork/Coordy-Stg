@@ -8,6 +8,7 @@ import prisma from '@/lib/prisma';
 import { UserRole } from '@prisma/client';
 import { createClient } from '@/lib/supabase/server';
 import { withErrorHandler, unauthorizedError, notFoundError } from '@/lib/api/errors';
+import { getMonthlyCreditUsage } from '@/lib/api/credit-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,5 +53,12 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     });
   }
 
-  return NextResponse.json(wallet);
+  const monthlyCreditUsage = wallet.creditLimit !== null
+    ? await getMonthlyCreditUsage(dbUser.id)
+    : null;
+
+  return NextResponse.json({
+    ...wallet,
+    monthlyCreditUsage,
+  });
 });

@@ -7,13 +7,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { ReservationStatus, TransactionType, TransactionStatus } from '@prisma/client';
+import { Prisma, ReservationStatus } from '@prisma/client';
 import { getAuthInstructor } from '@/lib/api/auth';
 import {
   notFoundError,
   forbiddenError,
   validationError,
-  conflictError,
   withErrorHandler,
 } from '@/lib/api/errors';
 import { sendAndLogWebhook, buildReservationWebhookData } from '@/lib/partner/webhook';
@@ -76,38 +75,16 @@ export const PATCH = withErrorHandler(async (
     return validationError('この予約は完了できません。ステータスがCONFIRMEDではありません。');
   }
 
-  // 売上金額を計算（実際の支払額を優先、取得できない場合は定価×人数）
-  const useTransaction = await prisma.pointTransaction.findFirst({
-    where: {
-      reservationId: reservation.id,
-      type: TransactionType.USE,
-      status: TransactionStatus.COMPLETED,
-    },
-  });
-  const revenueAmount = useTransaction
-    ? Math.abs(useTransaction.amount)
-    : reservation.service.price * reservation.participants;
+  // トランザクションで予約完了 + インストラクター売上加算
+  const totalAmount = reservation.service.price * reservation.participants;
 
-  // トランザクションで予約完了 + インストラクター売上入金
   const updatedReservation = await prisma.$transaction(async (tx) => {
-    // 楽観的ロック: ステータスがCONFIRMEDであることを保証（二重完了防止）
-    const updateResult = await tx.reservation.updateMany({
-      where: {
-        id,
-        status: ReservationStatus.CONFIRMED,
-      },
+    // ステータスを条件に含めた更新（二重完了防止）
+    const updated = await tx.reservation.update({
+      where: { id, status: ReservationStatus.CONFIRMED },
       data: {
         status: ReservationStatus.COMPLETED,
       },
-    });
-
-    if (updateResult.count === 0) {
-      return null; // 二重完了 - トランザクション外で409を返す
-    }
-
-    // 更新後の予約を取得
-    const updated = await tx.reservation.findUniqueOrThrow({
-      where: { id },
       include: {
         service: true,
         user: {
@@ -121,7 +98,6 @@ export const PATCH = withErrorHandler(async (
           include: {
             user: {
               select: {
-                id: true,
                 name: true,
                 image: true,
               },
@@ -131,36 +107,50 @@ export const PATCH = withErrorHandler(async (
       },
     });
 
-    // インストラクターのウォレットに売上を入金
-    const instructorUserId = updated.instructor?.user?.id;
-    if (instructorUserId && revenueAmount > 0) {
-      // ウォレットを取得（なければ作成）
-      await tx.wallet.upsert({
+    // インストラクターのウォレットに売上を加算
+    const instructorUserId = reservation.instructor?.userId;
+    if (instructorUserId) {
+      // ウォレットを取得または作成
+      let wallet = await tx.wallet.findUnique({
         where: { userId: instructorUserId },
-        create: { userId: instructorUserId, balance: revenueAmount },
-        update: { balance: { increment: revenueAmount } },
       });
 
-      // 売上入金の取引記録を作成
+      if (!wallet) {
+        wallet = await tx.wallet.create({
+          data: { userId: instructorUserId, balance: 0 },
+        });
+      }
+
+      // 残高を加算
+      await tx.wallet.update({
+        where: { userId: instructorUserId },
+        data: { balance: { increment: totalAmount } },
+      });
+
+      // 売上取引履歴を作成
       await tx.pointTransaction.create({
         data: {
           userId: instructorUserId,
-          type: TransactionType.CHARGE,
-          amount: revenueAmount,
+          type: 'CHARGE',
+          amount: totalAmount,
           method: 'service_revenue',
-          status: TransactionStatus.COMPLETED,
+          status: 'COMPLETED',
           reservationId: id,
-          description: `サービス売上: ${updated.service.title}（${updated.participants}名）`,
+          description: `サービス売上: ${reservation.service.title}（${reservation.participants}名）`,
         },
       });
     }
 
     return updated;
+  }).catch((error) => {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      return null;
+    }
+    throw error;
   });
 
-  // 二重完了チェック（トランザクションがnullを返した場合）
-  if (updatedReservation === null) {
-    return conflictError('この予約は既に完了済みまたはCONFIRMED以外のステータスです');
+  if (!updatedReservation) {
+    return validationError('この予約は既に完了済みか、ステータスが変更されています');
   }
 
   // 完了メール送信（非同期）
@@ -170,7 +160,7 @@ export const PATCH = withErrorHandler(async (
       userName: updatedReservation.user.name || updatedReservation.user.email,
       userEmail: updatedReservation.user.email,
       serviceName: updatedReservation.service.title,
-      instructorName: updatedReservation.instructor?.user?.name || 'インストラクター',
+      instructorName: updatedReservation.instructor?.user?.name || 'サービス提供者',
       scheduledAt: updatedReservation.scheduledAt,
       duration: updatedReservation.service.duration,
       price: updatedReservation.service.price * updatedReservation.participants,

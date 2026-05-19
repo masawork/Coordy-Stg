@@ -14,18 +14,7 @@ import { getSession } from '@/lib/auth';
 import { fetchCurrentInstructor } from '@/lib/api/instructors-client';
 import { ServiceImageUploader } from '@/components/features/service/ServiceImageUploader';
 import { handleNumericInput } from '@/lib/utils/number';
-
-const categories = [
-  'ファッション',
-  '電子機器・ガジェット',
-  'ハンドメイド・アート',
-  '本・雑誌',
-  'スポーツ・アウトドア',
-  'コスメ・美容',
-  '食品・飲料',
-  'インテリア・雑貨',
-  'その他',
-];
+import { SERVICE_CATEGORIES, PRICING_TYPES } from '@/lib/constants/categories';
 
 export default function EditServicePage() {
   const params = useParams();
@@ -38,6 +27,7 @@ export default function EditServicePage() {
     description: '',
     category: '',
     deliveryType: 'remote',
+    pricingType: 'fixed',
     location: '',
     locationDetail: '',
     price: '',
@@ -97,6 +87,7 @@ export default function EditServicePage() {
         description: service.description || '',
         category: service.category,
         deliveryType: service.deliveryType || 'remote',
+        pricingType: service.pricingType || 'fixed',
         location: parsedLocation,
         locationDetail: parsedLocationDetail,
         price: service.price.toString(),
@@ -163,6 +154,7 @@ export default function EditServicePage() {
         description: formData.description,
         category: formData.category,
         deliveryType: formData.deliveryType,
+        pricingType: formData.pricingType,
         location: formData.deliveryType === 'remote' ? undefined : locationFull,
         price: parseInt(formData.price),
         duration: parseInt(formData.duration),
@@ -196,7 +188,7 @@ export default function EditServicePage() {
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">出品内容の編集</h1>
-          <p className="text-sm text-gray-600 mt-1">商品情報を編集します</p>
+          <p className="text-sm text-gray-600 mt-1">出品内容を編集します</p>
         </div>
       </div>
 
@@ -209,7 +201,7 @@ export default function EditServicePage() {
 
         <div>
           <label htmlFor="title" className="block text-sm font-semibold text-gray-700 mb-2">
-            商品名 <span className="text-red-500">*</span>
+            サービス名 <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
@@ -250,7 +242,7 @@ export default function EditServicePage() {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
             >
               <option value="">選択してください</option>
-              {categories.map((cat) => (
+              {SERVICE_CATEGORIES.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
                 </option>
@@ -293,6 +285,25 @@ export default function EditServicePage() {
           </select>
         </div>
 
+        <div>
+          <label htmlFor="pricingType" className="block text-sm font-semibold text-gray-700 mb-2">
+            料金体系
+          </label>
+          <select
+            id="pricingType"
+            name="pricingType"
+            value={formData.pricingType}
+            onChange={handleChange}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          >
+            {PRICING_TYPES.map((pt) => (
+              <option key={pt.value} value={pt.value}>
+                {pt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* 場所設定（対面・ハイブリッドの場合のみ表示） */}
         {(formData.deliveryType === 'onsite' || formData.deliveryType === 'hybrid') && (
           <div className="space-y-4">
@@ -331,14 +342,18 @@ export default function EditServicePage() {
               </div>
             </div>
             <p className="text-xs text-gray-500">
-              詳しい住所やビル名は上の「商品説明」欄に記載してください。エリア・最寄り駅は商品一覧に表示されます。
+              詳しい住所やビル名は上の「サービス説明」欄に記載してください。エリア・最寄り駅はサービス一覧に表示されます。
             </p>
           </div>
         )}
 
         <div>
           <label htmlFor="price" className="block text-sm font-semibold text-gray-700 mb-2">
-            価格（円） <span className="text-red-500">*</span>
+            {formData.pricingType === 'negotiable' ? '参考価格（円）' :
+             formData.pricingType === 'hourly' ? '1時間あたりの価格（円）' :
+             formData.pricingType === 'daily' ? '1日あたりの価格（円）' :
+             formData.pricingType === 'monthly' ? '月額価格（円）' :
+             '価格（円）'} <span className="text-red-500">*</span>
           </label>
           <input
             type="text"

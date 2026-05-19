@@ -14,20 +14,24 @@ interface AppHeaderProps {
   userName?: string;
 }
 
+type AvailableRole = 'user' | 'instructor';
+
 export function AppHeader({ userName }: AppHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { toggle } = useSidebar();
   const [balance, setBalance] = useState<number | null>(null);
+  const [availableRoles, setAvailableRoles] = useState<AvailableRole[]>([]);
 
   const role = getRoleFromPath(pathname);
 
   useEffect(() => {
-    const loadBalance = async () => {
-      if (!role || role !== 'user') return; // ユーザーのみ残高表示
-
+    const loadData = async () => {
       const session = await getSession();
-      if (session?.user) {
+      if (!session?.user) return;
+
+      // ウォレット残高取得（ユーザーのみ）
+      if (role === 'user') {
         try {
           const response = await fetch(`/api/wallet/me?role=${role}`, {
             credentials: 'include',
@@ -36,25 +40,49 @@ export function AppHeader({ userName }: AppHeaderProps) {
             const wallet = await response.json();
             setBalance(wallet?.balance || 0);
           }
-        } catch (err) {
+        } catch {
+          // ignore
         }
+      }
+
+      // 利用可能なロールをチェック（admin以外）
+      if (role && role !== 'admin') {
+        const rolesToCheck: AvailableRole[] = ['user', 'instructor'];
+        const available: AvailableRole[] = [];
+
+        await Promise.all(
+          rolesToCheck.map(async (r) => {
+            try {
+              const res = await fetch(`/api/auth/check-role?role=${r}`, {
+                credentials: 'include',
+              });
+              if (res.ok) {
+                const data = await res.json();
+                if (data.user) {
+                  available.push(r);
+                }
+              }
+            } catch {
+              // ignore
+            }
+          })
+        );
+
+        setAvailableRoles(available);
       }
     };
 
-    loadBalance();
+    loadData();
   }, [pathname, role]);
 
-  // Don't show header on login/signup pages
   if (/\/(login|signup|verify)/.test(pathname)) {
     return null;
   }
 
   const handleBack = () => {
-    // Check if there's history to go back to
     if (typeof window !== 'undefined' && window.history.length > 1) {
       router.back();
     } else {
-      // Fallback to role homepage
       const fallbackPath = role ? `/${role}` : '/';
       router.push(fallbackPath);
     }
@@ -62,29 +90,41 @@ export function AppHeader({ userName }: AppHeaderProps) {
 
   const handleLogout = async () => {
     try {
-      // Cognitoセッションをクリア
       await betterAuthSignOut();
-
-      // localStorageをクリア
       clearSession();
-
-      // ロールごとにリダイレクト先を分岐（管理者は管理画面へ戻す）
       const fallbackPath = role === 'admin' ? '/manage/admin' : '/';
       window.location.href = fallbackPath;
-    } catch (error) {
+    } catch {
+      // ignore
     }
   };
 
-  const roleLabels = {
+  const handleSwitchRole = (targetRole: AvailableRole) => {
+    if (targetRole === role) return;
+    router.push(`/${targetRole}`);
+  };
+
+  const roleLabels: Record<string, string> = {
     user: 'クライアント',
     instructor: '出品者',
     admin: '管理者',
   };
 
+  const roleColors: Record<string, { active: string; inactive: string }> = {
+    user: {
+      active: 'bg-purple-600 text-white',
+      inactive: 'bg-gray-100 text-gray-600 hover:bg-purple-50 hover:text-purple-700',
+    },
+    instructor: {
+      active: 'bg-green-600 text-white',
+      inactive: 'bg-gray-100 text-gray-600 hover:bg-green-50 hover:text-green-700',
+    },
+  };
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-white border-b border-gray-200 px-4 pointer-events-auto">
       <div className="flex items-center justify-between h-full">
-        {/* Left: Hamburger → Back */}
+        {/* Left: Hamburger + Back */}
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
@@ -107,7 +147,7 @@ export function AppHeader({ userName }: AppHeaderProps) {
           </Button>
         </div>
 
-        {/* Center: Brand + Logo */}
+        {/* Center: Brand + User Info + Role Switcher */}
         <div className="flex-1 flex justify-center items-center gap-3">
           <Link
             href={role ? `/${role}` : '/'}
@@ -119,23 +159,37 @@ export function AppHeader({ userName }: AppHeaderProps) {
             </span>
           </Link>
 
-          {userName && (
-            <>
-              <span className="hidden sm:inline text-sm text-gray-600">
-                {userName}さん
+          {userName && role && (
+            <span className="hidden sm:inline text-sm text-gray-600">
+              {userName}さん
+              <span className="ml-1 text-xs text-gray-400">
+                （{roleLabels[role]}ログイン中）
               </span>
-              {role && (
-                <span className="hidden sm:inline px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
-                  {roleLabels[role]}
-                </span>
-              )}
-            </>
+            </span>
+          )}
+
+          {/* ロール切替ボタン（admin以外、両方のロールがある場合） */}
+          {role !== 'admin' && availableRoles.length > 1 && (
+            <div className="hidden sm:flex items-center gap-1 ml-2">
+              {availableRoles.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => handleSwitchRole(r)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                    r === role
+                      ? roleColors[r].active
+                      : roleColors[r].inactive
+                  }`}
+                >
+                  {roleLabels[r]}
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
-        {/* Right: Balance → Logout → Profile */}
+        {/* Right: Balance + Logout + Profile */}
         <div className="flex items-center gap-2">
-          {/* ポイント残高 */}
           {balance !== null && role === 'user' && (
             <Button
               variant="ghost"
@@ -178,6 +232,34 @@ export function AppHeader({ userName }: AppHeaderProps) {
           </Button>
         </div>
       </div>
+
+      {/* モバイル: ロール切替 + ログイン中表示 */}
+      {role && role !== 'admin' && (
+        <div className="sm:hidden flex items-center justify-center gap-2 pb-1 -mt-1">
+          {userName && (
+            <span className="text-xs text-gray-400">
+              {roleLabels[role]}ログイン中
+            </span>
+          )}
+          {availableRoles.length > 1 && (
+            <div className="flex items-center gap-1">
+              {availableRoles.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => handleSwitchRole(r)}
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${
+                    r === role
+                      ? roleColors[r].active
+                      : roleColors[r].inactive
+                  }`}
+                >
+                  {roleLabels[r]}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </header>
   );
 }

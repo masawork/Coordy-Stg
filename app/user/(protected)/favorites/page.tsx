@@ -81,7 +81,7 @@ export default function FavoritesPage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">お気に入り</h1>
         <p className="mt-2 text-gray-600">
-          お気に入りの出品者と商品を管理できます
+          お気に入りの出品者とサービスを管理できます
         </p>
       </div>
 
@@ -153,7 +153,7 @@ export default function FavoritesPage() {
                     onClick={() => router.push('/services')}
                     className="bg-purple-600 hover:bg-purple-700"
                   >
-                    商品を探す
+                    サービスを探す
                   </Button>
                 </div>
               )}
@@ -163,7 +163,7 @@ export default function FavoritesPage() {
             {services.length > 0 && (
               <div className="bg-white rounded-lg shadow p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                  お気に入り出品者の商品
+                  お気に入り出品者のサービス
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {services.map((service) => (

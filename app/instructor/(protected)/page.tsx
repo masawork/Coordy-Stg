@@ -313,7 +313,7 @@ export default function InstructorDashboardPage() {
             {upcomingReservations.map((r: any) => (
               <div key={r.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div>
-                  <p className="font-medium text-gray-900">{r.service?.title || '商品'}</p>
+                  <p className="font-medium text-gray-900">{r.service?.title || 'サービス'}</p>
                   <p className="text-sm text-gray-500">
                     {new Date(r.scheduledAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </p>

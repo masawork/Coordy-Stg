@@ -105,9 +105,9 @@ export default function ReserveServicePage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">商品が見つかりません</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">サービスが見つかりません</h1>
           <Link href="/services" className="text-purple-600 hover:text-purple-700">
-            商品一覧に戻る
+            サービス一覧に戻る
           </Link>
         </div>
       </div>
@@ -122,7 +122,7 @@ export default function ReserveServicePage() {
           className="inline-flex items-center text-purple-600 hover:text-purple-700 mb-6"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          商品詳細に戻る
+          サービス詳細に戻る
         </Link>
 
         <motion.div

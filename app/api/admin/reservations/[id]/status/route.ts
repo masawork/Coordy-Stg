@@ -144,7 +144,7 @@ export const PATCH = withErrorHandler(async (
         if (wallet) {
           await tx.wallet.update({
             where: { userId: reservation.userId },
-            data: { balance: wallet.balance + useTransaction.amount },
+            data: { balance: { increment: useTransaction.amount } },
           });
 
           // 返金トランザクションを作成

@@ -122,7 +122,7 @@ export default function InstructorServicesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">出品管理</h1>
-          <p className="text-sm text-gray-600 mt-1">出品中の商品を管理します</p>
+          <p className="text-sm text-gray-600 mt-1">出品中のサービスを管理します</p>
         </div>
         <Link href="/instructor/services/new">
         <Button
@@ -165,7 +165,7 @@ export default function InstructorServicesPage() {
             まだ出品がありません
           </h2>
           <p className="text-gray-500 mb-6">
-            最初の商品を出品して、販売を開始しましょう。
+            最初のサービスを出品して、販売を開始しましょう。
           </p>
           <Link href="/instructor/services/new">
           <Button className="bg-green-600 hover:bg-green-700">
@@ -180,7 +180,7 @@ export default function InstructorServicesPage() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  商品名
+                  サービス名
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   カテゴリ

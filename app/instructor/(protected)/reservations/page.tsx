@@ -172,7 +172,7 @@ export default function InstructorReservationsPage() {
             {statusFilter === 'all' ? '予約はまだありません' : '該当する予約はありません'}
           </h2>
           <p className="text-gray-500">
-            商品が予約されると、ここに表示されます。
+            サービスが予約されると、ここに表示されます。
           </p>
         </div>
       ) : (
@@ -193,7 +193,7 @@ export default function InstructorReservationsPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-gray-900 truncate">
-                          {reservation.service?.title || '商品'}
+                          {reservation.service?.title || 'サービス'}
                         </h3>
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 mt-1">
                           <span className="flex items-center gap-1">

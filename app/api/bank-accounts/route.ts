@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthUser } from '@/lib/api/auth';
+import { UserRole } from '@prisma/client';
 import { encrypt, decrypt } from '@/lib/utils/encryption';
 import { sendBankAccountCreatedEmail } from '@/lib/mail/resend';
 import { withErrorHandler, validationError } from '@/lib/api/errors';
@@ -16,7 +17,7 @@ const toHalfWidthDigits = (value: string) =>
  * 銀行口座一覧取得
  */
 export const GET = withErrorHandler(async (request: NextRequest) => {
-  const authResult = await getAuthUser();
+  const authResult = await getAuthUser(UserRole.INSTRUCTOR);
   if (authResult instanceof NextResponse) return authResult;
   const { dbUser, authUser } = authResult;
 
@@ -65,7 +66,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
  * 銀行口座登録
  */
 export const POST = withErrorHandler(async (request: NextRequest) => {
-  const authResult = await getAuthUser();
+  const authResult = await getAuthUser(UserRole.INSTRUCTOR);
   if (authResult instanceof NextResponse) return authResult;
   const { dbUser, authUser } = authResult;
 

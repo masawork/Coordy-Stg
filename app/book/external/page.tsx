@@ -140,7 +140,7 @@ export default function ExternalBookingPage() {
       const data = await res.json();
 
       if (!data.services || data.services.length === 0) {
-        setError('利用可能な商品がありません。');
+        setError('利用可能なサービスがありません。');
         setStep('error');
         return;
       }
@@ -166,7 +166,7 @@ export default function ExternalBookingPage() {
 
       setStep('service');
     } catch {
-      setError('商品情報の取得に失敗しました。');
+      setError('サービス情報の取得に失敗しました。');
       setStep('error');
     }
   };
@@ -262,8 +262,8 @@ export default function ExternalBookingPage() {
       if (!res.ok) {
         const errorMessages: Record<string, string> = {
           NO_AVAILABILITY: '申し訳ございません。この時間帯は満席です。別の日時をお選びください。',
-          SERVICE_NOT_FOUND: '商品が見つかりません。',
-          SERVICE_NOT_ALLOWED: 'この商品は予約できません。',
+          SERVICE_NOT_FOUND: 'サービスが見つかりません。',
+          SERVICE_NOT_ALLOWED: 'このサービスは予約できません。',
         };
         const errorCode = typeof data.error === 'string' ? data.error : data.error?.code;
         const errorMsg = data.error?.message || (typeof data.error === 'string' ? data.error : null);
@@ -426,7 +426,7 @@ export default function ExternalBookingPage() {
 
 function StepIndicator({ currentStep }: { currentStep: BookingStep }) {
   const steps = [
-    { key: 'service', label: '商品' },
+    { key: 'service', label: 'サービス' },
     { key: 'schedule', label: '日程' },
     { key: 'guest_info', label: '情報入力' },
     { key: 'confirmation', label: '確認' },
@@ -500,7 +500,7 @@ function ServiceSelection({
 }) {
   return (
     <div>
-      <h2 className="text-xl font-bold text-gray-800 mb-6">商品を選択</h2>
+      <h2 className="text-xl font-bold text-gray-800 mb-6">サービスを選択</h2>
       <div className="space-y-4">
         {services.map((service) => (
           <button
@@ -574,7 +574,7 @@ function ScheduleSelection({
     <div>
       {onBack && (
         <button onClick={onBack} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
-          <ArrowLeft className="w-4 h-4" /> 商品選択に戻る
+          <ArrowLeft className="w-4 h-4" /> サービス選択に戻る
         </button>
       )}
 
@@ -776,7 +776,7 @@ function ConfirmationStep({
 
       <div className="bg-white rounded-xl border border-gray-200 divide-y">
         <div className="p-4">
-          <h3 className="text-sm font-medium text-gray-500 mb-1">商品</h3>
+          <h3 className="text-sm font-medium text-gray-500 mb-1">サービス</h3>
           <p className="font-bold text-gray-800">{service.title}</p>
           <p className="text-sm text-gray-500">{service.instructor.name}</p>
         </div>
@@ -868,7 +868,7 @@ function CompletionStep({
             <p className="font-mono font-bold text-gray-800">{reservation.id as string}</p>
           </div>
           <div>
-            <span className="text-sm text-gray-500">商品</span>
+            <span className="text-sm text-gray-500">サービス</span>
             <p className="font-medium text-gray-800">{service.title}</p>
           </div>
           <div>

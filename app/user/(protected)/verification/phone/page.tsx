@@ -277,7 +277,7 @@ export default function PhoneVerificationPage() {
             ✨ Level 1 でできること
           </h3>
           <ul className="text-xs text-blue-800 space-y-1">
-            <li>✅ 商品の購入・予約</li>
+            <li>✅ サービスの購入・予約</li>
             <li>✅ 決済（最大5,000円/回）</li>
             <li>✅ メッセージ送信</li>
           </ul>

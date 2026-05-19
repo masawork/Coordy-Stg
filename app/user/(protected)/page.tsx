@@ -174,7 +174,7 @@ export default function UserDashboardPage() {
       return {
         level: 'Level 0',
         title: '未認証',
-        description: '電話番号認証を完了して、商品を購入できるようにしましょう',
+        description: '電話番号認証を完了して、サービスを購入できるようにしましょう',
         subDescription: '',
         action: '電話番号を認証',
         actionUrl: '/user/verification/phone',
@@ -199,7 +199,7 @@ export default function UserDashboardPage() {
             <div className="flex-1">
               <h3 className="font-bold text-red-800">電話番号が未認証です</h3>
               <p className="text-sm text-red-700">
-                商品を購入するには、電話番号認証を完了してください。
+                サービスを購入するには、電話番号認証を完了してください。
               </p>
             </div>
             <button
@@ -300,7 +300,7 @@ export default function UserDashboardPage() {
               <div className="flex-1">
                 <h3 className="text-lg font-bold mb-2">すべての設定が完了しています！</h3>
                 <p className="text-sm opacity-90">
-                  すべての機能をご利用いただけます。素敵な商品をお楽しみください！
+                  すべての機能をご利用いただけます。素敵なサービスをお楽しみください！
                 </p>
               </div>
             </div>
@@ -453,14 +453,14 @@ export default function UserDashboardPage() {
       {/* サービス検索 */}
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          🔍 商品を探す
+          🔍 サービスを探す
         </h2>
         <div className="flex gap-4">
           <button
             onClick={() => router.push('/services')}
             className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors shadow-md hover:shadow-lg"
           >
-            商品一覧を見る
+            サービス一覧を見る
           </button>
         </div>
       </div>
