@@ -6,9 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { RecurrenceType, PublishStatus, UserRole } from '@prisma/client';
+import { RecurrenceType, UserRole } from '@prisma/client';
 import prisma from '@/lib/prisma';
-import { createClient } from '@/lib/supabase/server';
 import { getAuthUser } from '@/lib/api/auth';
 import {
   notFoundError,
@@ -55,33 +54,6 @@ export const GET = withErrorHandler(async (
     return notFoundError('サービス');
   }
 
-  // PUBLISHED 以外のサービスは所有者または管理者のみアクセス可能
-  if (service.publishStatus !== 'PUBLISHED') {
-    const supabase = await createClient();
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return notFoundError('サービス');
-    }
-
-    // 所有者チェック
-    const isOwner = service.instructor.user.authId === authUser.id;
-
-    // 管理者チェック
-    let isAdmin = false;
-    if (!isOwner) {
-      const adminUser = await prisma.user.findFirst({
-        where: { authId: authUser.id, role: 'ADMIN' },
-      });
-      isAdmin = !!adminUser;
-    }
-
-    if (!isOwner && !isAdmin) {
-      // 未公開サービスの存在を隠す（404を返す）
-      return notFoundError('サービス');
-    }
-  }
-
   return NextResponse.json(service);
 });
 
@@ -116,13 +88,6 @@ export const PUT = withErrorHandler(async (
   const instructorUser = existingService.instructor.user;
   if (instructorUser.authId !== authUser.id && instructorUser.id !== authUser.id) {
     return forbiddenError('このサービスを更新する権限がありません');
-  }
-
-  // 審査中のサービスは編集不可（先に申請を取り下げる必要がある）
-  if (existingService.publishStatus === 'PENDING_REVIEW') {
-    return validationError(
-      '公開申請中のサービスは編集できません。先に公開申請を取り下げてから編集してください。'
-    );
   }
 
   const body = await request.json();
@@ -181,15 +146,6 @@ export const PUT = withErrorHandler(async (
     return validationError('繰り返しサービスの場合は曜日と開始・終了時間が必要です');
   }
 
-  // 公開中のサービスが編集された場合、再審査が必要
-  // → publishStatus を DRAFT にリセットし、isActive を false に
-  const currentPublishStatus = existingService.publishStatus as string;
-  if (currentPublishStatus === 'PUBLISHED' && Object.keys(updateData).length > 0) {
-    updateData.publishStatus = 'DRAFT';
-    updateData.isActive = false;
-    updateData.publishedAt = null;
-  }
-
   const service = await prisma.service.update({
     where: { id },
     data: updateData,
@@ -200,19 +156,6 @@ export const PUT = withErrorHandler(async (
       images: { orderBy: { sortOrder: 'asc' } },
     },
   });
-
-  // 公開中だったサービスが編集でリセットされた場合、通知を追加
-  if (currentPublishStatus === 'PUBLISHED' && Object.keys(updateData).length > 0) {
-    await prisma.notification.create({
-      data: {
-        userId: existingService.instructor.user.id,
-        type: 'system',
-        category: 'service',
-        title: 'サービス公開ステータス変更',
-        message: `サービス「${existingService.title}」の内容が変更されたため、公開ステータスが下書きにリセットされました。再度公開申請を行ってください。`,
-      },
-    });
-  }
 
   return NextResponse.json(service);
 });
@@ -251,14 +194,6 @@ export const DELETE = withErrorHandler(async (
     return forbiddenError('このサービスを削除する権限がありません');
   }
 
-  // 審査中のサービスは削除不可（先に申請を取り下げる必要がある）
-  const currentStatus = (existingService as Record<string, unknown>).publishStatus as string;
-  if (currentStatus === 'PENDING_REVIEW') {
-    return validationError(
-      '公開申請中のサービスは削除できません。先に公開申請を取り下げてから削除してください。'
-    );
-  }
-
   // 未完了の予約を確認
   const activeReservations = await prisma.reservation.count({
     where: {
@@ -283,13 +218,11 @@ export const DELETE = withErrorHandler(async (
     }
   }
 
-  // 論理削除（isActive = false, publishStatus を DRAFT にリセット）
+  // 論理削除（isActive = false）
   const service = await prisma.service.update({
     where: { id },
     data: {
       isActive: false,
-      publishStatus: PublishStatus.DRAFT,
-      publishedAt: null,
     },
     include: {
       instructor: { include: { user: true } },

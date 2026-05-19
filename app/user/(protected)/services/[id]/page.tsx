@@ -14,8 +14,9 @@ import { createReservation } from '@/lib/api/reservations-client';
 import { getServiceSchedules, ScheduleSlot, formatDateShort } from '@/lib/api/schedules-client';
 import { getStripe } from '@/lib/stripe/client';
 import { Button } from '@/components/ui/button';
-import { Calendar, Clock, Users, Tag, ArrowLeft, ChevronLeft, ChevronRight, CheckCircle, CreditCard, Wallet, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, Users, Tag, ArrowLeft, ChevronLeft, ChevronRight, CheckCircle, CreditCard, Wallet, AlertCircle, ShieldBan } from 'lucide-react';
 import { ServiceImageGallery } from '@/components/features/service/ServiceImageGallery';
+import { blockInstructor } from '@/lib/api/blocks-client';
 
 interface PaymentMethodData {
   id: string;
@@ -399,6 +400,26 @@ export default function ServiceDetailPage() {
                 )}
               </div>
             </div>
+            {service?.instructorId && (
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <button
+                  onClick={async () => {
+                    if (!confirm('この出品者をブロックしますか？\nブロックすると、この出品者のサービスが検索結果に表示されなくなります。')) return;
+                    try {
+                      await blockInstructor(String((instructor as any).id));
+                      alert('ブロックしました');
+                      router.push('/user/services');
+                    } catch {
+                      alert('ブロックに失敗しました');
+                    }
+                  }}
+                  className="text-sm text-gray-400 hover:text-red-500 flex items-center gap-1 transition-colors"
+                >
+                  <ShieldBan className="h-4 w-4" />
+                  この出品者をブロック
+                </button>
+              </div>
+            )}
           </div>
         )}
 

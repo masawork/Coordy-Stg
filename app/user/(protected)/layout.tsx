@@ -9,12 +9,13 @@
 export const dynamic = 'force-dynamic';
 
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { useSidebar } from '@/components/layout/SidebarProvider';
+import { useAuthSafe } from '@/lib/auth/AuthContext';
 import { X } from 'lucide-react';
 
 function ProtectedContent({ children }: { children: React.ReactNode }) {
@@ -24,10 +25,33 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { open, isDesktop, close } = useSidebar();
+  const auth = useAuthSafe();
+  const checkedRef = useRef(false);
 
   useEffect(() => {
+    checkedRef.current = false;
+  }, [pathname]);
+
+  useEffect(() => {
+    if (checkedRef.current) return;
+    checkedRef.current = true;
+
     const checkAuth = async () => {
       try {
+        // キャッシュがあれば即座に表示
+        const cached = auth?.getRoleData('user');
+        if (cached && !pathname.includes('/profile/setup')) {
+          const profile = cached.profile;
+          if (profile && profile.isProfileComplete) {
+            setDisplayName(cached.displayName);
+            setUser(cached.user);
+            setLoading(false);
+            // バックグラウンドで再検証
+            auth?.fetchRoleData('user');
+            return;
+          }
+        }
+
         const session = await getSession();
 
         if (!session?.user) {
@@ -37,44 +61,21 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
 
         const authUser = session.user;
 
-        // プロフィール完了チェック（セットアップページ以外）
         if (!pathname.includes('/profile/setup')) {
-          try {
-            // ロール別にプロフィールを取得（USERロールのユーザーを検索）
-            const response = await fetch(`/api/auth/check-role?role=user`, {
-              credentials: 'include',
-            });
+          const roleData = await auth?.fetchRoleData('user');
 
-            if (!response.ok) {
-              // 500エラーの場合はセットアップページへ（無限ループを防ぐ）
-              if (response.status === 500) {
-                router.push('/user/profile/setup');
-                return;
-              }
-              // 404エラーの場合はログインページへ
-              if (response.status === 404) {
-                router.push('/login/user');
-                return;
-              }
-              // その他のエラーもセットアップへ
-              router.push('/user/profile/setup');
-              return;
-            }
-
-            const { user: dbUser, profile } = await response.json();
-
-            // プロフィールが存在しないか、完了していない場合はセットアップへ
-            if (!profile || !profile.isProfileComplete) {
-              router.push('/user/profile/setup');
-              return;
-            }
-            setDisplayName(profile.displayName || authUser.user_metadata?.name || authUser.email || 'ユーザー');
-            setUser(authUser);
-          } catch (err) {
-            // エラー時はセットアップページへ（無限ループを防ぐ）
+          if (!roleData) {
             router.push('/user/profile/setup');
             return;
           }
+
+          if (!roleData.profile || !roleData.profile.isProfileComplete) {
+            router.push('/user/profile/setup');
+            return;
+          }
+
+          setDisplayName(roleData.displayName);
+          setUser(roleData.user);
         } else {
           setDisplayName(authUser.user_metadata?.name || authUser.email || 'ユーザー');
           setUser(authUser);
@@ -88,7 +89,7 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
     };
 
     checkAuth();
-  }, [router, pathname]);
+  }, [router, pathname, auth]);
 
   if (loading) {
     return (

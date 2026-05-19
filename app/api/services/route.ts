@@ -9,6 +9,7 @@ import { Prisma, RecurrenceType } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { getAuthInstructor } from '@/lib/api/auth';
 import { validationError, withErrorHandler } from '@/lib/api/errors';
+import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,9 +55,35 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   const page = Math.max(1, Number(searchParams.get('page')) || 1);
   const limit = Math.min(50, Math.max(1, Number(searchParams.get('limit')) || 12));
 
+  // --- ブロック済み出品者のフィルタリング ---
+  let blockedInstructorIds: string[] = [];
+  try {
+    const supabase = await createClient();
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (authUser) {
+      const dbUser = await prisma.user.findFirst({
+        where: { authId: authUser.id, role: 'USER' },
+        select: { id: true },
+      });
+      if (dbUser) {
+        const blocks = await prisma.blockedInstructor.findMany({
+          where: { userId: dbUser.id },
+          select: { instructorId: true },
+        });
+        blockedInstructorIds = blocks.map(b => b.instructorId);
+      }
+    }
+  } catch {
+    // 未ログイン時はブロックフィルタなし
+  }
+
   // --- WHERE 構築 ---
   const where: Prisma.ServiceWhereInput = {};
-  if (instructorId) where.instructorId = instructorId;
+  if (instructorId) {
+    where.instructorId = instructorId;
+  } else if (blockedInstructorIds.length > 0) {
+    where.instructorId = { notIn: blockedInstructorIds };
+  }
   if (category) where.category = category;
   if (isActive !== undefined) where.isActive = isActive;
   if (deliveryType) where.deliveryType = deliveryType;

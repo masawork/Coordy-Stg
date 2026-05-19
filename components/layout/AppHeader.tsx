@@ -8,7 +8,8 @@ import { useSidebar } from './SidebarProvider';
 import { getRoleFromPath } from '@/lib/utils';
 import { signOut as betterAuthSignOut } from '@/lib/auth';
 import { getSession, clearSession } from '@/lib/auth';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { useAuthSafe } from '@/lib/auth/AuthContext';
 
 interface AppHeaderProps {
   userName?: string;
@@ -22,58 +23,77 @@ export function AppHeader({ userName }: AppHeaderProps) {
   const { toggle } = useSidebar();
   const [balance, setBalance] = useState<number | null>(null);
   const [availableRoles, setAvailableRoles] = useState<AvailableRole[]>([]);
+  const auth = useAuthSafe();
+  const rolesCheckedRef = useRef(false);
 
   const role = getRoleFromPath(pathname);
 
   useEffect(() => {
-    const loadData = async () => {
-      const session = await getSession();
-      if (!session?.user) return;
-
-      // ウォレット残高取得（ユーザーのみ）
-      if (role === 'user') {
-        try {
-          const response = await fetch(`/api/wallet/me?role=${role}`, {
-            credentials: 'include',
-          });
-          if (response.ok) {
-            const wallet = await response.json();
-            setBalance(wallet?.balance || 0);
-          }
-        } catch {
-          // ignore
+    const loadBalance = async () => {
+      if (role !== 'user') return;
+      try {
+        const response = await fetch(`/api/wallet/me?role=${role}`, {
+          credentials: 'include',
+        });
+        if (response.ok) {
+          const wallet = await response.json();
+          setBalance(wallet?.balance || 0);
         }
-      }
-
-      // 利用可能なロールをチェック（admin以外）
-      if (role && role !== 'admin') {
-        const rolesToCheck: AvailableRole[] = ['user', 'instructor'];
-        const available: AvailableRole[] = [];
-
-        await Promise.all(
-          rolesToCheck.map(async (r) => {
-            try {
-              const res = await fetch(`/api/auth/check-role?role=${r}`, {
-                credentials: 'include',
-              });
-              if (res.ok) {
-                const data = await res.json();
-                if (data.user) {
-                  available.push(r);
-                }
-              }
-            } catch {
-              // ignore
-            }
-          })
-        );
-
-        setAvailableRoles(available);
+      } catch {
+        // ignore
       }
     };
 
-    loadData();
-  }, [pathname, role]);
+    loadBalance();
+  }, [role]);
+
+  useEffect(() => {
+    if (rolesCheckedRef.current) return;
+    if (!role || role === 'admin') return;
+
+    rolesCheckedRef.current = true;
+
+    const checkRoles = async () => {
+      const session = await getSession();
+      if (!session?.user) return;
+
+      const rolesToCheck: AvailableRole[] = ['user', 'instructor'];
+      const available: AvailableRole[] = [];
+
+      await Promise.all(
+        rolesToCheck.map(async (r) => {
+          const cached = auth?.getRoleData(r);
+          if (cached) {
+            available.push(r);
+            return;
+          }
+          try {
+            const res = await fetch(`/api/auth/check-role?role=${r}`, {
+              credentials: 'include',
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.user) {
+                available.push(r);
+              }
+            }
+          } catch {
+            // ignore
+          }
+        })
+      );
+
+      setAvailableRoles(available);
+
+      const targetRole = role === 'user' ? 'instructor' : 'user';
+      if (available.includes(targetRole)) {
+        auth?.prefetchRole(targetRole);
+        router.prefetch(`/${targetRole}`);
+      }
+    };
+
+    checkRoles();
+  }, [role, auth, router]);
 
   if (/\/(login|signup|verify)/.test(pathname)) {
     return null;
@@ -101,6 +121,7 @@ export function AppHeader({ userName }: AppHeaderProps) {
 
   const handleSwitchRole = (targetRole: AvailableRole) => {
     if (targetRole === role) return;
+    auth?.prefetchRole(targetRole);
     router.push(`/${targetRole}`);
   };
 

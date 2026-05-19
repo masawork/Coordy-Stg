@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { SidebarProvider, useSidebar } from '@/components/layout/SidebarProvider';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { AuthProvider } from '@/lib/auth/AuthContext';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 
 function ProtectedSidebarSheet() {
@@ -33,9 +34,11 @@ function ProtectedSidebarSheet() {
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <SidebarProvider>
-      <ProtectedSidebarSheet />
-      {children}
-    </SidebarProvider>
+    <AuthProvider>
+      <SidebarProvider>
+        <ProtectedSidebarSheet />
+        {children}
+      </SidebarProvider>
+    </AuthProvider>
   );
 }

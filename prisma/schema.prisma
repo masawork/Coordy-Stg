@@ -29,6 +29,8 @@ model User {
   reservations        Reservation[]
   pointTransactions   PointTransaction[]
   favoriteCreators    FavoriteCreator[]
+  favoriteServices    FavoriteService[]
+  blockedInstructors  BlockedInstructor[]
   phoneVerifications  PhoneVerification[]
   paymentMethods      PaymentMethod[]
   bankAccounts        BankAccount[]
@@ -70,6 +72,7 @@ model Instructor {
   services  Service[]
   reservations Reservation[]
   favoriteCreators FavoriteCreator[]
+  blockedBy BlockedInstructor[]
   campaigns Campaign[]
 
   @@map("instructors")
@@ -112,11 +115,12 @@ model Service {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  instructor   Instructor        @relation(fields: [instructorId], references: [id], onDelete: Cascade)
-  reservations Reservation[]
-  schedules    ServiceSchedule[]
-  campaigns    Campaign[]
-  images       ServiceImage[]
+  instructor       Instructor        @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  reservations     Reservation[]
+  schedules        ServiceSchedule[]
+  campaigns        Campaign[]
+  images           ServiceImage[]
+  favoriteServices FavoriteService[]
 
   @@index([instructorId])
   @@map("services")
@@ -307,6 +311,37 @@ model FavoriteCreator {
   @@index([userId])
   @@index([instructorId])
   @@map("favorite_creators")
+}
+
+model FavoriteService {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  serviceId String   @map("service_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, serviceId])
+  @@index([userId])
+  @@index([serviceId])
+  @@map("favorite_services")
+}
+
+model BlockedInstructor {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  instructorId String   @map("instructor_id")
+  reason       String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  instructor Instructor @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, instructorId])
+  @@index([userId])
+  @@index([instructorId])
+  @@map("blocked_instructors")
 }
 
 // ========================================

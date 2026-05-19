@@ -10,7 +10,7 @@ import { getSession, clearSession } from '@/lib/auth';
 import { getClientProfile, updateClientProfile } from '@/lib/api/profile-client';
 import { signOut as betterAuthSignOut } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
-import { User, Bell, Shield, CreditCard, HelpCircle, LogOut } from 'lucide-react';
+import { User, Bell, Shield, ShieldBan, CreditCard, HelpCircle, LogOut } from 'lucide-react';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -78,6 +78,12 @@ export default function SettingsPage() {
       label: '支払い設定',
       description: '支払い方法の管理',
       onClick: () => router.push('/user/payment'),
+    },
+    {
+      icon: ShieldBan,
+      label: 'ブロック管理',
+      description: 'ブロック中の出品者の管理',
+      onClick: () => router.push('/user/settings/blocked'),
     },
     {
       icon: HelpCircle,

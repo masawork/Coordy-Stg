@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Heart } from 'lucide-react';
-import { addFavoriteCreator, removeFavoriteCreator, getFavoriteCreators } from '@/lib/api/favorites-client';
+import { addFavoriteService, removeFavoriteService, getFavoriteServices } from '@/lib/api/favorites-client';
 import { CategoryPlaceholder } from './CategoryPlaceholder';
 
 const deliveryTypeLabels: Record<string, string> = {
@@ -45,21 +45,19 @@ export function ServiceCard({ service, linkPrefix = '/user/services' }: ServiceC
 
   useEffect(() => {
     const checkFavorite = async () => {
-      if (service.instructorId) {
-        try {
-          const favorites = await getFavoriteCreators();
-          const favorite = favorites.find((f: any) => f.instructorId === service.instructorId);
-          if (favorite) {
-            setIsFavorite(true);
-            setFavoriteId(favorite.id);
-          }
-        } catch (err) {
-          // 未ログイン時などはエラーを無視
+      try {
+        const favorites = await getFavoriteServices();
+        const favorite = favorites.find((f: any) => f.serviceId === service.id);
+        if (favorite) {
+          setIsFavorite(true);
+          setFavoriteId(favorite.id);
         }
+      } catch {
+        // 未ログイン時などはエラーを無視
       }
     };
     checkFavorite();
-  }, [service.instructorId]);
+  }, [service.id]);
 
   const [favoriteError, setFavoriteError] = useState(false);
 
@@ -67,27 +65,23 @@ export function ServiceCard({ service, linkPrefix = '/user/services' }: ServiceC
     e.preventDefault();
     e.stopPropagation();
 
-    if (!service.instructorId) return;
-
     setLoading(true);
     setFavoriteError(false);
 
     const wasFavorite = isFavorite;
     const prevFavoriteId = favoriteId;
 
-    // 楽観的更新
     setIsFavorite(!wasFavorite);
     if (wasFavorite) setFavoriteId(null);
 
     try {
       if (wasFavorite && prevFavoriteId) {
-        await removeFavoriteCreator(prevFavoriteId);
+        await removeFavoriteService(prevFavoriteId);
       } else {
-        const result = await addFavoriteCreator(service.instructorId);
+        const result = await addFavoriteService(service.id);
         setFavoriteId(result?.id || null);
       }
     } catch {
-      // 失敗時はUI状態を元に戻す
       setIsFavorite(wasFavorite);
       setFavoriteId(prevFavoriteId);
       setFavoriteError(true);
@@ -119,25 +113,23 @@ export function ServiceCard({ service, linkPrefix = '/user/services' }: ServiceC
             </span>
           )}
 
-          {/* お気に入りボタン */}
-          {service.instructorId && (
-            <div className="absolute top-2 right-2">
-              <button
-                onClick={handleFavoriteToggle}
-                disabled={loading}
-                className={`p-2 rounded-full transition-all ${
-                  favoriteError
-                    ? 'bg-red-100 text-red-600 ring-2 ring-red-300'
-                    : isFavorite
-                      ? 'bg-red-500 text-white hover:bg-red-600'
-                      : 'bg-white/90 text-gray-600 hover:text-red-500'
-                } shadow-md`}
-                title={favoriteError ? '操作に失敗しました' : isFavorite ? 'お気に入り解除' : 'お気に入り登録'}
-              >
-                <Heart className={`h-4 w-4 ${isFavorite ? 'fill-current' : ''}`} />
-              </button>
-            </div>
-          )}
+          {/* いいねボタン */}
+          <div className="absolute top-2 right-2">
+            <button
+              onClick={handleFavoriteToggle}
+              disabled={loading}
+              className={`p-2 rounded-full transition-all ${
+                favoriteError
+                  ? 'bg-red-100 text-red-600 ring-2 ring-red-300'
+                  : isFavorite
+                    ? 'bg-red-500 text-white hover:bg-red-600'
+                    : 'bg-white/90 text-gray-600 hover:text-red-500'
+              } shadow-md`}
+              title={favoriteError ? '操作に失敗しました' : isFavorite ? 'いいね解除' : 'いいね'}
+            >
+              <Heart className={`h-4 w-4 ${isFavorite ? 'fill-current' : ''}`} />
+            </button>
+          </div>
         </div>
       </Link>
 

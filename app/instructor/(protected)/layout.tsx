@@ -9,80 +9,71 @@
 export const dynamic = 'force-dynamic';
 
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { useSidebar } from '@/components/layout/SidebarProvider';
+import { useAuthSafe } from '@/lib/auth/AuthContext';
 import { X } from 'lucide-react';
 
 function ProtectedContent({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any | null>(null);
   const [displayName, setDisplayName] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [redirected, setRedirected] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const { open, close } = useSidebar();
+  const auth = useAuthSafe();
+  const checkedRef = useRef(false);
 
   useEffect(() => {
+    checkedRef.current = false;
+  }, [pathname]);
+
+  useEffect(() => {
+    if (checkedRef.current) return;
+    checkedRef.current = true;
+
     const checkAuth = async () => {
       try {
+        const cached = auth?.getRoleData('instructor');
+        if (cached && !pathname.includes('/profile/setup')) {
+          const dbUser = cached.user;
+          if (dbUser?.instructor?.bio) {
+            setDisplayName(cached.displayName);
+            setUser(cached.user);
+            setLoading(false);
+            auth?.fetchRoleData('instructor');
+            return;
+          }
+        }
+
         const session = await getSession();
 
         if (!session?.user) {
-          if (!redirected) {
-            setRedirected(true);
-            router.push('/login/instructor');
-          }
+          router.push('/login/instructor');
           return;
         }
 
         const authUser = session.user;
 
-        // インストラクタープロフィールチェック（セットアップページ以外）
         if (!pathname.includes('/profile/setup')) {
-          try {
-            // ロール別にユーザーを検索（INSTRUCTORロール）
-            const response = await fetch(`/api/auth/check-role?role=instructor`, {
-              credentials: 'include',
-            });
+          const roleData = await auth?.fetchRoleData('instructor');
 
-            if (!response.ok) {
-              // このロールでユーザーが登録されていない
-              if (!redirected) {
-                setRedirected(true);
-                router.push('/login/instructor');
-              }
-              return;
-            }
-
-            const { user: dbUser, profile } = await response.json();
-
-            // インストラクターのセットアップが完了しているか確認（bioが設定されているか）
-            if (!dbUser.instructor || !dbUser.instructor.bio) {
-              if (!redirected) {
-                setRedirected(true);
-                router.push('/instructor/profile/setup');
-              }
-              return;
-            }
-
-            setDisplayName(
-              profile?.displayName
-                || authUser.user_metadata?.name
-                || authUser.email
-                || 'インストラクター'
-            );
-            setUser(authUser);
-          } catch (err) {
-            if (!redirected) {
-              setRedirected(true);
-              router.push('/instructor/profile/setup');
-            }
+          if (!roleData) {
+            router.push('/login/instructor');
             return;
           }
+
+          if (!roleData.user?.instructor?.bio) {
+            router.push('/instructor/profile/setup');
+            return;
+          }
+
+          setDisplayName(roleData.displayName);
+          setUser(roleData.user);
         } else {
           setDisplayName(
             authUser.user_metadata?.name
@@ -95,15 +86,12 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
         setLoading(false);
       } catch (error) {
         setLoading(false);
-        if (!redirected) {
-          setRedirected(true);
-          router.push('/login/instructor');
-        }
+        router.push('/login/instructor');
       }
     };
 
     checkAuth();
-  }, [router, pathname, redirected]);
+  }, [router, pathname, auth]);
 
   if (loading) {
     return (
