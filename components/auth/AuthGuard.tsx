@@ -13,7 +13,7 @@ interface AuthGuardProps {
 export function AuthGuard({ 
   children, 
   requiredRole,
-  redirectTo = '/login/user' 
+  redirectTo = '/login' 
 }: AuthGuardProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);

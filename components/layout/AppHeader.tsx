@@ -23,6 +23,7 @@ export function AppHeader({ userName }: AppHeaderProps) {
   const { toggle } = useSidebar();
   const [balance, setBalance] = useState<number | null>(null);
   const [availableRoles, setAvailableRoles] = useState<AvailableRole[]>([]);
+  const [roleNames, setRoleNames] = useState<Record<string, string>>({});
   const auth = useAuthSafe();
   const rolesCheckedRef = useRef(false);
 
@@ -60,11 +61,14 @@ export function AppHeader({ userName }: AppHeaderProps) {
       const rolesToCheck: AvailableRole[] = ['user', 'instructor'];
       const available: AvailableRole[] = [];
 
+      const names: Record<string, string> = {};
+
       await Promise.all(
         rolesToCheck.map(async (r) => {
           const cached = auth?.getRoleData(r);
           if (cached) {
             available.push(r);
+            names[r] = cached.displayName;
             return;
           }
           try {
@@ -75,6 +79,7 @@ export function AppHeader({ userName }: AppHeaderProps) {
               const data = await res.json();
               if (data.user) {
                 available.push(r);
+                names[r] = data.profile?.displayName || data.user?.name || '';
               }
             }
           } catch {
@@ -84,6 +89,7 @@ export function AppHeader({ userName }: AppHeaderProps) {
       );
 
       setAvailableRoles(available);
+      setRoleNames(names);
 
       const targetRole = role === 'user' ? 'instructor' : 'user';
       if (available.includes(targetRole)) {
@@ -181,10 +187,14 @@ export function AppHeader({ userName }: AppHeaderProps) {
           </Link>
 
           {userName && role && (
-            <span className="hidden sm:inline text-sm text-gray-600">
+            <span className="hidden sm:inline flex items-center gap-1.5 text-sm text-gray-600">
               {userName}さん
-              <span className="ml-1 text-xs text-gray-400">
-                （{roleLabels[role]}ログイン中）
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                role === 'user' ? 'bg-purple-100 text-purple-700' :
+                role === 'instructor' ? 'bg-green-100 text-green-700' :
+                'bg-gray-100 text-gray-700'
+              }`}>
+                {roleLabels[role]}
               </span>
             </span>
           )}
@@ -196,6 +206,7 @@ export function AppHeader({ userName }: AppHeaderProps) {
                 <button
                   key={r}
                   onClick={() => handleSwitchRole(r)}
+                  title={roleNames[r] ? `${roleNames[r]}（${roleLabels[r]}）` : roleLabels[r]}
                   className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                     r === role
                       ? roleColors[r].active
@@ -203,6 +214,9 @@ export function AppHeader({ userName }: AppHeaderProps) {
                   }`}
                 >
                   {roleLabels[r]}
+                  {r !== role && roleNames[r] && roleNames[r] !== userName && (
+                    <span className="ml-1 opacity-70">({roleNames[r]})</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -258,8 +272,12 @@ export function AppHeader({ userName }: AppHeaderProps) {
       {role && role !== 'admin' && (
         <div className="sm:hidden flex items-center justify-center gap-2 pb-1 -mt-1">
           {userName && (
-            <span className="text-xs text-gray-400">
-              {roleLabels[role]}ログイン中
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+              role === 'user' ? 'bg-purple-100 text-purple-700' :
+              role === 'instructor' ? 'bg-green-100 text-green-700' :
+              'bg-gray-100 text-gray-700'
+            }`}>
+              {roleLabels[role]}
             </span>
           )}
           {availableRoles.length > 1 && (

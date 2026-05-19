@@ -55,7 +55,7 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
         const session = await getSession();
 
         if (!session?.user) {
-          router.push('/login/user');
+          router.push('/login');
           return;
         }
 
@@ -84,7 +84,7 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
         setLoading(false);
       } catch (error) {
         setLoading(false);
-        router.push('/login/user');
+        router.push('/login');
       }
     };
 

@@ -46,7 +46,7 @@ export default function EditServicePage() {
       setLoading(true);
       const session = await getSession();
       if (!session?.user) {
-        router.push('/login/instructor');
+        router.push('/login');
         return;
       }
 

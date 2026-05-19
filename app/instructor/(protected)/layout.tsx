@@ -53,7 +53,7 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
         const session = await getSession();
 
         if (!session?.user) {
-          router.push('/login/instructor');
+          router.push('/login');
           return;
         }
 
@@ -63,7 +63,7 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
           const roleData = await auth?.fetchRoleData('instructor');
 
           if (!roleData) {
-            router.push('/login/instructor');
+            router.push('/login');
             return;
           }
 
@@ -86,7 +86,7 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
         setLoading(false);
       } catch (error) {
         setLoading(false);
-        router.push('/login/instructor');
+        router.push('/login');
       }
     };
 

@@ -10,22 +10,29 @@ import { getSession, clearSession } from '@/lib/auth';
 import { getClientProfile, updateClientProfile } from '@/lib/api/profile-client';
 import { signOut as betterAuthSignOut } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
-import { User, Bell, Shield, ShieldBan, CreditCard, HelpCircle, LogOut } from 'lucide-react';
+import { User, Bell, Shield, ShieldBan, CreditCard, HelpCircle, LogOut, Store } from 'lucide-react';
 
 export default function SettingsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
+  const [hasInstructorRole, setHasInstructorRole] = useState(false);
+  const [registeringInstructor, setRegisteringInstructor] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
       const session = await getSession();
       if (!session?.user) {
-        router.push('/login/user');
+        router.push('/login');
         return;
       }
 
       loadProfile(session.user.id);
+
+      fetch('/api/auth/check-role?role=INSTRUCTOR')
+        .then(r => r.ok ? r.json() : null)
+        .then(d => setHasInstructorRole(!!d?.user))
+        .catch(() => {});
     };
     loadData();
   }, [router]);
@@ -49,8 +56,26 @@ export default function SettingsPage() {
     try {
       await betterAuthSignOut();
       clearSession();
-      router.push('/login/user');
+      router.push('/login');
     } catch (error) {
+    }
+  };
+
+  const handleBecomeInstructor = async () => {
+    if (!confirm('出品者として登録しますか？\n登録後、出品者プロフィールの設定が必要です。')) return;
+    setRegisteringInstructor(true);
+    try {
+      await fetch('/api/users/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'instructor' }),
+      });
+      setHasInstructorRole(true);
+      router.push('/instructor/profile/setup');
+    } catch {
+      alert('登録に失敗しました。時間をおいて再度お試しください。');
+    } finally {
+      setRegisteringInstructor(false);
     }
   };
 
@@ -157,6 +182,30 @@ export default function SettingsPage() {
                 );
               })}
             </div>
+
+            {/* 出品者登録 */}
+            {!hasInstructorRole && (
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg shadow p-6 border border-green-200">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-green-100 rounded-lg">
+                    <Store className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900">出品者として活動する</h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      サービスを出品して収益を得ることができます。手数料10%、初期費用0円。
+                    </p>
+                  </div>
+                  <Button
+                    onClick={handleBecomeInstructor}
+                    disabled={registeringInstructor}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {registeringInstructor ? '登録中...' : '出品者登録'}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* ログアウト */}
             <div className="bg-white rounded-lg shadow p-6">

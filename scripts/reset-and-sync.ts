@@ -77,7 +77,7 @@ async function resetAndSync() {
     console.log('🎉 同期完了！');
     console.log('');
     console.log('次のステップ:');
-    console.log('1. http://localhost:3000/login/user でログイン');
+    console.log('1. http://localhost:3000/login でログイン');
     console.log('2. プロフィール設定ページで情報を入力');
     console.log('3. 保存して完了！');
   } catch (error) {

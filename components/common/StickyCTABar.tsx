@@ -1,20 +1,28 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaUser, FaChalkboardTeacher, FaTimes } from 'react-icons/fa';
+import { FaUser, FaTimes } from 'react-icons/fa';
+import { getSession } from '@/lib/auth';
 
 export default function StickyCTABar() {
   const [isVisible, setIsVisible] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const checkedRef = useRef(false);
+
+  useEffect(() => {
+    if (checkedRef.current) return;
+    checkedRef.current = true;
+    getSession().then(s => setIsLoggedIn(!!s?.user)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
-      // ヒーローセクションを通過したら表示
       const scrollPosition = window.scrollY;
       const windowHeight = window.innerHeight;
-      
+
       if (scrollPosition > windowHeight * 0.5 && !isDismissed) {
         setIsVisible(true);
       } else if (scrollPosition <= windowHeight * 0.5) {
@@ -31,6 +39,8 @@ export default function StickyCTABar() {
     setIsVisible(false);
   };
 
+  if (isLoggedIn) return null;
+
   return (
     <AnimatePresence>
       {isVisible && (
@@ -43,25 +53,22 @@ export default function StickyCTABar() {
         >
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between gap-4">
-              {/* CTAボタン */}
               <div className="flex flex-col sm:flex-row gap-3 flex-1 justify-center">
                 <Link
-                  href="/signup/user"
+                  href="/signup"
                   className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-full hover:from-purple-700 hover:to-pink-700 transition-all shadow-lg hover:shadow-xl text-sm sm:text-base"
                 >
                   <FaUser className="text-sm" />
-                  <span>ユーザー登録</span>
+                  <span>無料で新規登録</span>
                 </Link>
                 <Link
-                  href="/signup/instructor"
-                  className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-full hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl text-sm sm:text-base"
+                  href="/login"
+                  className="flex items-center justify-center gap-2 px-6 py-3 bg-white text-gray-700 font-bold rounded-full border border-gray-300 hover:bg-gray-50 transition-all shadow-md hover:shadow-lg text-sm sm:text-base"
                 >
-                  <FaChalkboardTeacher className="text-sm" />
-                  <span>出品者登録</span>
+                  <span>ログイン</span>
                 </Link>
               </div>
 
-              {/* 閉じるボタン */}
               <button
                 onClick={handleDismiss}
                 className="flex-shrink-0 p-2 text-gray-400 hover:text-gray-600 transition-colors"

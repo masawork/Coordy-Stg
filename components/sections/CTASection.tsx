@@ -23,28 +23,9 @@ export default function CTASection() {
     checkSession();
   }, []);
 
-  // ユーザーボタンの遷移先を決定
-  const getUserButtonHref = () => {
-    if (!mounted || !session) return '/signup/user';
-    if (session.user_metadata?.role?.toLowerCase() === 'user') return '/user';
-    return '/signup/user';
-  };
-
-  // 出品者ボタンの遷移先を決定
-  const getInstructorButtonHref = () => {
-    if (!mounted || !session) return '/signup/instructor';
-    if (session.user_metadata?.role?.toLowerCase() === 'instructor') return '/instructor';
-    // ユーザーとしてログイン中でも /signup/instructor へ（別ロールのアカウント作成を許可）
-    return '/signup/instructor';
-  };
-
-  // ボタンテキストを決定（ログイン状態でもラベルは変えない）
-  const getUserButtonText = () => {
-    return 'ユーザーの新規登録はこちら';
-  };
-
-  const getInstructorButtonText = () => {
-    return '出品者の新規登録はこちら';
+  const getSignupHref = () => {
+    if (!mounted || !session) return '/signup';
+    return '/user';
   };
 
   return (
@@ -63,14 +44,14 @@ export default function CTASection() {
             受講する側も、提供する側も、あなたの第一歩をサポートします
           </p>
           <div className="flex flex-col sm:flex-row gap-6 justify-center">
-            <Link href={getUserButtonHref()} className="text-center">
+            <Link href={getSignupHref()} className="text-center">
               <Button variant="secondary" size="lg" className="text-lg">
-                {getUserButtonText()}
+                無料で新規登録
               </Button>
             </Link>
-            <Link href={getInstructorButtonHref()} className="text-center">
-              <Button variant="secondary" size="lg" className="text-lg">
-                {getInstructorButtonText()}
+            <Link href="/login" className="text-center">
+              <Button variant="secondary" size="lg" className="text-lg border-white/50">
+                ログインはこちら
               </Button>
             </Link>
           </div>

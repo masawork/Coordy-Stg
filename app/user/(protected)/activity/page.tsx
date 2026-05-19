@@ -19,7 +19,7 @@ export default function ActivityPage() {
     const loadSessionAndActivity = async () => {
       const session = await getSession();
       if (!session) {
-        router.push('/login/user');
+        router.push('/login');
         return;
       }
 

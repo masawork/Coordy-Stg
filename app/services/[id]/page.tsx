@@ -173,12 +173,12 @@ export default function ServiceDetailPage() {
                     このサービスを予約するにはログインが必要です
                   </p>
                   <div className="flex gap-2">
-                    <Link href="/login/user">
+                    <Link href="/login">
                       <Button variant="primary" size="sm">
                         ログイン
                       </Button>
                     </Link>
-                    <Link href="/signup/user">
+                    <Link href="/signup">
                       <Button variant="outline" size="sm">
                         新規登録
                       </Button>

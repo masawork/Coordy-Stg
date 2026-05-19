@@ -57,7 +57,7 @@ export default function ServiceDetailPage() {
     const loadData = async () => {
       const session = await getSession();
       if (!session?.user) {
-        router.push('/login/user');
+        router.push('/login');
         return;
       }
 

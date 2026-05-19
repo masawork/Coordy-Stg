@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 
     if (exchangeError) {
       console.error('❌ Exchange code error:', exchangeError);
-      return NextResponse.redirect(`${origin}/login/${requestedRole}?error=exchange_failed`);
+      return NextResponse.redirect(`${origin}/login?error=exchange_failed`);
     }
 
     // ユーザー情報取得
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
 
     if (userError || !user) {
       console.error('❌ Get user error:', userError);
-      return NextResponse.redirect(`${origin}/login/${requestedRole}?error=user_fetch_failed`);
+      return NextResponse.redirect(`${origin}/login?error=user_fetch_failed`);
     }
 
     console.log('✅ User authenticated:', { authId: user.id, email: user.email, requestedRole });

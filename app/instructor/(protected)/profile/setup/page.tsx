@@ -46,7 +46,7 @@ export default function InstructorProfileSetupPage() {
       // セッションを取得
       const session = await getSession();
       if (!session?.user) {
-        router.push('/login/instructor');
+        router.push('/login');
         return;
       }
 
@@ -56,7 +56,7 @@ export default function InstructorProfileSetupPage() {
       });
 
       if (!roleCheckRes.ok) {
-        router.push('/login/instructor');
+        router.push('/login');
         return;
       }
 
@@ -88,7 +88,7 @@ export default function InstructorProfileSetupPage() {
         }));
       }
     } catch (err: any) {
-      router.push('/login/instructor');
+      router.push('/login');
     } finally {
       setInitialLoading(false);
     }

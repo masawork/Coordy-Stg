@@ -15,15 +15,9 @@ export type Role = typeof ROLES[keyof typeof ROLES];
 // パス定義
 export const PATHS = {
   HOME: '/',
-  LOGIN: {
-    USER: '/login/user',
-    INSTRUCTOR: '/login/instructor',
-    ADMIN: '/admin-portal/login', // 通常導線からはアクセス不可
-  },
-  SIGNUP: {
-    USER: '/signup/user',
-    INSTRUCTOR: '/signup/instructor',
-  },
+  LOGIN: '/login',
+  SIGNUP: '/signup',
+  ADMIN_LOGIN: '/manage/login',
   USER: {
     HOME: '/user',
     SERVICES: '/user/services',

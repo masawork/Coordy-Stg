@@ -64,12 +64,12 @@ export default function InstructorIdentityVerificationPage() {
       try {
         const session = await getSession();
         if (!session?.user) {
-          router.push('/login/instructor');
+          router.push('/login');
           return;
         }
         await loadStatus();
       } catch (err) {
-        router.push('/login/instructor');
+        router.push('/login');
       }
     };
     run();
@@ -81,7 +81,7 @@ export default function InstructorIdentityVerificationPage() {
       setLoading(true);
       const session = await getSession();
       if (!session?.user) {
-        router.push('/login/instructor');
+        router.push('/login');
         return;
       }
       const userName = session.user.user_metadata?.name || session.user.user_metadata?.full_name || '';
@@ -89,7 +89,7 @@ export default function InstructorIdentityVerificationPage() {
       const response = await fetch('/api/verification/identity/status?role=instructor', { credentials: 'include' });
 
       if (response.status === 401 || response.status === 403) {
-        router.push('/login/instructor');
+        router.push('/login');
         return;
       }
 
@@ -135,7 +135,7 @@ export default function InstructorIdentityVerificationPage() {
       // エラー発生時も認証状態を確認
       const session = await getSession();
       if (!session?.user) {
-        router.push('/login/instructor');
+        router.push('/login');
         return;
       }
       setError('ステータスの取得に失敗しました');
@@ -327,7 +327,7 @@ export default function InstructorIdentityVerificationPage() {
       // プロフィール情報が変わっていればユーザーに確認し、更新を実施
       const session = await getSession();
       if (!session?.user) {
-        router.push('/login/instructor');
+        router.push('/login');
         return;
       }
 
@@ -367,7 +367,7 @@ export default function InstructorIdentityVerificationPage() {
 
       // 認証エラー時は即座にリダイレクト
       if (response.status === 401 || response.status === 403) {
-        router.push('/login/instructor');
+        router.push('/login');
         return;
       }
 
@@ -382,7 +382,7 @@ export default function InstructorIdentityVerificationPage() {
       // エラー発生時も認証状態を確認
       const session = await getSession();
       if (!session?.user) {
-        router.push('/login/instructor');
+        router.push('/login');
         return;
       }
       setError(err.message || '提出に失敗しました');

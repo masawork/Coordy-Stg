@@ -69,7 +69,7 @@ export default function NewServicePage() {
     try {
       const session = await getSession();
       if (!session?.user) {
-        router.push('/login/instructor');
+        router.push('/login');
         return;
       }
 
@@ -112,7 +112,7 @@ export default function NewServicePage() {
 
       setInstructorId(instructor.id);
     } catch (error) {
-      router.push('/login/instructor');
+      router.push('/login');
     }
   };
 
