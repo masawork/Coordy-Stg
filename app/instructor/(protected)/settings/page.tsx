@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Bell, Lock, Shield, CreditCard, Video, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Bell, Lock, Shield, CreditCard, Video, CheckCircle, XCircle, Loader2, Banknote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function InstructorSettingsPage() {
@@ -20,6 +20,9 @@ export default function InstructorSettingsPage() {
   const [googleLoading, setGoogleLoading] = useState(true);
   const [googleDisconnecting, setGoogleDisconnecting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [payoutFrequency, setPayoutFrequency] = useState<'IMMEDIATE' | 'MONTHLY'>('IMMEDIATE');
+  const [payoutLoading, setPayoutLoading] = useState(true);
+  const [payoutSaving, setPayoutSaving] = useState(false);
 
   useEffect(() => {
     // URLパラメータからメッセージを取得
@@ -41,6 +44,7 @@ export default function InstructorSettingsPage() {
 
     // Google連携状態を確認
     checkGoogleStatus();
+    loadPayoutSettings();
   }, [searchParams]);
 
   const checkGoogleStatus = async () => {
@@ -51,6 +55,40 @@ export default function InstructorSettingsPage() {
     } catch (error) {
     } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  const loadPayoutSettings = async () => {
+    try {
+      const res = await fetch('/api/instructor/payout-settings');
+      if (res.ok) {
+        const data = await res.json();
+        setPayoutFrequency(data.payoutFrequency);
+      }
+    } catch {
+    } finally {
+      setPayoutLoading(false);
+    }
+  };
+
+  const handlePayoutChange = async (freq: 'IMMEDIATE' | 'MONTHLY') => {
+    setPayoutSaving(true);
+    try {
+      const res = await fetch('/api/instructor/payout-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payoutFrequency: freq }),
+      });
+      if (res.ok) {
+        setPayoutFrequency(freq);
+        setMessage({ type: 'success', text: '振込設定を更新しました' });
+      } else {
+        setMessage({ type: 'error', text: '振込設定の更新に失敗しました' });
+      }
+    } catch {
+      setMessage({ type: 'error', text: '振込設定の更新に失敗しました' });
+    } finally {
+      setPayoutSaving(false);
     }
   };
 
@@ -207,6 +245,64 @@ export default function InstructorSettingsPage() {
             </label>
           </div>
         </div>
+      </div>
+
+      {/* 振込設定 */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <Banknote className="h-5 w-5 text-green-600" />
+          <h2 className="text-lg font-semibold text-gray-900">振込設定</h2>
+        </div>
+
+        {payoutLoading ? (
+          <div className="flex justify-center py-4">
+            <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              売上の振込タイミングを選択してください。手数料は振込方法によって異なります。
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button
+                onClick={() => handlePayoutChange('IMMEDIATE')}
+                disabled={payoutSaving}
+                className={`p-4 rounded-lg border-2 text-left transition-colors ${
+                  payoutFrequency === 'IMMEDIATE'
+                    ? 'border-green-600 bg-green-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold text-gray-900">都度払い</span>
+                  <span className="text-sm font-medium text-orange-600">¥250/回</span>
+                </div>
+                <p className="text-sm text-gray-500">出金申請ごとに振込されます</p>
+              </button>
+              <button
+                onClick={() => handlePayoutChange('MONTHLY')}
+                disabled={payoutSaving}
+                className={`p-4 rounded-lg border-2 text-left transition-colors ${
+                  payoutFrequency === 'MONTHLY'
+                    ? 'border-green-600 bg-green-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold text-gray-900">月次払い</span>
+                  <span className="text-sm font-medium text-green-600">¥150/回</span>
+                </div>
+                <p className="text-sm text-gray-500">月末締め・翌月15日に一括振込</p>
+              </button>
+            </div>
+            {payoutSaving && (
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                更新中...
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* セキュリティ設定 */}

@@ -19,6 +19,7 @@ model User {
   emailVerified  DateTime? @map("email_verified") @db.Timestamptz(6)
   image          String?
   role           UserRole  @default(USER)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -61,6 +62,7 @@ model Instructor {
   specialties String[]
   hourlyRate  Int?     @map("hourly_rate")
   isVerified  Boolean  @default(false) @map("is_verified")
+  payoutFrequency PayoutFrequency @default(IMMEDIATE) @map("payout_frequency")
   // Google OAuth for Meet integration
   googleAccessToken  String?  @map("google_access_token") @db.Text
   googleRefreshToken String?  @map("google_refresh_token") @db.Text
@@ -87,6 +89,13 @@ enum RecurrenceType {
   CUSTOM   // カスタム
 
   @@map("recurrence_type")
+}
+
+enum PayoutFrequency {
+  IMMEDIATE // 都度払い（出金申請ごとに振込）
+  MONTHLY   // 月次払い（月末締め翌月15日払い）
+
+  @@map("payout_frequency")
 }
 
 model Service {
@@ -716,4 +725,55 @@ model WebhookLog {
   @@index([success])
   @@index([createdAt])
   @@map("webhook_logs")
+}
+
+// ===== 施設予約連携 =====
+
+model Facility {
+  id          String   @id @default(uuid())
+  name        String
+  address     String
+  prefecture  String
+  description String?  @db.Text
+  amenities   String[]
+  capacity    Int      @default(1)
+  hourlyRate  Int?     @map("hourly_rate")
+  imageUrl    String?  @map("image_url")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  slots FacilitySlot[]
+
+  @@index([prefecture])
+  @@index([isActive])
+  @@map("facilities")
+}
+
+model FacilitySlot {
+  id          String           @id @default(uuid())
+  facilityId  String           @map("facility_id")
+  date        DateTime         @db.Date
+  startTime   String           @map("start_time")
+  endTime     String           @map("end_time")
+  status      FacilitySlotStatus @default(AVAILABLE)
+  bookedBy    String?          @map("booked_by")
+  serviceId   String?          @map("service_id")
+  price       Int?
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@index([facilityId, date])
+  @@index([status])
+  @@map("facility_slots")
+}
+
+enum FacilitySlotStatus {
+  AVAILABLE // 空き
+  HELD      // 出品者が仮押さえ中
+  BOOKED    // 予約確定済み
+  CANCELLED // キャンセル
+
+  @@map("facility_slot_status")
 }

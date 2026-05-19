@@ -5,8 +5,9 @@ import { withErrorHandler, validationError, notFoundError, conflictError } from 
 
 export const dynamic = 'force-dynamic';
 
-// 振込手数料（円）
-const TRANSFER_FEE = 250;
+// 振込手数料（円）— 出金頻度により異なる
+const TRANSFER_FEE_IMMEDIATE = 250;
+const TRANSFER_FEE_MONTHLY = 150;
 // 最低引き出し額
 const MIN_WITHDRAWAL = 1000;
 // 最大引き出し額（1,000万円）
@@ -70,6 +71,16 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     return validationError(`1回の引き出し上限は${MAX_WITHDRAWAL.toLocaleString()}円です`);
   }
 
+  // インストラクターの振込頻度を取得して手数料を決定
+  const instructor = await prisma.instructor.findUnique({
+    where: { userId },
+    select: { payoutFrequency: true },
+  });
+
+  const transferFee = instructor?.payoutFrequency === 'MONTHLY'
+    ? TRANSFER_FEE_MONTHLY
+    : TRANSFER_FEE_IMMEDIATE;
+
   // 銀行口座の確認（Prisma User IDで比較）
   const bankAccount = await prisma.bankAccount.findUnique({
     where: { id: bankAccountId },
@@ -83,7 +94,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     return validationError('この銀行口座は未承認です。管理者の承認をお待ちください');
   }
 
-  const netAmount = amount - TRANSFER_FEE;
+  const netAmount = amount - transferFee;
 
   // $transactionで残高チェック・出金作成・残高減算・取引記録を一括実行
   const result = await prisma.$transaction(async (tx) => {
@@ -116,7 +127,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       data: {
         instructorId: userId,
         amount,
-        fee: TRANSFER_FEE,
+        fee: transferFee,
         netAmount,
         bankAccountId,
         status: 'PENDING',

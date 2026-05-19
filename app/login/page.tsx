@@ -168,7 +168,7 @@ export default function LoginPage() {
   );
 }
 
-async function detectRedirect(authUserId: string): Promise<string> {
+async function detectRedirect(_authUserId: string): Promise<string> {
   try {
     const [userRes, instrRes] = await Promise.all([
       fetch('/api/auth/check-role?role=USER'),
@@ -177,11 +177,8 @@ async function detectRedirect(authUserId: string): Promise<string> {
     const userData = userRes.ok ? await userRes.json() : null;
     const instrData = instrRes.ok ? await instrRes.json() : null;
 
-    const hasUser = userData?.registered;
-    const hasInstructor = instrData?.registered;
-
-    if (hasUser) return '/user';
-    if (hasInstructor) return '/instructor';
+    if (userData?.user) return '/user';
+    if (instrData?.user) return '/instructor';
 
     await fetch('/api/users/sync', {
       method: 'POST',

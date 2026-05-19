@@ -10,7 +10,7 @@ import { getSession, clearSession } from '@/lib/auth';
 import { getClientProfile, updateClientProfile } from '@/lib/api/profile-client';
 import { signOut as betterAuthSignOut } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
-import { User, Bell, Shield, ShieldBan, CreditCard, HelpCircle, LogOut, Store } from 'lucide-react';
+import { User, Bell, Shield, ShieldBan, CreditCard, HelpCircle, LogOut, Store, UserX } from 'lucide-react';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -18,6 +18,7 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState<any>(null);
   const [hasInstructorRole, setHasInstructorRole] = useState(false);
   const [registeringInstructor, setRegisteringInstructor] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -76,6 +77,36 @@ export default function SettingsPage() {
       alert('登録に失敗しました。時間をおいて再度お試しください。');
     } finally {
       setRegisteringInstructor(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    const first = confirm('本当に退会しますか？\n退会すると全てのアカウントデータが無効化されます。この操作は取り消せません。');
+    if (!first) return;
+    const second = prompt('退会を確定するには「DELETE」と入力してください');
+    if (second !== 'DELETE') {
+      alert('入力が正しくありません。退会はキャンセルされました。');
+      return;
+    }
+
+    setDeletingAccount(true);
+    try {
+      const res = await fetch('/api/account/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmation: 'DELETE' }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || '退会に失敗しました');
+        return;
+      }
+      clearSession();
+      window.location.href = '/login';
+    } catch {
+      alert('退会に失敗しました。時間をおいて再度お試しください。');
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -217,6 +248,29 @@ export default function SettingsPage() {
                 <LogOut className="h-4 w-4 mr-2" />
                 ログアウト
               </Button>
+            </div>
+
+            {/* 退会 */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-red-100 rounded-lg">
+                  <UserX className="h-6 w-6 text-red-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-gray-900">退会する</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    アカウントを削除します。未完了の予約や残高がある場合は退会できません。
+                  </p>
+                </div>
+                <Button
+                  onClick={handleDeleteAccount}
+                  disabled={deletingAccount}
+                  variant="outline"
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                >
+                  {deletingAccount ? '処理中...' : '退会する'}
+                </Button>
+              </div>
             </div>
 
             {/* アプリ情報 */}
