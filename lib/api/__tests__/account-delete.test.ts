@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const mockGetUser = jest.fn();
+const mockSignOut = jest.fn();
 const mockFindMany = jest.fn();
 const mockUpdate = jest.fn();
-const mockTransaction = jest.fn();
-const mockSignOut = jest.fn();
 
 jest.mock('@/lib/supabase/server', () => ({
   createClient: jest.fn().mockResolvedValue({
@@ -15,14 +14,17 @@ jest.mock('@/lib/supabase/server', () => ({
   }),
 }));
 
+const txProxy = {
+  user: {
+    findMany: (...args: any[]) => mockFindMany(...args),
+    update: (...args: any[]) => mockUpdate(...args),
+  },
+};
+
 jest.mock('@/lib/prisma', () => ({
   __esModule: true,
   default: {
-    user: {
-      findMany: (...args: any[]) => mockFindMany(...args),
-      update: (...args: any[]) => mockUpdate(...args),
-    },
-    $transaction: (...args: any[]) => mockTransaction(...args),
+    $transaction: (fn: any) => fn(txProxy),
   },
 }));
 
@@ -44,6 +46,8 @@ async function parseResponse(res: NextResponse) {
 describe('POST /api/account/delete', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUpdate.mockResolvedValue({ id: 'u1' });
+    mockSignOut.mockResolvedValue({});
   });
 
   it('should return 401 if not authenticated', async () => {
@@ -71,7 +75,6 @@ describe('POST /api/account/delete', () => {
         reservations: [{ id: 'r1', status: 'CONFIRMED' }],
         withdrawalRequests: [],
         wallet: { balance: 0 },
-        instructor: null,
       },
     ]);
 
@@ -89,7 +92,6 @@ describe('POST /api/account/delete', () => {
         reservations: [],
         withdrawalRequests: [{ id: 'w1', status: 'PENDING' }],
         wallet: { balance: 0 },
-        instructor: null,
       },
     ]);
 
@@ -107,7 +109,6 @@ describe('POST /api/account/delete', () => {
         reservations: [],
         withdrawalRequests: [],
         wallet: { balance: 500 },
-        instructor: null,
       },
     ]);
 
@@ -125,17 +126,15 @@ describe('POST /api/account/delete', () => {
         reservations: [],
         withdrawalRequests: [],
         wallet: { balance: 0 },
-        instructor: null,
       },
     ]);
-    mockTransaction.mockResolvedValue([{ id: 'u1' }]);
-    mockSignOut.mockResolvedValue({});
 
     const res = await POST(makeRequest({ confirmation: 'DELETE' }));
     const { body, status } = await parseResponse(res);
     expect(status).toBe(200);
     expect(body.success).toBe(true);
     expect(body.message).toContain('退会');
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
   });
 
   it('should handle multiple user records (multi-role)', async () => {
@@ -146,22 +145,19 @@ describe('POST /api/account/delete', () => {
         reservations: [],
         withdrawalRequests: [],
         wallet: { balance: 0 },
-        instructor: null,
       },
       {
         id: 'u2',
         reservations: [],
         withdrawalRequests: [],
         wallet: null,
-        instructor: null,
       },
     ]);
-    mockTransaction.mockResolvedValue([{ id: 'u1' }, { id: 'u2' }]);
-    mockSignOut.mockResolvedValue({});
 
     const res = await POST(makeRequest({ confirmation: 'DELETE' }));
     const { body, status } = await parseResponse(res);
     expect(status).toBe(200);
     expect(body.success).toBe(true);
+    expect(mockUpdate).toHaveBeenCalledTimes(2);
   });
 });

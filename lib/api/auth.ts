@@ -58,7 +58,6 @@ export async function getAuthUser(role?: UserRole): Promise<
   return { dbUser, authUser };
 }
 
-/** @deprecated getAuthSeller() を使用してください */
 /**
  * 認証済みインストラクターを取得
  * ユーザーがINSTRUCTORロールであり、instructor情報が存在することを確認
@@ -114,7 +113,6 @@ export async function getAuthAdmin(): Promise<{ dbUser: User } | NextResponse> {
   return { dbUser };
 }
 
-/** @deprecated getVerifiedSeller() を使用してください */
 /**
  * 認証済み＆本人確認済みインストラクターを取得
  * サービスや商品の作成など、本人確認（Level 2）が必要な操作で使用

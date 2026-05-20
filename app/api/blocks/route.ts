@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthUser } from '@/lib/api/auth';
 import { UserRole } from '@prisma/client';
-import { withErrorHandler, validationError, conflictError } from '@/lib/api/errors';
+import { withErrorHandler, validationError, conflictError, notFoundError } from '@/lib/api/errors';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +34,13 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   if (!instructorId) {
     return validationError('出品者IDが必要です');
+  }
+
+  const instructor = await prisma.instructor.findUnique({
+    where: { id: instructorId },
+  });
+  if (!instructor) {
+    return notFoundError('出品者');
   }
 
   const existing = await prisma.blockedInstructor.findUnique({

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthUser } from '@/lib/api/auth';
 import { UserRole } from '@prisma/client';
-import { withErrorHandler, validationError, conflictError } from '@/lib/api/errors';
+import { withErrorHandler, validationError, conflictError, notFoundError } from '@/lib/api/errors';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +37,13 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   if (!serviceId) {
     return validationError('サービスIDが必要です');
+  }
+
+  const service = await prisma.service.findUnique({
+    where: { id: serviceId },
+  });
+  if (!service) {
+    return notFoundError('サービス');
   }
 
   const existing = await prisma.favoriteService.findUnique({

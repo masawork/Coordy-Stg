@@ -13,6 +13,10 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   const prefecture = searchParams.get('prefecture');
   const date = searchParams.get('date');
 
+  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return validationError('日付はYYYY-MM-DD形式で指定してください');
+  }
+
   const where: any = { isActive: true };
   if (prefecture) where.prefecture = prefecture;
 
@@ -38,11 +42,18 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   const authResult = await getAuthInstructor();
   if (isErrorResponse(authResult)) return authResult;
 
-  const { dbUser, instructor } = authResult;
+  const { dbUser } = authResult;
   const body = await request.json();
   const { slotId, serviceId } = body;
 
   if (!slotId) return validationError('スロットIDを指定してください');
+
+  if (serviceId) {
+    const service = await prisma.service.findUnique({
+      where: { id: serviceId },
+    });
+    if (!service) return notFoundError('サービス');
+  }
 
   const slot = await prisma.facilitySlot.findUnique({
     where: { id: slotId },
